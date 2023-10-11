@@ -3,6 +3,8 @@ import { useState } from "react";
 import github from "../assets/github.png";
 import link from "../assets/link.png";
 
+import hemingway from "../assets/Projects/hemingway.png";
+import hemingway_motion from "../assets/Projects/hemingway-motion.gif";
 import fakeTwitter from "../assets/Projects/faketwitter.png";
 import fakeTwitter_motion from "../assets/Projects/faketwitter-motion.gif";
 import amazon_clone from "../assets/Projects/amazon-clone.png";
@@ -19,6 +21,7 @@ import sunrise_weather from "../assets/Projects/sunrise-weather-screenshot.png";
 import sunrise_weather_motion from "../assets/Projects/sunrise-weather-motion.gif";
 
 const Projects = () => {
+  const [isHoveringHemingway, setIsHoveringHemingway] = useState(false);
   const [isHoveringFakeTwitter, setIsHoveringFakeTwitter] = useState(false);
   const [isHoveringAmazonClone, setIsHoveringAmazonClone] = useState(false);
   const [isHoveringThriveTracker, setIsHoveringThriveTracker] = useState(false);
@@ -34,6 +37,43 @@ const Projects = () => {
         Featured Projects
       </h2>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 text-center">
+        {/* Hemingway*/}
+        <div
+          class="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
+          onMouseEnter={() => setIsHoveringHemingway(true)}
+          onMouseLeave={() => setIsHoveringHemingway(false)}
+        >
+          <img
+            src={isHoveringHemingway ? hemingway_motion : hemingway}
+            alt="Hemingway Search Engine"
+            className="w-full h-48 object-cover"
+          />
+          <div className="p-4">
+            <h3 className="text-xl font-semibold mb-2">Hemingway Search Engine</h3>
+            <h4 class="text-sm font-medium text-gray-600 mb-2">
+              React | Flask | Word2Vec | NumPy
+            </h4>
+            <p className="text-gray-700 text-base">
+              Hemingway is a search engine that uses a Word2Vec model and NumPy to
+              calculate the similarity between a user's query and the text
+              in the corpus. If no exact results are found, it will display at least three results.
+            </p>
+            <div className="flex justify-center mt-4">
+              <a
+                href="https://github.com/Duncan-Wood/Hemingway-Search-Engine"
+                className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <img
+                  src={github}
+                  alt="Github"
+                  className="w-full h-8 object-cover"
+                />
+              </a>
+            </div>
+          </div>
+        </div>
         {/* FakeTwitter*/}
         <div
           class="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
