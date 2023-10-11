@@ -108,7 +108,6 @@ const Nav = () => {
                   to="contact"
                   smooth={true}
                   duration={500}
-                  offset={-50}
                   onClick={handleClick}
                   className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                 >
@@ -178,7 +177,6 @@ const Nav = () => {
               to="contact"
               smooth={true}
               duration={500}
-              offset={-50}
               onClick={handleClick}
               className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
             >
