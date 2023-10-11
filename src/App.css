@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+#inner-home {
+  background-image: url("./assets/design/purple-leaf-stroke.png");
+  background-size: 7vh;
+  border-radius: 5%;
+}
+#home-text {
+  font-family: "Montserrat", sans-serif;
+  font-weight: 700;
+  font-size: 3.5vh;
+  background-color: #32114e;
+  color: white;
+  padding: 1vh;
+  border-radius: 2ch;
+  border: 0.25vh solid #aa4cff;
+}
+#headshot {
+  border: 0.25vh solid #32114e;
+  filter: saturate(135%);
+}
+
+#contact__form {
+  width: 70%;
+}
+#contact-icons {
+  border: 0.25vh solid black;
+  background-color: #aa4cff;
+  padding: 1vh;
+  border-radius: 0.5ch;
+}
+
+#contact__formMessage {
+  height: 150px;
+}
+
+.skills-wrapper {
+  display: inline-flex;
+}
+
+#skills-container::-webkit-scrollbar {
+  height: 1vh;
+}
+
+#skills-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
