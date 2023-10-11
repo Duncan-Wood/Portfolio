@@ -63,6 +63,7 @@ const Nav = () => {
                   to="home"
                   smooth={true}
                   duration={500}
+                  offset={-100}
                   onClick={handleClick}
                   className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                 >
@@ -77,6 +78,7 @@ const Nav = () => {
                   to="about"
                   smooth={true}
                   duration={500}
+                  offset={-100}
                   onClick={handleClick}
                   className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                 >
@@ -86,6 +88,7 @@ const Nav = () => {
                   to="projects"
                   smooth={true}
                   duration={500}
+                  offset={-100}
                   onClick={handleClick}
                   className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                 >
@@ -95,6 +98,7 @@ const Nav = () => {
                   to="skills"
                   smooth={true}
                   duration={500}
+                  offset={-100}
                   onClick={handleClick}
                   className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                 >
@@ -104,6 +108,7 @@ const Nav = () => {
                   to="contact"
                   smooth={true}
                   duration={500}
+                  offset={-50}
                   onClick={handleClick}
                   className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                 >
@@ -132,6 +137,7 @@ const Nav = () => {
               to="home"
               smooth={true}
               duration={500}
+              offset={-100}
               onClick={handleClick}
               className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex flex-row items-center"
             >
@@ -142,6 +148,7 @@ const Nav = () => {
               to="about"
               smooth={true}
               duration={500}
+              offset={-100}
               onClick={handleClick}
               className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
             >
@@ -151,6 +158,7 @@ const Nav = () => {
               to="projects"
               smooth={true}
               duration={500}
+              offset={-100}
               onClick={handleClick}
               className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
             >
@@ -160,6 +168,7 @@ const Nav = () => {
               to="skills"
               smooth={true}
               duration={500}
+              offset={-100}
               onClick={handleClick}
               className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
             >
@@ -169,6 +178,7 @@ const Nav = () => {
               to="contact"
               smooth={true}
               duration={500}
+              offset={-50}
               onClick={handleClick}
               className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
             >
