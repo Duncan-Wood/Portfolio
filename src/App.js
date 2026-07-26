@@ -17,6 +17,7 @@ import "./App.css";
 import Nav from "./components/nav";
 import Home from "./components/home";
 import About from "./components/About";
+import Experience from "./components/Experience";
 import Projects from "./components/Projects";
 import Skills from "./components/Skills";
 import Contact from "./components/Contact";
@@ -28,6 +29,7 @@ function App() {
       <main id="body">
         <Home id="home" />
         <About id="about" />
+        <Experience id="experience" />
         <Projects id="projects" />
         <Skills id="skills" />
         <Contact id="contact" />

@@ -20,383 +20,200 @@ import dog_city_motion from "../assets/Projects/dog-city-motion.gif";
 import sunrise_weather from "../assets/Projects/sunrise-weather-screenshot.png";
 import sunrise_weather_motion from "../assets/Projects/sunrise-weather-motion.gif";
 
+const professionalProjects = [
+  {
+    name: "Internal Data-Review Tool",
+    tech: "Next.js | TypeScript | Supabase | PostgreSQL",
+    description:
+      "Built from an empty repo as lead developer: surfaces proposed record changes as a field-level diff for the data team to accept or reject, writing approved changes back to the source-of-truth system with a full audit trail. In daily production use.",
+  },
+  {
+    name: "Reusable AI Summarization System",
+    tech: "Ruby on Rails | LLM | Structured Output",
+    description:
+      "A shared Rails concern any analytics module can include to generate schema-validated, AI-written narrative summaries of report data. Adopted across three modules, it became the standard pattern and cut inference cost ~5x.",
+  },
+  {
+    name: "HIPAA Document-Conversion Service",
+    tech: "Python | Flask | Google Cloud Run | Docker",
+    description:
+      "A HIPAA-compliant microservice that converts documents on demand, replacing an expensive commercial alternative, with a full automated unit, integration, and performance test suite.",
+  },
+];
+
+const personalProjects = [
+  {
+    name: "Hemingway Search Engine",
+    tech: "React | Flask | Word2Vec | NumPy",
+    description:
+      "A search engine that uses a Word2Vec model and NumPy to calculate the similarity between a user's query and the text in the corpus. If no exact results are found, it returns at least three of the closest matches.",
+    image: hemingway,
+    motion: hemingway_motion,
+    github: "https://github.com/Duncan-Wood/Hemingway-Search-Engine",
+  },
+  {
+    name: "Fake Twitter",
+    tech: "React | Material UI | AWS | Docker",
+    description:
+      "A collaborative full-stack app built with Joshua Rizek that replicates Twitter's core features while emphasizing full-stack development and DevOps integration.",
+    image: fakeTwitter,
+    motion: fakeTwitter_motion,
+    github: "https://github.com/rizekj12/fakeTwitter",
+  },
+  {
+    name: "Amazon Clone",
+    tech: "React | Firebase | Stripe",
+    description:
+      "A React-based e-commerce app where users can create accounts, add items to a basket, and view the subtotal — a solid foundation for e-commerce apps.",
+    image: amazon_clone,
+    motion: amazon_clone_motion,
+    live: "https://clone-153b6.web.app/",
+    github: "https://github.com/Duncan-Wood/amazon-clone",
+  },
+  {
+    name: "ThriveTracker",
+    tech: "React | Django | Tailwind",
+    description:
+      "A full-stack application with time-tracking and progress-monitoring features to support individuals in their addiction-recovery journey.",
+    image: thrivetracker,
+    motion: thrivetracker_motion,
+    github: "https://github.com/Duncan-Wood/ThriveTracker-Frontend",
+  },
+  {
+    name: "Tick-iT",
+    tech: "Django Views | Django | Material Theme Builder",
+    description:
+      "A Django web app for browsing venues and events and purchasing tickets, providing a seamless ticket-buying experience.",
+    image: tickiT,
+    motion: tickiT_motion,
+    github: "https://github.com/nezcodin/Tick-iT-Hackathon",
+  },
+  {
+    name: "Coping Corner",
+    tech: "React | PostgreSQL | Material Theme Builder",
+    description:
+      "A full-stack web application for people struggling with mental health, providing user authentication, resource creation and sharing, and community building.",
+    image: coping_corner,
+    motion: coping_corner_motion,
+    github: "https://github.com/Duncan-Wood/Coping-Corner-Frontend",
+  },
+  {
+    name: "Dog City",
+    tech: "React | Axios | ChartJS",
+    description:
+      "A React web app for dog lovers that lets users browse 172 dog breeds and view their characteristics and images.",
+    image: dog_city,
+    motion: dog_city_motion,
+    live: "https://dog-city.netlify.app/",
+    github: "https://github.com/Duncan-Wood/Dog-City",
+  },
+  {
+    name: "Sunrise Weather",
+    tech: "HTML | Axios | JavaScript",
+    description:
+      "A single-page website that displays current weather information from a weather API alongside a random quote to brighten your day.",
+    image: sunrise_weather,
+    motion: sunrise_weather_motion,
+    live: "https://sunrise-weather.surge.sh",
+    github: "https://github.com/Duncan-Wood/Sunrise-Weather",
+  },
+];
+
+const cardClasses =
+  "bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300 flex flex-col";
+
+const LinkButton = ({ href, icon, alt, color }) => (
+  <a
+    href={href}
+    className={`${color} text-white font-bold py-1 px-3 rounded-md border mx-2`}
+    target="_blank"
+    rel="noreferrer"
+  >
+    <img src={icon} alt={alt} className="w-full h-8 object-cover" />
+  </a>
+);
+
+const ProfessionalCard = ({ project }) => (
+  <div className={cardClasses}>
+    <div className="h-48 bg-gradient-to-br from-purple-700 to-purple-900 flex items-center justify-center p-4">
+      <h3 className="text-xl font-semibold text-white text-center">
+        {project.name}
+      </h3>
+    </div>
+    <div className="p-4 flex flex-col flex-1">
+      <h4 className="text-sm font-medium text-gray-600 mb-2">{project.tech}</h4>
+      <p className="text-gray-700 text-base">{project.description}</p>
+    </div>
+  </div>
+);
+
+const PersonalCard = ({ project }) => {
+  const [isHovering, setIsHovering] = useState(false);
+  return (
+    <div
+      className={cardClasses}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      <img
+        src={isHovering ? project.motion : project.image}
+        alt={project.name}
+        className="w-full h-48 object-cover"
+      />
+      <div className="p-4 flex flex-col flex-1">
+        <h3 className="text-xl font-semibold mb-2">{project.name}</h3>
+        <h4 className="text-sm font-medium text-gray-600 mb-2">
+          {project.tech}
+        </h4>
+        <p className="text-gray-700 text-base flex-1">{project.description}</p>
+        <div className="flex justify-center mt-4">
+          {project.live && (
+            <LinkButton
+              href={project.live}
+              icon={link}
+              alt="Deployed App"
+              color="bg-blue-300 hover:bg-blue-500 border-blue-500"
+            />
+          )}
+          {project.github && (
+            <LinkButton
+              href={project.github}
+              icon={github}
+              alt="Github"
+              color="bg-gray-300 hover:bg-gray-500 border-gray-500"
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Projects = () => {
   const [showAllProjects, setShowAllProjects] = useState(false);
 
-  const [isHoveringHemingway, setIsHoveringHemingway] = useState(false);
-  const [isHoveringFakeTwitter, setIsHoveringFakeTwitter] = useState(false);
-  const [isHoveringAmazonClone, setIsHoveringAmazonClone] = useState(false);
-  const [isHoveringThriveTracker, setIsHoveringThriveTracker] = useState(false);
-  const [isHoveringTickiT, setIsHoveringTickiT] = useState(false);
-  const [isHoveringCopingCorner, setIsHoveringCopingCorner] = useState(false);
-  const [isHoveringDogCity, setIsHoveringDogCity] = useState(false);
-  const [isHoveringSunriseWeather, setIsHoveringSunriseWeather] =
-    useState(false);
-
-  const toggleProjects = () => {
-    setShowAllProjects(!showAllProjects);
-  };
+  const [featuredPersonal, ...morePersonal] = personalProjects;
 
   return (
     <div id="projects" className="m-10">
-      <h2 className="text-3xl font-bold mb-10 text-center">
-        Featured Projects
-      </h2>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg: justify-items-center grid-cols-3 text-center justify-items-center">
-        {/* Hemingway*/}
-        <div
-          className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-          onMouseEnter={() => setIsHoveringHemingway(true)}
-          onMouseLeave={() => setIsHoveringHemingway(false)}
-        >
-          <img
-            src={isHoveringHemingway ? hemingway_motion : hemingway}
-            alt="Hemingway Search Engine"
-            className="w-full h-48 object-cover"
-          />
-          <div className="p-4">
-            <h3 className="text-xl font-semibold mb-2">
-              Hemingway Search Engine
-            </h3>
-            <h4 className="text-sm font-medium text-gray-600 mb-2">
-              React | Flask | Word2Vec | NumPy
-            </h4>
-            <p className="text-gray-700 text-base">
-              Hemingway is a search engine that uses a Word2Vec model and NumPy
-              to calculate the similarity between a user's query and the text in
-              the corpus. If no exact results are found, it will display at
-              least three results.
-            </p>
-            <div className="flex justify-center mt-4">
-              <a
-                href="https://github.com/Duncan-Wood/Hemingway-Search-Engine"
-                className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <img
-                  src={github}
-                  alt="Github"
-                  className="w-full h-8 object-cover"
-                />
-              </a>
-            </div>
-          </div>
-        </div>
-        {/* FakeTwitter*/}
-        <div
-          className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-          onMouseEnter={() => setIsHoveringFakeTwitter(true)}
-          onMouseLeave={() => setIsHoveringFakeTwitter(false)}
-        >
-          <img
-            src={isHoveringFakeTwitter ? fakeTwitter_motion : fakeTwitter}
-            alt="Fake Twitter"
-            className="w-full h-48 object-cover"
-          />
-          <div className="p-4">
-            <h3 className="text-xl font-semibold mb-2">Fake Twitter</h3>
-            <h4 className="text-sm font-medium text-gray-600 mb-2">
-              React | Material UI | AWS | Docker
-            </h4>
-            <p className="text-gray-700 text-base">
-              FakeTwitter is a collaborative full-stack app developed with
-              Joshua Rizek, a Senior Software Engineer at Booz Allen, aiming to
-              replicate Twitter's features while emphasizing full stack
-              development and DevOps integration.
-            </p>
-            <div className="flex justify-center mt-4">
-              <a
-                href="https://github.com/rizekj12/fakeTwitter"
-                className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <img
-                  src={github}
-                  alt="Github"
-                  className="w-full h-8 object-cover"
-                />
-              </a>
-            </div>
-          </div>
-        </div>
-        {/* Amazon Clone*/}
-        <div
-          className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-          onMouseEnter={() => setIsHoveringAmazonClone(true)}
-          onMouseLeave={() => setIsHoveringAmazonClone(false)}
-        >
-          <img
-            src={isHoveringAmazonClone ? amazon_clone_motion : amazon_clone}
-            alt="Amazon Clone"
-            className="w-full h-48 object-cover"
-          />
-          <div className="p-4">
-            <h3 className="text-xl font-semibold mb-2">Amazon Clone</h3>
-            <h4 className="text-sm font-medium text-gray-600 mb-2">
-              React | Firebase | Stripe
-            </h4>
-            <p className="text-gray-700 text-base">
-              The Amazon Clone is a React-based e-commerce app where users can
-              create accounts, add items to their basket, and view the subtotal.
-              It's a valuable learning resource and a solid foundation for
-              e-commerce apps.
-            </p>
-            <div className="flex justify-center mt-4">
-              <a
-                href="https://clone-153b6.web.app/"
-                className="bg-blue-300 hover:bg-blue-500 text-white font-bold py-1 px-3 rounded-md border border-blue-500 mr-4"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <img
-                  src={link}
-                  alt="Deployed App"
-                  className="w-full h-8 object-cover"
-                />
-              </a>
-              <a
-                href="https://github.com/Duncan-Wood/amazon-clone"
-                className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <img
-                  src={github}
-                  alt="Github"
-                  className="w-full h-8 object-cover"
-                />
-              </a>
-            </div>
-          </div>
-        </div>
-        {/* Thrivetracker */}
-        <div
-          className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-          onMouseEnter={() => setIsHoveringThriveTracker(true)}
-          onMouseLeave={() => setIsHoveringThriveTracker(false)}
-        >
-          <img
-            src={isHoveringThriveTracker ? thrivetracker_motion : thrivetracker}
-            alt="ThriveTracker"
-            className="w-full h-48 object-cover"
-          />
-          <div className="p-4">
-            <h3 className="text-xl font-semibold mb-2">ThriveTracker</h3>
-            <h4 className="text-sm font-medium text-gray-600 mb-2">
-              React | Django | Tailwind
-            </h4>
-            <p className="text-gray-700 text-base">
-              ThriveTracker is a full-stack application that features time
-              tracking and progress monitoring functionalities to aid
-              individuals in their addiction recovery journey.
-            </p>
-            <div className="flex justify-center mt-4">
-              <a
-                href="https://github.com/Duncan-Wood/ThriveTracker-Frontend"
-                className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <img
-                  src={github}
-                  alt="Github"
-                  className="w-full h-8 object-cover"
-                />
-              </a>
-            </div>
-          </div>
-        </div>
-        {/* Additional projects (hidden by default) */}
-        {showAllProjects && (
-          <>
-            {/* TickiT*/}
-            <div
-              className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-              onMouseEnter={() => setIsHoveringTickiT(true)}
-              onMouseLeave={() => setIsHoveringTickiT(false)}
-            >
-              <img
-                src={isHoveringTickiT ? tickiT_motion : tickiT}
-                alt="Tick-iT"
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h3 className="text-xl font-semibold mb-2">Tick-iT</h3>
-                <h4 className="text-sm font-medium text-gray-600 mb-2">
-                  Django Views | Django | Material Theme Builder
-                </h4>
-                <p className="text-gray-700 text-base">
-                  Tick-iT is a Django web app for browsing venues, events, and
-                  purchasing tickets, providing a seamless ticket-buying
-                  experience.
-                </p>
-                <div className="flex justify-center mt-4">
-                  <a
-                    href="https://github.com/nezcodin/Tick-iT-Hackathon"
-                    className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <img
-                      src={github}
-                      alt="Github"
-                      className="w-full h-8 object-cover"
-                    />
-                  </a>
-                </div>
-              </div>
-            </div>
-            {/* Coping Corner */}
-            <div
-              className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-              onMouseEnter={() => setIsHoveringCopingCorner(true)}
-              onMouseLeave={() => setIsHoveringCopingCorner(false)}
-            >
-              <img
-                src={
-                  isHoveringCopingCorner ? coping_corner_motion : coping_corner
-                }
-                alt="Coping Corner"
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h3 className="text-xl font-semibold mb-2">Coping Corner</h3>
-                <h4 className="text-sm font-medium text-gray-600 mb-2">
-                  React | PostgreSQL | Material Theme Builder
-                </h4>
-                <p className="text-gray-700 text-base">
-                  Coping Corner is a full-stack web application for individuals
-                  struggling with mental health that provides user
-                  authentication, resource creation and sharing, and community
-                  building.
-                </p>
-                <div className="flex justify-center mt-4">
-                  <a
-                    href="https://github.com/Duncan-Wood/Coping-Corner-Frontend"
-                    className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <img
-                      src={github}
-                      alt="Github"
-                      className="w-full h-8 object-cover"
-                    />
-                  </a>
-                </div>
-              </div>
-            </div>
-            {/* Dog City */}
-            <div
-              className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-              onMouseEnter={() => setIsHoveringDogCity(true)}
-              onMouseLeave={() => setIsHoveringDogCity(false)}
-            >
-              <img
-                src={isHoveringDogCity ? dog_city_motion : dog_city}
-                alt="Dog City"
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h3 className="text-xl font-semibold mb-2">Dog City</h3>
-                <h4 className="text-sm font-medium text-gray-600 mb-2">
-                  React | Axios | ChartJS
-                </h4>
-                <p className="text-gray-700 text-base">
-                  Dog City is a React web app for dog lovers that lets users
-                  browse 172 dog breeds and view their characteristics and
-                  images.
-                </p>
-                <div className="flex justify-center mt-4">
-                  <a
-                    href="https://dog-city.netlify.app/"
-                    className="bg-blue-300 hover:bg-blue-500 text-white font-bold py-1 px-3 rounded-md border border-blue-500 mr-4"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <img
-                      src={link}
-                      alt="Deployed App"
-                      className="w-full h-8 object-cover"
-                    />
-                  </a>
-                  <a
-                    href="https://github.com/Duncan-Wood/Dog-City"
-                    className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <img
-                      src={github}
-                      alt="Github"
-                      className="w-full h-8 object-cover"
-                    />
-                  </a>
-                </div>
-              </div>
-            </div>
-            {/* Sunrise Weather */}
-            <div
-              className="bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300"
-              onMouseEnter={() => setIsHoveringSunriseWeather(true)}
-              onMouseLeave={() => setIsHoveringSunriseWeather(false)}
-            >
-              <img
-                src={
-                  isHoveringSunriseWeather
-                    ? sunrise_weather_motion
-                    : sunrise_weather
-                }
-                alt="Sunrise Weather"
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h3 className="text-xl font-semibold mb-2">Sunrise Weather</h3>
-                <h4 className="text-sm font-medium text-gray-600 mb-2">
-                  HTML | Axios | JavaScript
-                </h4>
-                <p className="text-gray-700 text-base">
-                  Sunrise Weather is a single-page website that displays current
-                  weather information from a weather API and a random quote to
-                  brighten up your day.
-                </p>
-                <div className="flex justify-center mt-4">
-                  <a
-                    href="https://sunrise-weather.surge.sh"
-                    className="bg-blue-300 hover:bg-blue-500 text-white font-bold py-1 px-3 rounded-md border border-blue-500 mr-4"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <img
-                      src={link}
-                      alt="Deployed App"
-                      className="w-full h-8 object-cover"
-                    />
-                  </a>
-                  <a
-                    href="https://github.com/Duncan-Wood/Sunrise-Weather"
-                    className="bg-gray-300 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md border border-gray-500"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <img
-                      src={github}
-                      alt="Github"
-                      className="w-full h-8 object-cover"
-                    />
-                  </a>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+      <h2 className="text-3xl font-bold mb-2 text-center">Featured Projects</h2>
+      <p className="text-gray-500 text-center mb-10">
+        Selected professional work and personal builds.
+      </p>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 justify-items-center">
+        {professionalProjects.map((project) => (
+          <ProfessionalCard key={project.name} project={project} />
+        ))}
+        <PersonalCard project={featuredPersonal} />
+        {showAllProjects &&
+          morePersonal.map((project) => (
+            <PersonalCard key={project.name} project={project} />
+          ))}
       </div>
-      <div className="text-center mt-4">
+      <div className="text-center mt-8">
         <button
           className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg"
-          onClick={toggleProjects}
+          onClick={() => setShowAllProjects(!showAllProjects)}
         >
           {showAllProjects ? "Show Less" : "Show All"}
         </button>

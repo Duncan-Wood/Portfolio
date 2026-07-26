@@ -85,6 +85,16 @@ const Nav = () => {
                   About
                 </ScrollLink>
                 <ScrollLink
+                  to="experience"
+                  smooth={true}
+                  duration={500}
+                  offset={-100}
+                  onClick={handleClick}
+                  className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Experience
+                </ScrollLink>
+                <ScrollLink
                   to="projects"
                   smooth={true}
                   duration={500}
@@ -114,7 +124,7 @@ const Nav = () => {
                   Contact
                 </ScrollLink>
                 <a
-                  href="https://docs.google.com/document/d/1S1OmTFn_FNE7jcgu3MyRMuzcYBRcIsjW/edit?usp=sharing&ouid=105120848197838885353&rtpof=true&sd=true"
+                  href="/resume.pdf"
                   target="_blank"
                   rel="noreferrer"
                   className="cursor-pointer text-white hover:bg-purple-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
@@ -154,6 +164,16 @@ const Nav = () => {
               About
             </ScrollLink>
             <ScrollLink
+              to="experience"
+              smooth={true}
+              duration={500}
+              offset={-100}
+              onClick={handleClick}
+              className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+            >
+              Experience
+            </ScrollLink>
+            <ScrollLink
               to="projects"
               smooth={true}
               duration={500}
@@ -183,7 +203,7 @@ const Nav = () => {
               Contact
             </ScrollLink>
             <a
-              href="https://docs.google.com/document/d/1S1OmTFn_FNE7jcgu3MyRMuzcYBRcIsjW/edit?usp=sharing&ouid=105120848197838885353&rtpof=true&sd=true"
+              href="/resume.pdf"
               target="_blank"
               rel="noreferrer"
               className="cursor-pointer text-white hover:bg-purple-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium"

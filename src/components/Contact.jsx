@@ -60,7 +60,7 @@ const Contact = () => {
             />
           </a>
           <a
-            href="https://docs.google.com/document/d/1S1OmTFn_FNE7jcgu3MyRMuzcYBRcIsjW/edit?usp=sharing&ouid=105120848197838885353&rtpof=true&sd=true"
+            href="/resume.pdf"
             target="_blank"
             rel="noreferrer"
           >

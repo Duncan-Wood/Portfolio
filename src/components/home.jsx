@@ -52,7 +52,7 @@ const Home = () => {
               />
             </a>
             <a
-              href="https://docs.google.com/document/d/1S1OmTFn_FNE7jcgu3MyRMuzcYBRcIsjW/edit?usp=sharing&ouid=105120848197838885353&rtpof=true&sd=true"
+              href="/resume.pdf"
               target="_blank"
               rel="noreferrer"
             >
@@ -64,7 +64,7 @@ const Home = () => {
             </a>
           </div>
           <h3 className="text-xl font-medium mt-4 text-center p-4">
-            I'm a software engineer based out of Northern Virginia
+            I'm a full-stack software engineer based in the Washington, D.C. area
           </h3>
         </div>
       </div>
