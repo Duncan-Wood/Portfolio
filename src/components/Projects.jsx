@@ -5,14 +5,8 @@ import link from "../assets/link.png";
 
 import hemingway from "../assets/Projects/hemingway.png";
 import hemingway_motion from "../assets/Projects/hemingway-motion.gif";
-import fakeTwitter from "../assets/Projects/faketwitter.png";
-import fakeTwitter_motion from "../assets/Projects/faketwitter-motion.gif";
-import amazon_clone from "../assets/Projects/amazon-clone.png";
-import amazon_clone_motion from "../assets/Projects/amazon-clone-motion.gif";
 import thrivetracker from "../assets/Projects/thrivetracker.png";
 import thrivetracker_motion from "../assets/Projects/thrivetracker-motion.gif";
-import tickiT from "../assets/Projects/tickit.png";
-import tickiT_motion from "../assets/Projects/tickit-motion.gif";
 import coping_corner from "../assets/Projects/coping-corner-screenshot.png";
 import coping_corner_motion from "../assets/Projects/coping-corner-motion.gif";
 import dog_city from "../assets/Projects/dog-city-screenshot.png";
@@ -22,22 +16,23 @@ import sunrise_weather_motion from "../assets/Projects/sunrise-weather-motion.gi
 
 const professionalProjects = [
   {
-    name: "Internal Data-Review Tool",
-    tech: "Next.js | TypeScript | Supabase | PostgreSQL",
+    name: "Update Detector",
+    tech: "Next.js | TypeScript | Supabase",
     description:
-      "Built from an empty repo as lead developer: surfaces proposed record changes as a field-level diff for the data team to accept or reject, writing approved changes back to the source-of-truth system with a full audit trail. In daily production use.",
+      "A tool EcoMap's data team uses to review proposed changes to asset data — editing, accepting, or rejecting each suggested update before it goes live, with reviewed updates archived and the original values preserved. Built from an empty repo as lead developer.",
+    live: "https://update-detector.vercel.app/",
   },
   {
-    name: "Reusable AI Summarization System",
+    name: "AI Report Summaries",
     tech: "Ruby on Rails | LLM | Structured Output",
     description:
-      "A shared Rails concern any analytics module can include to generate schema-validated, AI-written narrative summaries of report data. Adopted across three modules, it became the standard pattern and cut inference cost ~5x.",
+      "A shared system that turns report data into plain-language narrative summaries using a structured LLM schema, reusable across multiple report modules. A team effort I helped design and did much of the refining on.",
   },
   {
     name: "HIPAA Document-Conversion Service",
-    tech: "Python | Flask | Google Cloud Run | Docker",
+    tech: "Python | Flask | Google Cloud Run",
     description:
-      "A HIPAA-compliant microservice that converts documents on demand, replacing an expensive commercial alternative, with a full automated unit, integration, and performance test suite.",
+      "A HIPAA-compliant microservice that converts documents on demand, replacing an expensive commercial tool, with a full automated unit, integration, and performance test suite.",
   },
 ];
 
@@ -52,23 +47,13 @@ const personalProjects = [
     github: "https://github.com/Duncan-Wood/Hemingway-Search-Engine",
   },
   {
-    name: "Fake Twitter",
-    tech: "React | Material UI | AWS | Docker",
+    name: "Coping Corner",
+    tech: "React | PostgreSQL | Material Theme Builder",
     description:
-      "A collaborative full-stack app built with Joshua Rizek that replicates Twitter's core features while emphasizing full-stack development and DevOps integration.",
-    image: fakeTwitter,
-    motion: fakeTwitter_motion,
-    github: "https://github.com/rizekj12/fakeTwitter",
-  },
-  {
-    name: "Amazon Clone",
-    tech: "React | Firebase | Stripe",
-    description:
-      "A React-based e-commerce app where users can create accounts, add items to a basket, and view the subtotal — a solid foundation for e-commerce apps.",
-    image: amazon_clone,
-    motion: amazon_clone_motion,
-    live: "https://clone-153b6.web.app/",
-    github: "https://github.com/Duncan-Wood/amazon-clone",
+      "A full-stack web application for people struggling with mental health, providing user authentication, resource creation and sharing, and community building.",
+    image: coping_corner,
+    motion: coping_corner_motion,
+    github: "https://github.com/Duncan-Wood/Coping-Corner-Frontend",
   },
   {
     name: "ThriveTracker",
@@ -78,24 +63,6 @@ const personalProjects = [
     image: thrivetracker,
     motion: thrivetracker_motion,
     github: "https://github.com/Duncan-Wood/ThriveTracker-Frontend",
-  },
-  {
-    name: "Tick-iT",
-    tech: "Django Views | Django | Material Theme Builder",
-    description:
-      "A Django web app for browsing venues and events and purchasing tickets, providing a seamless ticket-buying experience.",
-    image: tickiT,
-    motion: tickiT_motion,
-    github: "https://github.com/nezcodin/Tick-iT-Hackathon",
-  },
-  {
-    name: "Coping Corner",
-    tech: "React | PostgreSQL | Material Theme Builder",
-    description:
-      "A full-stack web application for people struggling with mental health, providing user authentication, resource creation and sharing, and community building.",
-    image: coping_corner,
-    motion: coping_corner_motion,
-    github: "https://github.com/Duncan-Wood/Coping-Corner-Frontend",
   },
   {
     name: "Dog City",
@@ -119,6 +86,8 @@ const personalProjects = [
   },
 ];
 
+const PERSONAL_PREVIEW_COUNT = 3;
+
 const cardClasses =
   "bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300 flex flex-col";
 
@@ -135,14 +104,24 @@ const LinkButton = ({ href, icon, alt, color }) => (
 
 const ProfessionalCard = ({ project }) => (
   <div className={cardClasses}>
-    <div className="h-48 bg-gradient-to-br from-purple-700 to-purple-900 flex items-center justify-center p-4">
+    <div className="h-40 bg-gradient-to-br from-purple-700 to-purple-900 flex items-center justify-center p-4">
       <h3 className="text-xl font-semibold text-white text-center">
         {project.name}
       </h3>
     </div>
     <div className="p-4 flex flex-col flex-1">
       <h4 className="text-sm font-medium text-gray-600 mb-2">{project.tech}</h4>
-      <p className="text-gray-700 text-base">{project.description}</p>
+      <p className="text-gray-700 text-base flex-1">{project.description}</p>
+      {project.live && (
+        <div className="flex justify-center mt-4">
+          <LinkButton
+            href={project.live}
+            icon={link}
+            alt="Live Site"
+            color="bg-blue-300 hover:bg-blue-500 border-blue-500"
+          />
+        </div>
+      )}
     </div>
   </div>
 );
@@ -189,35 +168,57 @@ const PersonalCard = ({ project }) => {
   );
 };
 
-const Projects = () => {
-  const [showAllProjects, setShowAllProjects] = useState(false);
+const cardGrid =
+  "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 justify-items-center";
 
-  const [featuredPersonal, ...morePersonal] = personalProjects;
+const Projects = () => {
+  const [showAllPersonal, setShowAllPersonal] = useState(false);
+
+  const visiblePersonal = showAllPersonal
+    ? personalProjects
+    : personalProjects.slice(0, PERSONAL_PREVIEW_COUNT);
 
   return (
     <div id="projects" className="m-10">
-      <h2 className="text-3xl font-bold mb-2 text-center">Featured Projects</h2>
-      <p className="text-gray-500 text-center mb-10">
-        Selected professional work and personal builds.
-      </p>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 justify-items-center">
-        {professionalProjects.map((project) => (
-          <ProfessionalCard key={project.name} project={project} />
-        ))}
-        <PersonalCard project={featuredPersonal} />
-        {showAllProjects &&
-          morePersonal.map((project) => (
+      <h2 className="text-3xl font-bold mb-10 text-center">Projects</h2>
+
+      <section className="mb-14">
+        <h3 className="text-2xl font-semibold mb-2 text-center">
+          Professional Work
+        </h3>
+        <p className="text-gray-500 text-center mb-8">
+          Tools and services I built on the job.
+        </p>
+        <div className={cardGrid}>
+          {professionalProjects.map((project) => (
+            <ProfessionalCard key={project.name} project={project} />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-2xl font-semibold mb-2 text-center">
+          Personal Projects
+        </h3>
+        <p className="text-gray-500 text-center mb-8">
+          Things I built to learn and to scratch an itch.
+        </p>
+        <div className={cardGrid}>
+          {visiblePersonal.map((project) => (
             <PersonalCard key={project.name} project={project} />
           ))}
-      </div>
-      <div className="text-center mt-8">
-        <button
-          className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg"
-          onClick={() => setShowAllProjects(!showAllProjects)}
-        >
-          {showAllProjects ? "Show Less" : "Show All"}
-        </button>
-      </div>
+        </div>
+        {personalProjects.length > PERSONAL_PREVIEW_COUNT && (
+          <div className="text-center mt-8">
+            <button
+              className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg"
+              onClick={() => setShowAllPersonal(!showAllPersonal)}
+            >
+              {showAllPersonal ? "Show Less" : "Show All"}
+            </button>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

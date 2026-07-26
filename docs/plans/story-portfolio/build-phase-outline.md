@@ -2,7 +2,7 @@
 title: Portfolio Metamorphosis — Build-Phase Outline
 source: ../../../Concept.md
 storyboard: ../../../storyboard/
-status: in-progress — Phase 1
+status: Phase 1 in review
 ---
 
 # Portfolio Metamorphosis — Build-Phase Outline
@@ -44,13 +44,13 @@ The plan covers two connected tracks: refreshing the existing conventional ("sta
 
 **Deferred.** Modernizing the underlying build tooling is out of scope for now and listed at the bottom of the [Build Phase Index](#build-phase-index) with a reopening trigger.
 
-**Where to look next.** Phase 1 is greenlit and in progress. The open questions that blocked Phase 2 — the node-rendering approach and the default landing — are now resolved; see [Open Questions](#open-questions).
+**Where to look next.** Phase 1 is implemented and in human review; standing feedback is captured in [build-preferences.md](./build-preferences.md) and the round-by-round log at [../human-review.md](../human-review.md). The open questions that blocked Phase 2 — the node-rendering approach and the default landing — are resolved; see [Open Questions](#open-questions).
 
 ## Build Phase Index {#build-phase-index}
 
 | # | Phase | Kind | Status | Outcome (one sentence) |
 |---|-------|------|--------|------------------------|
-| 1 | [Refresh the Standard Portfolio](#phase-1) | Feature slice | In progress | The conventional site reflects the last three years and every link works. |
+| 1 | [Refresh the Standard Portfolio](#phase-1) | Feature slice | In review | The conventional site reflects the last three years and every link works. |
 | 2 | [Two-Experience Shell](#phase-2) | Foundation | Ready | Visitors land on the node-brain and can switch to the standard site and back. |
 | 3 | [First Chapter by Zooming Into the Node](#phase-3) | Feature slice | Planned | Entering the glowing node zooms into the first life scene with hover details. |
 | 4 | [Complete the Life-Journey Timeline](#phase-4) | Feature slice | Planned | Visitors move forward and back through all four life chapters. |

@@ -8,20 +8,15 @@ const About = () => {
         <div className="max-w-3xl">
           <h3 className="text-2xl font-bold mb-2 text-center">About Me</h3>
           <p className="text-gray-600 leading-relaxed ">
-            I'm a full-stack software engineer with 2+ years of professional
-            experience and a background in writing and rhetoric — a combination
-            that helps me translate ambiguous, high-stakes problems into
-            reliable, production-grade software. At EcoMap Technologies I became
-            the sole engineer on a 70+ customer white-labeled platform during an
-            abrupt organizational transition, stabilizing it while continuing to
-            ship 0-to-1 features across Next.js, TypeScript, Ruby on Rails, and
-            Python services. As a contract developer with Mighty Crow I designed
-            a rule-based housing-compliance engine and shipped a HIPAA-compliant
-            document-conversion service on Google Cloud Run that replaced an
-            expensive commercial tool. I care most about work that empowers
-            disadvantaged communities and improves access to mental-health
-            resources — and about finding the real root cause of a problem
-            rather than the first fix that compiles.
+            I'm a software engineer and a generalist at heart — more interested
+            in building things that matter than in job titles. My path into tech
+            ran through writing and rhetoric, community organizing, and a lot of
+            curiosity, and the throughline is a belief in using technology to
+            serve people and be part of something bigger than myself. I care
+            about work that empowers communities, widens access, and supports
+            mental health, and I like taking on ambiguous, high-stakes problems
+            and staying with them until they genuinely work. Above all, I want
+            the things I build to leave people a little better off than before.
           </p>
         </div>
       </div>

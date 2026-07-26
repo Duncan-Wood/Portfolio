@@ -13,13 +13,13 @@ const Nav = () => {
     <nav id="nav" className="bg-purple-800">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
         <div className="relative flex items-center justify-between h-16">
-          <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
+          <div className="absolute inset-y-0 left-0 flex items-center md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
               type="button"
               className="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
               aria-controls="mobile-menu"
-              aria-expanded="false"
+              aria-expanded={isOpen}
             >
               <span className="sr-only">Open main menu</span>
               {/* Hamburger Icon */}
@@ -57,8 +57,8 @@ const Nav = () => {
             </button>
           </div>
           <div className="flex-1 flex items-center justify-center sm:items-stretch sm:justify-center">
-            <div className="hidden sm:block sm:ml-6">
-              <div className="flex flex-row space-x-4 items-center">
+            <div className="hidden md:block md:ml-6">
+              <div className="flex flex-row space-x-2 items-center">
                 <ScrollLink
                   to="home"
                   smooth={true}
@@ -138,7 +138,7 @@ const Nav = () => {
         {/* Mobile menu, toggle className based on menu state */}
 
         <div
-          className={`${isOpen ? "block" : "hidden"} sm:hidden`}
+          className={`${isOpen ? "block" : "hidden"} md:hidden`}
           id="mobile-menu"
         >
           <div className="px-2 pt-2 pb-3 space-y-1">

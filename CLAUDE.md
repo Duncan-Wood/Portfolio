@@ -22,3 +22,11 @@ Single-project repository: a personal portfolio single-page app.
 - `src/assets/` — images
 - `public/` — static shell (`index.html`, `manifest.json`); `_redirects` present for SPA redirect hosting
 - `tailwind.config.js`, `postcss.config.js` — styling config
+
+## Build workflow
+
+This portfolio is being rebuilt in phases with a human-review loop. Before working on it, read:
+- `docs/README.md` — the process (loop + which command to run when).
+- `docs/plans/story-portfolio/build-preferences.md` — standing voice/design preferences; respect these every phase.
+- `docs/plans/story-portfolio/build-phase-outline.md` — the phased plan and current status.
+- `docs/human-review.md` — Duncan's round-by-round feedback; read the newest section each round.

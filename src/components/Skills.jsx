@@ -1,32 +1,32 @@
-const skillCategories = [
+const skillGroups = [
   {
-    category: "Languages",
-    skills: ["JavaScript", "TypeScript", "Python", "Ruby", "SQL", "HTML/CSS"],
+    label: "Languages",
+    skills: ["JavaScript", "TypeScript", "Python", "Ruby", "SQL"],
   },
   {
-    category: "Backend",
-    skills: ["Ruby on Rails", "Node.js", "Flask", "FastAPI", "Express"],
-  },
-  {
-    category: "Frontend",
-    skills: ["React", "Next.js", "Tailwind CSS", "Material UI"],
-  },
-  {
-    category: "Data & Databases",
-    skills: ["PostgreSQL", "Supabase", "BigQuery", "SQLAlchemy", "ActiveRecord"],
-  },
-  {
-    category: "Cloud & Infrastructure",
+    label: "Frameworks & Libraries",
     skills: [
-      "Google Cloud Platform",
-      "Cloud Run",
-      "Docker",
-      "CI/CD",
-      "Vercel",
+      "Ruby on Rails",
+      "React",
+      "Next.js",
+      "Node.js",
+      "Flask",
+      "FastAPI",
+      "Tailwind CSS",
     ],
   },
   {
-    category: "AI & LLM",
+    label: "Data & Cloud",
+    skills: [
+      "PostgreSQL",
+      "Supabase",
+      "BigQuery",
+      "Google Cloud Platform",
+      "Docker",
+    ],
+  },
+  {
+    label: "AI & LLM",
     skills: [
       "LLM Integration",
       "Retrieval-Augmented Generation",
@@ -35,8 +35,8 @@ const skillCategories = [
     ],
   },
   {
-    category: "Testing & Observability",
-    skills: ["Sentry", "Playwright", "RSpec", "Jest"],
+    label: "Practices",
+    skills: ["Sentry", "Testing", "CI/CD"],
   },
 ];
 
@@ -45,19 +45,16 @@ const Skills = () => {
     <div id="skills" className="m-10">
       <h2 className="text-3xl font-bold mb-10 text-center">Skills</h2>
       <div className="max-w-4xl mx-auto space-y-6">
-        {skillCategories.map((group) => (
-          <div
-            key={group.category}
-            className="flex flex-col sm:flex-row sm:items-start"
-          >
-            <h3 className="text-base font-semibold text-purple-800 sm:w-56 sm:flex-shrink-0 mb-2 sm:mb-0">
-              {group.category}
+        {skillGroups.map((group) => (
+          <div key={group.label}>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-purple-800 mb-3 text-center sm:text-left">
+              {group.label}
             </h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
               {group.skills.map((skill) => (
                 <span
                   key={skill}
-                  className="bg-purple-100 text-purple-900 text-sm font-medium px-3 py-1 rounded-full"
+                  className="bg-white border border-purple-200 text-purple-900 text-sm font-medium px-4 py-2 rounded-lg shadow-sm hover:border-purple-800 hover:-translate-y-0.5 transition duration-200"
                 >
                   {skill}
                 </span>

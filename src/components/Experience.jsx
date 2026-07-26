@@ -4,16 +4,15 @@ const experienceData = [
     company: "EcoMap Technologies",
     dates: "Nov 2023 – Jul 2026",
     bullets: [
-      "Became sole engineering owner of a 70+ customer white-labeled, multi-tenant platform during an abrupt organizational transition, owning triage-to-deploy and cutting customer escalations to under 3 per month.",
-      "Built a real-time internal data-review tool from an empty repo (Next.js, TypeScript, Supabase), compressing the data team's verification workflow and resolving severe state-desync issues.",
-      "Shipped two analytics modules on a Ruby on Rails platform with high-performance BigQuery models and automated monthly data-refresh pipelines.",
-      "Designed a reusable Rails LLM-summarization system across three modules, cut inference cost ~5x, and led a production RAG chatbot's embedding-model migration across 27,000+ records.",
-      "Root-caused and remediated a production SQL-injection vulnerability and led a zero-downtime credential-rotation response across four services.",
-      "Built search-log analysis tooling that revealed ~50% of traffic was automated bots, then shipped an upstream fix that reduced infrastructure spend.",
+      "Became the sole engineer maintaining a 70+ customer white-labeled platform, owning the full cycle from triage to weekly deploys while keeping customer escalations low.",
+      "Built and shipped several State Scorecard intelligence-report modules (including Population and Business Formation & Survival) on a Ruby on Rails platform, backed by BigQuery data models and automated monthly refreshes.",
+      "Helped design and did much of the refining on a shared AI-summary system that turns report data into plain-language narratives with a structured LLM schema, reused across multiple report modules.",
+      "Root-caused and fixed a production SQL-injection vulnerability, and helped lead a zero-downtime credential rotation across four services.",
+      "Built self-directed search-log analysis tooling that revealed how much traffic came from bots, then shipped an upstream fix to cut wasted requests and infrastructure spend.",
     ],
   },
   {
-    role: "Contract Full-Stack Developer",
+    role: "Contract Developer",
     company: "Mighty Crow",
     dates: "Jan 2025 – Nov 2025",
     bullets: [

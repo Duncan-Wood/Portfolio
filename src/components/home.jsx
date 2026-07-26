@@ -64,7 +64,7 @@ const Home = () => {
             </a>
           </div>
           <h3 className="text-xl font-medium mt-4 text-center p-4">
-            I'm a full-stack software engineer based in the Washington, D.C. area
+            I'm a software engineer based in the Washington, D.C. area
           </h3>
         </div>
       </div>
