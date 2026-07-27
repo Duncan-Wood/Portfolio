@@ -130,5 +130,5 @@ Companion to [../build-phase-outline.md](../build-phase-outline.md). See [review
 
 ## Open items (author decision)
 
-- **OI-1 (F8):** Where does design-modernization + the skills-treatment redesign live — folded into Phase 1's scope, or a dedicated new phase? Blocks a clean answer to "what is Phase 1's definition of done." Does not block starting Phase 2 work.
+- **OI-1 (F8): RESOLVED (2026-07-27).** Design modernization and the skills-treatment redesign do not apply to the standard version — it stays in its current format (refresh, not redesign); expressive/personality-forward design belongs to the node-brain alternate. Recorded in build-preferences.md ("Two versions — keep them separate").
 - **OI-2 (F1):** Which flip-gate shape — (a) keep a single Phase 7 and gate the OQ2 flip on it (simplest), or (b) build accessibility into each slice as acceptance criteria and shrink Phase 7 to a final sweep (cheaper long-run, per F5/V4)? The plan now states the gate; the mechanism is the author's call.

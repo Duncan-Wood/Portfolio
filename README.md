@@ -1,94 +1,51 @@
-# Duncan Wood's Portfolio
+# Duncan Wood
 
-Welcome to my portfolio! Here you'll find an overview of my background, education, skills, software development projects, work experience, and more. Feel free to reach out to me through the provided contact information or social media links if you have any questions or opportunities for collaboration.
+Software engineer with a background in writing and rhetoric — I turn ambiguous, high-stakes problems into reliable software and communicate the thinking behind it. I'm especially drawn to work that widens access and supports mental health. Based in the Washington, D.C. area.
 
-## About Me
-- **Name:** Duncan Wood
 - **Email:** [duncanwoodpro@gmail.com](mailto:duncanwoodpro@gmail.com)
-- **Location:** Northern Virginia
 - **Website:** [duncanwoodpro.netlify.app](https://duncanwoodpro.netlify.app/)
 - **LinkedIn:** [linkedin.com/in/duncanwoodpro](https://www.linkedin.com/in/duncanwoodpro/)
 - **GitHub:** [github.com/Duncan-Wood](https://github.com/Duncan-Wood)
 
-## Overview
-I am a full-stack developer with a unique background in rhetorical writing. This combination of skills enables me to approach software development with a strong focus on effective communication and problem-solving. My passion for creating impactful software is driven by a desire to empower disadvantaged communities and improve access to mental health resources.
+## Experience
 
-## Education
-- **Software Engineering Immersive**
-  - General Assembly
-  - April 2023
+### Software Engineer — EcoMap Technologies (Nov 2023 – Jul 2026)
+- Became the sole engineer maintaining a 70+ customer white-labeled platform, owning the full cycle from triage to weekly deploys while keeping customer escalations low.
+- Built and shipped several State Scorecard intelligence-report modules (including Population and Business Formation & Survival) on a Ruby on Rails platform, backed by BigQuery models and automated monthly refreshes.
+- Helped design and refine a shared AI-summary system that turns report data into plain-language narratives with a structured LLM schema, reused across multiple report modules.
+- Root-caused and fixed a production SQL-injection vulnerability, and helped lead a zero-downtime credential rotation across four services.
 
-- **Bachelor of Arts in Writing and Rhetoric**
-  - University of Central Florida, Orlando, Florida
-  - Graduated May 2020
-  - Minor: Diversity and Social Inequality
+### Contract Developer — Mighty Crow (Jan 2025 – Nov 2025)
+- Designed a rule-based housing-compliance engine using database triggers and functions to automate real-time certification state cascades across regulatory registries.
+- Shipped a HIPAA-compliant document-conversion service on Google Cloud Run that replaced an expensive commercial tool, with a full automated test suite.
 
-- **Study Abroad**
-  - Florida State University in London, London, England
-  - Spring 2018
+## Projects
+
+### Professional
+- **Update Detector** — a tool EcoMap's data team uses to review proposed changes to asset data, accepting or rejecting each suggested update before it goes live. Built from an empty repo as lead developer. _Next.js · TypeScript · Supabase_ — [live](https://update-detector.vercel.app/)
+- **AI Report Summaries** — a shared system that turns report data into plain-language narrative summaries with a structured LLM schema, reusable across report modules. A team effort I helped design and did much of the refining on. _Ruby on Rails · LLM_
+- **HIPAA Document-Conversion Service** — a HIPAA-compliant microservice that converts documents on demand, replacing an expensive commercial tool, with full unit, integration, and performance tests. _Python · Flask · Google Cloud Run_
+
+### Personal
+- **Hemingway Search Engine** — similarity search over a text corpus using a Word2Vec model and NumPy. _React · Flask · Word2Vec · NumPy_ — [GitHub](https://github.com/Duncan-Wood/Hemingway-Search-Engine)
+- **Coping Corner** — a full-stack app for people managing mental health, with auth, resource sharing, and community. _React · PostgreSQL_ — [GitHub](https://github.com/Duncan-Wood/Coping-Corner-Frontend)
+- **ThriveTracker** — time-tracking and progress monitoring to support addiction recovery. _React · Django · Tailwind_ — [GitHub](https://github.com/Duncan-Wood/ThriveTracker-Frontend)
+- **Dog City** — browse 172 dog breeds with their characteristics and images. _React · Axios · ChartJS_ — [live](https://dog-city.netlify.app/) · [GitHub](https://github.com/Duncan-Wood/Dog-City)
+- **Sunrise Weather** — a single-page site showing current weather and a random quote. _HTML · Axios · JavaScript_ — [live](https://sunrise-weather.surge.sh) · [GitHub](https://github.com/Duncan-Wood/Sunrise-Weather)
 
 ## Skills
-I possess a diverse skill set, including but not limited to:
 
-- **Computer Skills:** Zoom, Excel, PowerPoint, Word, Google Docs, Google Sheets, Google Slides
-- **Social Media Skills:** Facebook, Twitter, Instagram, LinkedIn, Snapchat, Discord, Twitch
-- **Collaboration and Version Control Skills:** Git, GitHub, Slack
-- **Design Skills:** Trello, Figma, Canva, Photopea, Adobe Creative Cloud
-- **Programming Skills:** JavaScript, Python, Flask, Typescript, C++, HTML, CSS, SQL, Node.js, React.js, Django, Express, Bootstrap, Bubble
+- **Languages:** JavaScript, TypeScript, Python, Ruby, SQL
+- **Frameworks & Libraries:** Ruby on Rails, React, Next.js, Node.js, Flask, FastAPI, Tailwind CSS
+- **Data & Cloud:** PostgreSQL, Supabase, BigQuery, Google Cloud Platform, Docker
+- **AI & LLM:** LLM integration, retrieval-augmented generation, vector embeddings, structured output
+- **Practices:** Sentry, testing, CI/CD
 
-## Software Development Projects
-<!-- 1. **ThriveTracker2.0**
-   - [GitHub Repository](https://github.com/Duncan-Wood/ThriveTracker2.0)
-   - Technologies: Django, Views, React
+## Education
 
-2. **Mood Tunes for Penguins**
-   - [Live Demo](https://mood-tunes-for-penguins-67857.bubbleapps.io/version-test/)
-   - Technologies: Bubble -->
+- **Software Engineering Immersive** — General Assembly (2023)
+- **B.A., Writing & Rhetoric** — University of Central Florida (2020)
 
-1. **Hemingway Search Engine**
-   - [GitHub Repository](https://github.com/Duncan-Wood/Hemingway-Search-Engine)
-   - Developed a search engine application for Hemingway's writing.
-   - Technologies: React, Flask, Axios, Gensim, NumPy
+---
 
-2. **LinkedIn Web Scraper**
-   - [GitHub Repository](https://github.com/Duncan-Wood/LinkedIn-Web-Scraper)
-   - Designed and implemented a LinkedIn Web Scraper using Scrapy.
-   - Technologies: Scrapy, Flask
-
-3. **Fake Twitter**
-   - [GitHub Repository](https://github.com/rizekj12/fakeTwitter)
-   - Collaborated on a full-stack application mimicking Twitter's functionality.
-   - Technologies: JavaScript, React, AWS Amplify
-
-4. **Coping Corner**
-   - [GitHub Repository](https://github.com/Duncan-Wood/Coping-Corner-Frontend)
-   - Developed a full-stack application for managing mental health resources.
-   - Technologies: PostgreSQL, Express, React, Node
-
-5. **Dog City**
-   - [GitHub Repository](https://github.com/Duncan-Wood/Dog-City)
-   - Designed and developed a React web application for exploring dog breeds.
-   - Technologies: React, API integration
-
-6. **Sunrise Weather**
-   - [GitHub Repository](https://github.com/Duncan-Wood/Sunrise-Weather)
-   - Created a single-page website displaying weather information.
-   - Technologies: WeatherAPI, Quotable API, Axios, Styled-Components
-
-## Work Experience
-- Various roles in dog walking, pet sitting, and pet care
-- Appointment Setter at Frontline Pest Control
-- Substitute Teacher at Scoot Education
-- Canvasser at Working Families
-- Field Organizer at Grassroots Voter Outreach
-- Barista at Starbucks at UCF
-- Retail Sales Associate at Guess? Retail
-- Service Technician at My Beer Guy
-- Volunteer at Planned Parenthood and Florida Democratic Party
-- Field Organizer at Hard Knocks LLC.
-
-## Leadership Experience
-- Public Relations Officer at Pi Epsilon Pi
-- Alumni Representative of the department of Writing and Rhetoric at UCF
-
-Thank you for visiting my portfolio, and I look forward to connecting with you and exploring potential collaborations and opportunities!
+This repository is a React (Create React App) + Tailwind CSS site. See [`CLAUDE.md`](./CLAUDE.md) and [`docs/`](./docs/) for the build plan and conventions.

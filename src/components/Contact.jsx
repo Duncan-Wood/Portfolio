@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import emailjs from "emailjs-com";
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
@@ -6,6 +6,7 @@ import resume from "../assets/resume.png";
 
 const Contact = () => {
   const form = useRef();
+  const [status, setStatus] = useState(null);
 
   const sendEmail = (e) => {
     e.preventDefault();
@@ -18,14 +19,14 @@ const Contact = () => {
         "UHwNnvmJByK7HhFBu"
       )
       .then(
-        (result) => {
-          console.log(result.text);
+        () => {
+          setStatus("success");
+          form.current.reset();
         },
-        (error) => {
-          console.log(error.text);
+        () => {
+          setStatus("error");
         }
       );
-    e.target.reset();
   };
 
   return (
@@ -129,6 +130,20 @@ const Contact = () => {
               Send
             </button>
           </div>
+          {status === "success" && (
+            <p role="status" className="text-center text-green-600 font-medium">
+              Thanks — your message is on its way.
+            </p>
+          )}
+          {status === "error" && (
+            <p role="alert" className="text-center text-red-600 font-medium">
+              Something went wrong — email me directly at{" "}
+              <a href="mailto:duncanwoodpro@gmail.com" className="underline">
+                duncanwoodpro@gmail.com
+              </a>
+              .
+            </p>
+          )}
         </form>
       </div>
     </div>
