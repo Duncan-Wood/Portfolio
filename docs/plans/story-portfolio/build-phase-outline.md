@@ -2,7 +2,7 @@
 title: Portfolio Metamorphosis — Build-Phase Outline
 source: ../../../Concept.md
 storyboard: ../../../storyboard/
-status: Phase 1 complete (pending contact-form check)
+status: Phase 1 complete — Phase 2 ready
 ---
 
 # Portfolio Metamorphosis — Build-Phase Outline
@@ -45,13 +45,13 @@ The plan covers two connected tracks: refreshing the existing conventional ("sta
 
 **Deferred.** Modernizing the underlying build tooling is out of scope for now and listed at the bottom of the [Build Phase Index](#build-phase-index) with a reopening trigger.
 
-**Where to look next.** Phase 1 is content-complete, reviewed, and committed (one contact-form verification pending). Standing feedback lives in [build-preferences.md](./build-preferences.md) and the round-by-round log at [../human-review.md](../human-review.md). Phase 2 is unblocked; the open questions that gated it — the node-rendering approach and the default landing — are resolved; see [Open Questions](#open-questions).
+**Where to look next.** Phase 1 is complete and signed off. Standing feedback lives in [build-preferences.md](./build-preferences.md) and the round-by-round log at [../human-review.md](../human-review.md). **Phase 2 is ready to start** — the open questions that gated it (the node-rendering approach and the default landing) are resolved; see [Open Questions](#open-questions).
 
 ## Build Phase Index {#build-phase-index}
 
 | # | Phase | Kind | Status | Outcome (one sentence) |
 |---|-------|------|--------|------------------------|
-| 1 | [Refresh the Standard Portfolio](#phase-1) | Feature slice | Complete\* | The conventional site reflects the last three years and every link works. |
+| 1 | [Refresh the Standard Portfolio](#phase-1) | Feature slice | Complete | The conventional site reflects the last three years and every link works. |
 | 2 | [Two-Experience Shell](#phase-2) | Foundation | Ready | Visitors reach the node-brain at its own address and can switch to the standard site and back. |
 | 3 | [First Chapter by Zooming Into the Node](#phase-3) | Feature slice | Planned | Entering the glowing node zooms into the first life scene with hover details. |
 | 4 | [Complete the Life-Journey Timeline](#phase-4) | Feature slice | Planned | Visitors move forward and back through all four life chapters. |
@@ -61,7 +61,7 @@ The plan covers two connected tracks: refreshing the existing conventional ("sta
 | 8 | [Final Art and Unified Identity](#phase-8) | Polish | Planned | Final illustrations and the node-brain logo replace every placeholder. |
 | — | Modernize the build tooling | Deferred | Deferred | *(deferred)* Revisit only if tooling friction blocks the interactive work. |
 
-\* Phase 1 is content-complete, reviewed, and committed. One verification remains before it is fully signed off: confirm the contact form delivers a real message (the send logic is unchanged, but a live submission was never tested).
+Phase 1 is signed off: content refreshed and accurate, all review feedback resolved, the contact form verified delivering, resume link live, README aligned to the site, and everything committed.
 
 ## How This Build Departs from the Concept Note {#departures}
 

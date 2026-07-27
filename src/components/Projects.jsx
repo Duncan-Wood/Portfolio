@@ -19,8 +19,7 @@ const professionalProjects = [
     name: "Update Detector",
     tech: "Next.js | TypeScript | Supabase",
     description:
-      "A tool EcoMap's data team uses to review proposed changes to asset data — editing, accepting, or rejecting each suggested update before it goes live, with reviewed updates archived and the original values preserved. Built from an empty repo as lead developer.",
-    live: "https://update-detector.vercel.app/",
+      "A tool EcoMap's data team uses to review proposed changes to asset data — editing, accepting, or rejecting each suggested update before it goes live, with reviewed updates archived and the original values preserved. Built from an empty repo as lead developer. (Internal tool.)",
   },
   {
     name: "AI Report Summaries",

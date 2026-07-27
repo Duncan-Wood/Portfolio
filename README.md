@@ -22,7 +22,7 @@ Software engineer with a background in writing and rhetoric — I turn ambiguous
 ## Projects
 
 ### Professional
-- **Update Detector** — a tool EcoMap's data team uses to review proposed changes to asset data, accepting or rejecting each suggested update before it goes live. Built from an empty repo as lead developer. _Next.js · TypeScript · Supabase_ — [live](https://update-detector.vercel.app/)
+- **Update Detector** — an internal tool EcoMap's data team uses to review proposed changes to asset data, accepting or rejecting each suggested update before it goes live. Built from an empty repo as lead developer. _Next.js · TypeScript · Supabase_
 - **AI Report Summaries** — a shared system that turns report data into plain-language narrative summaries with a structured LLM schema, reusable across report modules. A team effort I helped design and did much of the refining on. _Ruby on Rails · LLM_
 - **HIPAA Document-Conversion Service** — a HIPAA-compliant microservice that converts documents on demand, replacing an expensive commercial tool, with full unit, integration, and performance tests. _Python · Flask · Google Cloud Run_
 
