@@ -30,3 +30,7 @@ This portfolio is being rebuilt in phases with a human-review loop. Before worki
 - `docs/plans/story-portfolio/build-preferences.md` — standing voice/design preferences; respect these every phase.
 - `docs/plans/story-portfolio/build-phase-outline.md` — the phased plan and current status.
 - `docs/human-review.md` — Duncan's round-by-round feedback; read the newest section each round.
+
+## Coding Standards
+
+Coding standards live in `docs/coding-standards/`. They are exposed to Claude Code through a small set of per-file-type index files under `.claude/rules/coding-standards/`. Each index file is a path-scoped rule that lists the standards relevant to one file type, with a short description of each. When Claude reads a file matching an index's `paths:` glob, Claude loads only the index and then decides which (if any) standards to open. The full text of a standard is never loaded automatically. Standards do not appear in the available-skills picker. Humans continue to browse `docs/coding-standards/` for the canonical readable form.
