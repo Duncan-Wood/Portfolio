@@ -4,6 +4,15 @@ Durable preferences and conventions for this portfolio build. **Consult this bef
 
 Companion docs: [build-phase-outline.md](./build-phase-outline.md) (the plan) · [../human-review.md](../human-review.md) (the running review log).
 
+## Two versions — keep them separate (scope)
+
+The portfolio has two distinct experiences, and work for one must **not** bleed into the other:
+
+- **The standard version** is the existing conventional site (Home · About · Experience · Projects · Skills · Contact). Its job is to be **functional, scannable, and professional** — the version recruiters, web scrapers, and people who don't want the new experience use. Phase 1 **refreshes** it: update content, prune, modest modernization **within the current format**. Do **not** redesign it from scratch or replace the existing design, and do **not** put personal-life / life-story content on it (no high-school-onward journey, theatre, kickball, dogs, etc.).
+- **The node-brain alternate** (the story experience, Phases 2–8) is where the **warm, handmade, whole-person, expressive** material lives — the life journey, the drawings, the immersion, the distinctive art direction.
+
+Design reinvention and personality-forward art direction belong to the **alternate**, not the standard version. (Lesson learned: a `/frontend-design` pass produced new concepts and a life-story layout for the standard version — both wrong; that energy is for the alternate.)
+
 ## The iteration loop
 
 1. Claude implements or revises a phase.
@@ -51,7 +60,7 @@ Known corrections to carry forward:
 
 ## Design & responsiveness
 
-- **Standing goal: modernize the visual design.** The site should feel current, with more soul than a default template. (Deeper redesign may be sequenced later, but keep it in view every phase.)
+- **Standing goal: modernize the visual design — within the current format for the standard version.** The standard site should feel current, with more soul than a default template, but **evolve the existing design rather than replace it** (see *Two versions* above). Personality-forward reinvention belongs to the node-brain alternate.
 - **Responsiveness must be automatic, not hand-tuned per breakpoint.** The nav currently overflows at some widths — solve it so layouts adapt on their own rather than requiring manual tweaks for each screen size.
 
 ## Open design questions
