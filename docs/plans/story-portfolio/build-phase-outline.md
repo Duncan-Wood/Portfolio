@@ -16,6 +16,7 @@ The plan covers two connected tracks: refreshing the existing conventional ("sta
 - [Executive Summary](#executive-summary)
 - [Build Phase Index](#build-phase-index)
 - [How This Build Departs from the Concept Note](#departures)
+- [Cross-cutting work](#cross-cutting)
 - [Phase Kinds](#phase-kinds)
 - [Phase 1 — Refresh the Standard Portfolio](#phase-1)
 - [Phase 2 — Two-Experience Shell](#phase-2)
@@ -51,7 +52,7 @@ The plan covers two connected tracks: refreshing the existing conventional ("sta
 | # | Phase | Kind | Status | Outcome (one sentence) |
 |---|-------|------|--------|------------------------|
 | 1 | [Refresh the Standard Portfolio](#phase-1) | Feature slice | In review | The conventional site reflects the last three years and every link works. |
-| 2 | [Two-Experience Shell](#phase-2) | Foundation | Ready | Visitors land on the node-brain and can switch to the standard site and back. |
+| 2 | [Two-Experience Shell](#phase-2) | Foundation | Blocked (Phase 1 in review) | Visitors reach the node-brain at its own address and can switch to the standard site and back. |
 | 3 | [First Chapter by Zooming Into the Node](#phase-3) | Feature slice | Planned | Entering the glowing node zooms into the first life scene with hover details. |
 | 4 | [Complete the Life-Journey Timeline](#phase-4) | Feature slice | Planned | Visitors move forward and back through all four life chapters. |
 | 5 | [Narrative Resolution](#phase-5) | Feature slice | Planned | The journey ends by pulling back to the node-brain reaching outward. |
@@ -64,6 +65,17 @@ The plan covers two connected tracks: refreshing the existing conventional ("sta
 
 <a id="d1"></a>
 **D1 — Placeholder-first artwork.** The concept note lists "research and produce the artwork" as one of the chunks of work, which could be read as producing the illustrations before building the experience. This plan does the opposite: every story phase is built with rough placeholder shapes standing in for the node-brain, the shadow character, and the scene frames, and the final vector illustrations are swapped in during [Phase 8](#phase-8). This keeps the experience demonstrable months before the art is finished and prevents unfinished art from blocking any build work. Individual phases refer to this decision as "D1 (placeholder-first)."
+
+So that Phase 8 stays a visual-only swap and does not undo the accessibility hardening before it, placeholders are authored at the same aspect ratio and anchor points planned for the final art, and hover and zoom targets are defined in scene-relative coordinates rather than against placeholder pixel bounds.
+
+## Cross-cutting work {#cross-cutting}
+
+Some work from [build-preferences.md](./build-preferences.md) is not a phase of its own but a standing requirement of every phase:
+
+- **Automatic responsiveness.** Layouts adapt on their own; the nav overflow raised in review is fixed as part of [Phase 1](#phase-1). No phase hand-tunes per breakpoint.
+- **Accessibility built into each slice.** The input-agnostic essentials ship with the interaction that introduces them (see [Phase 3](#phase-3)), with [Phase 7](#phase-7) as the final sweep rather than the first place accessibility appears.
+
+**Open item — design modernization and the skills-treatment redesign.** build-preferences names these as standing goals, but no phase yet owns them. Decide whether they fold into [Phase 1](#phase-1)'s definition of done or become a dedicated phase. Tracked in [artifacts/review-findings.md](artifacts/review-findings.md) as OI-1.
 
 ## Phase Kinds {#phase-kinds}
 
@@ -88,7 +100,7 @@ The plan covers two connected tracks: refreshing the existing conventional ("sta
 
 The logo and headshot are intentionally left for later: the leaf-to-brain logo change belongs with the unified visual identity in [Phase 8](#phase-8), and a refreshed headshot depends on an asset that is not ready yet (see [Open Questions](#open-questions)).
 
-**Why this is Phase 1.** The story experience's escape-hatch banner ("take me to the standard version") points directly at this site, so it must be trustworthy before the two are wired together. It is also the lowest-risk, highest-certainty work in the plan and delivers real value immediately, with no dependency on any other phase.
+**Why this is Phase 1.** The story experience's escape-hatch banner ("take me to the standard version") points directly at this site, so it must be trustworthy before the two are wired together. It is also the lowest-risk, highest-certainty work in the plan and delivers real value immediately, with no upstream dependency. (The standard site does receive later passes — the cross-navigation in [Phase 2](#phase-2) and the logo and identity in [Phase 8](#phase-8) — so Phase 1 leaves it content-final, not finished for good.)
 
 **Outcome to demonstrate.**
 
@@ -120,21 +132,23 @@ The logo and headshot are intentionally left for later: the leaf-to-brain logo c
 
 **What we build.** The entryway for the new experience and the ability to cross between the two.
 
+- The story experience is reachable at its own dedicated address during the build, so it can be demonstrated while the standard site remains the default landing (per [OQ2](#oq-2)).
 - A new node-brain screen renders as the entry to the story experience, drawn with placeholder shapes per D1 (placeholder-first).
 - One node glows while the others stay dark, signalling where the story begins.
-- A subtle banner offers to take the visitor to the standard version.
-- The standard version offers a way back to the story experience (an inferred navigation need, not stated in the concept note).
+- A restrained but always-findable control offers to take the visitor to the standard version — persistent across the entry screen and every later chapter, keyboard-reachable, and clearly labelled. "Subtle" here means visually quiet, never hidden or transient.
+
+The reverse link (standard site back to the story) is deferred to [Phase 5](#phase-5), when the story becomes the default: during the build, browser back-navigation already covers the visitor who arrived via the control above, and a standing "go to the story" link would only push standard-site visitors into the half-built experience OQ2 is protecting them from.
 
 This phase does not yet zoom into the node or tell any chapter — it establishes the two-experience structure and the crossing between them.
 
-**Why this is Phase 2.** Every later story phase needs an entry point and a way to move between the two experiences, so this is the foundation the rest of the story stands on. It comes after Phase 1 because the "take me to the standard version" banner needs a finished standard site to point at. It is demonstrable on its own: a visitor can land on the node-brain and cross to the standard site and back.
+**Why this is Phase 2.** Every later story phase needs an entry point and a way to move between the two experiences, so this is the foundation the rest of the story stands on. It comes after Phase 1 because the "take me to the standard version" control needs a standard site that is content-complete enough to point at — which is why its status stays blocked until Phase 1 exits review. It is demonstrable on its own: from the story's dedicated address, a visitor can land on the node-brain, cross to the standard site, and return.
 
 **Outcome to demonstrate.**
 
-1. Open the site and land on the node-brain entry screen.
+1. Visit the story's dedicated address and land on the node-brain entry screen (the standard site is still the default landing during the build).
 2. See a single node glowing among darker ones.
-3. Click the banner and arrive at the refreshed standard portfolio from [Phase 1](#phase-1).
-4. Follow the link back and return to the node-brain.
+3. Use the control and arrive at the refreshed standard portfolio from [Phase 1](#phase-1).
+4. Return to the node-brain with browser back-navigation.
 
 **Source citations.**
 
@@ -157,9 +171,10 @@ This phase does not yet zoom into the node or tell any chapter — it establishe
 
 **What we build.** The complete story interaction, proven on a single chapter — the high-school years.
 
+- The glowing node carries a clear "enter" signifier — a pointer affordance and short microcopy, plus a focusable, labelled control — so a first-time visitor knows it can be entered rather than only that it is important.
 - Entering the glowing node zooms the view inward, transitioning from the node-brain into the first scene.
 - The high-school scene appears with its placeholder elements (the lonely-kid lunch, the built computer, speech, and theatre).
-- Hovering an element reveals a short blurb about that memory.
+- Revealing an element's short blurb works by hover, keyboard focus, and tap alike — the detail is never hover-only, so keyboard and touch visitors reach it from the start rather than waiting for [Phase 7](#phase-7).
 
 Only one chapter is built here. The goal is to validate the entry-to-scene-to-detail interaction before repeating it.
 
@@ -182,7 +197,8 @@ Only one chapter is built here. The goal is to validate the entry-to-scene-to-de
 
 **Preconditions to verify before starting.**
 
-- The visual approach chosen in [Phase 2](#phase-2) supports smooth zooming and hover targets.
+- The visual approach chosen in [Phase 2](#phase-2) supports smooth zooming and hover, focus, and tap targets.
+- The high-school chapter's short blurb text is drafted and verified against the accuracy and voice rules in [build-preferences.md](./build-preferences.md). Blurb authoring for the later chapters is scheduled to run in parallel, the way [OQ3](#oq-3) schedules the art.
 
 ## Phase 4 — Complete the Life-Journey Timeline {#phase-4}
 
@@ -196,8 +212,10 @@ Only one chapter is built here. The goal is to validate the entry-to-scene-to-de
 - The DC-area years (fundraising for queer rights, dog walking, kickball, the coding bootcamp).
 - The software career (Ecomap's work and the move to Mighty Crow).
 - Scrolling carries the visitor forward and backward through the chapters, fast-forwarding or reversing through the journey.
+- A lightweight progress cue shows which chapter the visitor is in and how many remain, and a first-scene hint signals that scrolling travels through time rather than down a page.
+- Chapter transitions are discrete and interruptible — one deliberate gesture moves one chapter — and explicit previous/next controls exist so scrolling is not the only way to move.
 
-Each new chapter reuses the scene-and-hover pattern proven in [Phase 3](#phase-3).
+Each new chapter reuses the scene-and-reveal pattern proven in [Phase 3](#phase-3).
 
 **Why this is Phase 4.** With the interaction validated on one chapter, the remaining chapters are lower-risk repetition. Adding scrolling here — once there is more than one chapter to move between — is the moment travel through the timeline becomes meaningful. After this phase, the full life story is walkable start to finish.
 
@@ -231,6 +249,7 @@ Each new chapter reuses the scene-and-hover pattern proven in [Phase 3](#phase-3
 
 - After the software-career chapter, the view pulls back out to the node-brain.
 - This time the nodes reach outward from the brain, symbolising making connections and contributions beyond yourself.
+- The closing beat offers a clear next step — contact, resume, revisit any chapter, or the standard portfolio — so the built-up intent converts instead of dissolving on an abstract final screen.
 
 **Why this is Phase 5.** The resolution only lands once the full journey exists to resolve, so it depends on the completed timeline. It gives the experience a deliberate ending rather than trailing off after the last chapter, completing the arc the opening node-brain set up.
 
@@ -245,7 +264,7 @@ Each new chapter reuses the scene-and-hover pattern proven in [Phase 3](#phase-3
 - [storyboard/6.jpg](../../../storyboard/6.jpg) — the closing node-brain with nodes reaching outward to connect with others.
 - [Concept.md → Future Status](../../../Concept.md#future-status) — wrapping back to the node-connected brain with nodes coming out to symbolise connection and contribution.
 
-**Connects to.** Completes the core narrative begun in [Phase 2](#phase-2) and built through [Phase 4](#phase-4). Once this phase ships, the story is a complete experience and can become the default landing (see [Open Questions](#open-questions)).
+**Connects to.** Completes the core narrative begun in [Phase 2](#phase-2) and built through [Phase 4](#phase-4). Once this phase ships, the story is narratively complete. It becomes the default landing only after the readiness gate in [OQ2](#oq-2) is met — touch and keyboard access to detail, a reduced-motion fallback, and text an automated reader can consume — and until then it stays reachable at its dedicated address.
 
 **Preconditions to verify before starting.**
 
@@ -259,10 +278,10 @@ Each new chapter reuses the scene-and-hover pattern proven in [Phase 3](#phase-3
 
 **What we build.** Rewards for visitors who slow down and look closer.
 
-- Zooming further into an experience reveals a fuller account of it, beyond the short hover blurb.
-- Hidden easter eggs are tucked into the scenes to reward curious exploration.
+- Each experience gains a visible, predictable "more" affordance that opens a fuller account beyond the short blurb, so decision-relevant content is one obvious step away rather than a hidden discovery. (The standard site carries this same substance for visitors who only skim.)
+- Separately, hidden easter eggs are tucked into the scenes to reward curious exploration. Only this delight content is gated behind discovery — never the career substance a visitor needs to evaluate you.
 
-**Why this is Phase 6.** This enriches chapters that already exist and work, so it sensibly follows the complete timeline. It is separated from the core chapters because the experience is already valuable without it — the depth and the hidden rewards make a good experience delightful rather than making it function.
+**Why this is Phase 6.** This enriches chapters that already exist and work, so it sensibly follows the complete timeline. It is separated from the core chapters because the experience is already valuable without it — the depth and the hidden rewards make a good experience delightful rather than making it function. It depends only on the completed timeline from [Phase 4](#phase-4), not on the [Phase 5](#phase-5) resolution, so it may be built in parallel with Phase 5; it is numbered after Phase 5 only to finish the core emotional arc before adding rewards.
 
 **Outcome to demonstrate.**
 
@@ -294,7 +313,7 @@ Each new chapter reuses the scene-and-hover pattern proven in [Phase 3](#phase-3
 - Visitors who prefer reduced motion get a calmer version of the transitions.
 - Scenes and their elements carry text descriptions so the story is legible to assistive technology and to automated readers.
 
-**Why this is Phase 7.** This hardens an experience that already works on a desktop with a mouse, so it follows the phases that build that experience. It is grouped into one dedicated pass because the story is motion-heavy and scroll-driven, which raises device and accessibility concerns that are cheaper to address deliberately across the whole experience than piecemeal.
+**Why this is Phase 7.** This completes the broad device and accessibility pass. It is *not* the first place accessibility appears: the input-agnostic essentials — detail reachable by keyboard and touch, a reduced-motion fallback, and text an automated reader can consume — are built into the slices that introduce each interaction (see [Phase 3](#phase-3)) and must ship before the [OQ2](#oq-2) default flip. Grouping the remaining, whole-experience hardening here keeps it coherent; treating the essentials as buildable-in-each-slice rather than wholly deferred is a deliberate judgment call, not a citation-backed fact.
 
 **Outcome to demonstrate.**
 
@@ -312,6 +331,7 @@ Each new chapter reuses the scene-and-hover pattern proven in [Phase 3](#phase-3
 **Preconditions to verify before starting.**
 
 - The core chapters and interactions are stable enough that adapting them will not be invalidated by imminent changes.
+- The input-agnostic and automated-reader essentials (keyboard and touch detail, reduced-motion fallback, text descriptions) have already shipped as the subset gating the [OQ2](#oq-2) default flip; this phase completes the remaining whole-experience hardening.
 
 ## Phase 8 — Final Art and Unified Identity {#phase-8}
 
@@ -368,7 +388,7 @@ The concept wants visitors to land in the story, but it also values keeping the 
 - **Option A (recommended): keep the standard portfolio as the default landing until [Phase 5](#phase-5) ships, then flip the default to the story.** Protects recruiters and automated readers during the build while still letting you demo the story via a direct link.
 - **Option B: make the story the default landing immediately.** Delivers the intended first impression sooner but exposes unfinished chapters.
 - **Recommendation:** Option A — flip the default once the narrative is whole.
-- **Decision (resolved):** Option A — the standard portfolio stays the default landing until [Phase 5](#phase-5) ships, then the default flips to the story.
+- **Decision (resolved):** Option A — the standard portfolio stays the default landing until the story is *ready*, then the default flips to the story. Readiness is more than the four chapters existing ([Phase 5](#phase-5)): the flip is gated on a minimum bar — detail reachable by keyboard and touch, a reduced-motion fallback, and text descriptions an automated reader can consume (the crawler-facing and input-agnostic essentials otherwise grouped in [Phase 7](#phase-7)). A canonical-URL note accompanies the flip so the root-URL meaning change does not silently break shared or bookmarked links. **Rollback trigger:** if story-as-default measurably underperforms with real visitors — a sharp rise in bounce, mobile complaints, or lost recruiter contact — return the default to the standard site.
 
 ### OQ3 — How are the final illustrations produced? {#oq-3}
 
@@ -391,3 +411,15 @@ The concept notes the headshot is not ready yet.
 ### Carry-over notes
 
 - **Logo change timing.** Moving the logo from the leaf to the node-brain is folded into [Phase 8](#phase-8) so the unified identity lands across both experiences at once, rather than changing the standard site's logo before the brain visual exists. No decision is required unless you want the logo changed earlier.
+
+## Review History
+
+- **Review mode:** team (medium).
+- **Rounds completed:** 1 — see [artifacts/review-iteration-history.md](artifacts/review-iteration-history.md).
+- **Team composition:** han-core:junior-developer (generalist assumptions/standards), han-core:adversarial-validator (attacks sequencing and evidence), han-core:user-experience-designer (the plan is a novel user-facing interaction model). han-core:evidence-based-investigator was not required — the plain-language plan has no codebase claims to verify.
+- **Findings raised:** 17 — see [artifacts/review-findings.md](artifacts/review-findings.md). 15 resolved by evidence (edited into the plan); 2 remain as author open items (OI-1, OI-2).
+- **YAGNI candidates:** 1 — the Phase 2 standard→story reverse link (F2), resolved by deferring it to [Phase 5](#phase-5).
+- **Assumptions challenged:** the default-flip readiness gate (accessibility + crawler-legibility, not just chapter count), Phase 2's demoability under the resolved default-landing decision, and D1's rework risk — all edited into the plan.
+- **Consolidations made:** the reverse link deferred to Phase 5; accessibility essentials pulled into the slices that introduce each interaction rather than wholly deferred to Phase 7.
+- **Ambiguities resolved:** blurb-authoring is now a Phase 3 precondition; the escape hatch has a findability floor; the closing beat has a call-to-action; the flip has a rollback trigger.
+- **Open items remaining:** 2 — **OI-1** (which phase owns design modernization + the skills-treatment redesign; does not block starting the story track) and **OI-2** (flip-gate mechanism: single Phase 7 gated on essentials vs. accessibility-per-slice with a shrunk Phase 7). Neither blocks Phase 1; both are captured in [artifacts/review-findings.md](artifacts/review-findings.md).
