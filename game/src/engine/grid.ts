@@ -2,10 +2,6 @@ export const COLUMNS = 6;
 export const ROWS = 12;
 export const PIECE_TYPE_COUNT = 6;
 
-export function cellCount(): number {
-  return COLUMNS * ROWS;
-}
-
 export function pieceTypeAt(column: number, row: number): number {
   assertOnBoard(column, 'column', COLUMNS);
   assertOnBoard(row, 'row', ROWS);

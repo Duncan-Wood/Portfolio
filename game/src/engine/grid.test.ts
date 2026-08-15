@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { COLUMNS, PIECE_TYPE_COUNT, ROWS, cellCount, pieceTypeAt } from './grid';
+import { COLUMNS, PIECE_TYPE_COUNT, ROWS, pieceTypeAt } from './grid';
 
 describe('grid dimensions', () => {
   it('is six columns wide and twelve rows tall', () => {
     expect(COLUMNS).toBe(6);
     expect(ROWS).toBe(12);
-  });
-
-  it('counts every cell in the board', () => {
-    expect(cellCount()).toBe(72);
   });
 });
 
