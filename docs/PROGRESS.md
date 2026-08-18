@@ -6,7 +6,7 @@ each stage.
 
 ## Status
 
-**Stage 2 — Matching + cascades. Engine built and playable; juice and polish still to come.**
+**Stage 3 — Juice. Started: the cascade is now visible. Stage 2's benchmark is met.**
 
 Stage 1 is closed. Its benchmark (*pairs can be placed precisely and it feels instant*) was
 judged met: "responsive, just pointless" — the input is right, and what was missing was the
@@ -15,11 +15,29 @@ loop, which is what Stage 2 adds. DAS 130 / ARR 40 stand as-is; no sweep was nee
 - **Done** — Stage 0 setup (`game/` is a self-contained Vite + TypeScript + Phaser 4.2.1
   package, Node pinned in `game/mise.toml`, `/game` wired into both the root dev server
   and the production build), plus the Stage 1 engine, scene, input, and tuning.
-- **Done in Stage 2 so far** — connected-group matching, cascade resolution, exponential
-  chain scoring, and a score readout. Verified in Chrome: 45 played moves cleared groups
-  and scored 130.
-- **Next** — the hidden row and next-piece preview, then Stage 3's juice pass, which is
-  where the design plan says "correct" becomes "fun".
+- **Stage 2 is closed.** Its benchmark — *a deliberately buried trigger sets off a
+  multi-step chain* — was met by hand-building one: nine placed pieces produced a
+  **three-link chain scoring 280** (`40 + 80 + 160`), predicted before the trigger was
+  dropped and confirmed exactly. That also independently validates the exponential scoring.
+- **Done in Stage 3 so far** — the cascade resolves one link per `chainLinkDelay` instead
+  of instantly, so it can be seen at all.
+- **Next** — the rest of the juice checklist (tweens on pop and fall, particles, hit-stop,
+  screen shake, rising audio per link), then the hidden row and next-piece preview.
+
+### Why Stage 3 became urgent
+
+Building that chain by hand exposed the real reason the game read as unfun: **the payoff
+was invisible.** The whole cascade resolved between two frames. The only evidence it had
+happened was the score jumping 0 → 280 and three columns vanishing — no falling, no
+clearing, nothing to watch or react to. The best thing the game could do was imperceptible.
+
+Two other things that session surfaced, both arguing for the preview:
+
+- Every one of the nine pieces had to be **rotated purely to discover the satellite's
+  colour**, since it spawns at row −1 off-screen. You cannot plan a chain when half the
+  information costs an input to reveal.
+- Four of nine pairs were unusable for the plan and got parked in corners. That is normal
+  for 4 colours, but it means chain-building leans on lookahead the game does not offer.
 
 Verified in Chrome through the dev proxy: gravity, lock, respawn, rotation, wall blocking,
 DAS auto-repeat, `window.tuning` driving the live simulation, soft drop not carrying across
@@ -127,6 +145,14 @@ Settled and tested, across Stages 1 and 2. Don't re-litigate without a reason.
 - **Chain scoring is `cellsCleared × 10 × 2^linkIndex`** — deliberately a placeholder.
   Exponential in chain depth, which is the property that matters, but not Puyo's real
   formula (chain power + colour bonus + group bonus). Replace it when scoring is tuned.
+- **The chain resolves over time, in a `resolving` phase between lock and spawn.** Each
+  link is applied one `chainLinkDelay` (220ms) apart, so a completed group is on screen as a
+  group before it clears. Two rules fall out of it: input is **ignored while resolving**
+  (there is now a real window where `pair` is locked onto the board but the next one has not
+  spawned, and moving it would corrupt the board), and a lock that matches nothing spawns
+  **immediately** with no delay — otherwise every non-matching piece would pay the chain tax.
+  `resolveChain` is now a loop over a single-step `resolveStep`, so the engine keeps its
+  all-at-once API for tests while the scene gets it link by link.
 - **Input is polled once per frame, not event-driven.** A press must survive to the next
   poll, so a press *and* release inside one frame is dropped. Unreachable from a physical
   keyboard (a real tap is ~30ms against an 8–16ms frame) — it only shows up with synthetic

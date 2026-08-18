@@ -4,6 +4,7 @@ export interface Tuning {
   lockDelay: number;
   autoShiftDelay: number;
   autoRepeatInterval: number;
+  chainLinkDelay: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -12,4 +13,5 @@ export const DEFAULT_TUNING: Tuning = {
   lockDelay: 500,
   autoShiftDelay: 130,
   autoRepeatInterval: 40,
+  chainLinkDelay: 220,
 };

@@ -179,6 +179,11 @@ describe('matching after a lock', () => {
     }
     dropToFloor(game);
     game.update(lockDelay);
+
+    for (let tick = 0; game.resolving && tick < 20; tick += 1) {
+      game.update(DEFAULT_TUNING.chainLinkDelay);
+    }
+
     return game;
   };
 
@@ -246,5 +251,100 @@ describe('switching between gravity and soft drop', () => {
     game.update(softDropInterval * 3);
 
     expect(game.pair.row).toBe(3);
+  });
+});
+
+describe('resolving a chain over time', () => {
+  const buildTwoLinkChain = () => {
+    const game = simulation();
+    // B clears first; the stranded R above it falls in to complete the R group.
+    game.board.place(0, ROWS - 1, RED);
+    game.board.place(0, ROWS - 2, RED);
+    game.board.place(0, ROWS - 3, RED);
+    game.board.place(1, ROWS - 1, BLUE);
+    game.board.place(1, ROWS - 2, BLUE);
+    game.board.place(1, ROWS - 3, BLUE);
+    game.board.place(2, ROWS - 1, BLUE);
+    game.board.place(1, ROWS - 4, RED);
+    return game;
+  };
+
+  const lockCurrentPair = (game: Simulation) => {
+    dropToFloor(game);
+    game.update(lockDelay);
+  };
+
+  it('spawns the next pair immediately when the lock matches nothing', () => {
+    const game = simulation();
+    const before = game.piecesSpawned;
+
+    lockCurrentPair(game);
+
+    expect(game.piecesSpawned).toBe(before + 1);
+    expect(game.resolving).toBe(false);
+  });
+
+  it('enters the resolving phase when the lock completes a group', () => {
+    const game = simulation();
+    for (let offset = 0; offset < 3; offset += 1) {
+      game.board.place(SPAWN_COLUMN, ROWS - 1 - offset, RED);
+    }
+
+    lockCurrentPair(game);
+
+    expect(game.resolving).toBe(true);
+  });
+
+  it('holds the next pair back until the chain finishes', () => {
+    const game = simulation();
+    for (let offset = 0; offset < 3; offset += 1) {
+      game.board.place(SPAWN_COLUMN, ROWS - 1 - offset, RED);
+    }
+    const before = game.piecesSpawned;
+
+    lockCurrentPair(game);
+
+    expect(game.piecesSpawned).toBe(before);
+  });
+
+  it('clears one link per chain-link delay rather than all at once', () => {
+    const game = buildTwoLinkChain();
+    lockCurrentPair(game);
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    const afterFirstLink = game.score;
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    const afterSecondLink = game.score;
+
+    expect(afterFirstLink).toBeGreaterThan(0);
+    expect(afterSecondLink).toBeGreaterThan(afterFirstLink);
+  });
+
+  it('ignores input while resolving', () => {
+    const game = simulation();
+    for (let offset = 0; offset < 3; offset += 1) {
+      game.board.place(SPAWN_COLUMN, ROWS - 1 - offset, RED);
+    }
+    lockCurrentPair(game);
+
+    expect(game.moveLeft()).toBe(false);
+    expect(game.rotate()).toBe(false);
+  });
+
+  it('returns to falling and spawns once nothing is left to clear', () => {
+    const game = simulation();
+    for (let offset = 0; offset < 3; offset += 1) {
+      game.board.place(SPAWN_COLUMN, ROWS - 1 - offset, RED);
+    }
+    const before = game.piecesSpawned;
+    lockCurrentPair(game);
+
+    for (let tick = 0; tick < 10; tick += 1) {
+      game.update(DEFAULT_TUNING.chainLinkDelay);
+    }
+
+    expect(game.resolving).toBe(false);
+    expect(game.piecesSpawned).toBe(before + 1);
   });
 });

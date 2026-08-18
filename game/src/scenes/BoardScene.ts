@@ -42,7 +42,9 @@ export class BoardScene extends Scene {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
   private scoreText: Phaser.GameObjects.Text;
+  private chainText: Phaser.GameObjects.Text;
   private shownScore = -1;
+  private shownChain = -1;
   private nextFpsRefresh = 0;
   private timestep: FixedTimestep;
   private inputTranslator: InputTranslator;
@@ -99,6 +101,13 @@ export class BoardScene extends Scene {
       fontSize: '28px',
       color: '#e8eef2',
     }).setOrigin(1, 0);
+
+    this.shownChain = -1;
+    this.chainText = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, '', {
+      fontFamily: 'monospace',
+      fontSize: '64px',
+      color: '#ffc914',
+    }).setOrigin(0.5, 0.5).setVisible(false);
   }
 
   update(time: number, delta: number): void {
@@ -110,6 +119,7 @@ export class BoardScene extends Scene {
 
     this.drawBoard();
     this.drawPair();
+    this.refreshChain();
     this.refreshScore();
     this.refreshFps(time);
   }
@@ -163,6 +173,13 @@ export class BoardScene extends Scene {
   }
 
   private drawPair(): void {
+    if (this.simulation.resolving) {
+      for (const rectangle of this.pairRectangles) {
+        rectangle.setVisible(false);
+      }
+      return;
+    }
+
     const cells = this.simulation.pair.cells();
     for (let index = 0; index < cells.length; index += 1) {
       const cell = cells[index];
@@ -174,6 +191,17 @@ export class BoardScene extends Scene {
         rectangle.setPosition(centerOfColumn(cell.column), centerOfRow(cell.row));
         rectangle.setFillStyle(PIECE_COLORS[cell.pieceType]);
       }
+    }
+  }
+
+  private refreshChain(): void {
+    const { resolving, chainLength } = this.simulation;
+    const showing = resolving && chainLength >= 2;
+
+    this.chainText.setVisible(showing);
+    if (showing && chainLength !== this.shownChain) {
+      this.shownChain = chainLength;
+      this.chainText.setText(`${chainLength} CHAIN`);
     }
   }
 

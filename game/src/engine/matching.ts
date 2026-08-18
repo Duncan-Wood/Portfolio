@@ -46,33 +46,43 @@ export function findGroups(board: Board): Group[] {
   return groups;
 }
 
+export function resolveStep(board: Board): ChainLink | null {
+  board.settle();
+
+  const groups = findGroups(board);
+  if (groups.length === 0) {
+    return null;
+  }
+
+  let cellsCleared = 0;
+  for (const group of groups) {
+    for (const cell of group.cells) {
+      board.clear(cell.column, cell.row);
+      cellsCleared += 1;
+    }
+  }
+
+  return { groups, cellsCleared };
+}
+
 export function resolveChain(board: Board): ChainLink[] {
   const links: ChainLink[] = [];
 
   for (;;) {
-    board.settle();
-
-    const groups = findGroups(board);
-    if (groups.length === 0) {
+    const link = resolveStep(board);
+    if (link === null) {
       return links;
     }
-
-    let cellsCleared = 0;
-    for (const group of groups) {
-      for (const cell of group.cells) {
-        board.clear(cell.column, cell.row);
-        cellsCleared += 1;
-      }
-    }
-    links.push({ groups, cellsCleared });
+    links.push(link);
   }
 }
 
+export function scoreLink(link: ChainLink, linkIndex: number): number {
+  return link.cellsCleared * 10 * 2 ** linkIndex;
+}
+
 export function scoreChain(links: ChainLink[]): number {
-  return links.reduce(
-    (total, link, index) => total + link.cellsCleared * 10 * 2 ** index,
-    0,
-  );
+  return links.reduce((total, link, index) => total + scoreLink(link, index), 0);
 }
 
 function connectedCells(

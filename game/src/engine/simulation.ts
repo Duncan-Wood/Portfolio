@@ -1,7 +1,7 @@
 import { COLUMNS } from './grid';
 import { Board } from './board';
 import { FallingPair } from './falling-pair';
-import { resolveChain, scoreChain } from './matching';
+import { findGroups, resolveStep, scoreLink } from './matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
 export const SPAWN_COLUMN = Math.floor((COLUMNS - 1) / 2);
@@ -14,8 +14,11 @@ export class Simulation {
   softDropping = false;
   piecesSpawned = 0;
   score = 0;
+  resolving = false;
+  chainLength = 0;
 
   private fallProgress = 0;
+  private resolveTimer = 0;
   private lockTimer = 0;
 
   constructor(
@@ -26,12 +29,23 @@ export class Simulation {
   }
 
   update(delta: number): void {
+    if (this.resolving) {
+      this.advanceChain(delta);
+      return;
+    }
+
     if (!this.pair.canFall(this.board)) {
       this.lockTimer += delta;
       if (this.lockTimer >= this.tuning.lockDelay) {
         this.pair.lock(this.board);
-        this.score += scoreChain(resolveChain(this.board));
-        this.pair = this.spawn();
+
+        if (findGroups(this.board).length > 0) {
+          this.resolving = true;
+          this.chainLength = 0;
+          this.resolveTimer = 0;
+        } else {
+          this.pair = this.spawn();
+        }
       }
       return;
     }
@@ -53,15 +67,33 @@ export class Simulation {
   }
 
   moveLeft(): boolean {
-    return this.afterInput(this.pair.moveLeft(this.board));
+    return this.resolving ? false : this.afterInput(this.pair.moveLeft(this.board));
   }
 
   moveRight(): boolean {
-    return this.afterInput(this.pair.moveRight(this.board));
+    return this.resolving ? false : this.afterInput(this.pair.moveRight(this.board));
   }
 
   rotate(): boolean {
-    return this.afterInput(this.pair.rotateClockwise(this.board));
+    return this.resolving ? false : this.afterInput(this.pair.rotateClockwise(this.board));
+  }
+
+  private advanceChain(delta: number): void {
+    this.resolveTimer += delta;
+    if (this.resolveTimer < this.tuning.chainLinkDelay) {
+      return;
+    }
+    this.resolveTimer = 0;
+
+    const link = resolveStep(this.board);
+    if (link === null) {
+      this.resolving = false;
+      this.pair = this.spawn();
+      return;
+    }
+
+    this.score += scoreLink(link, this.chainLength);
+    this.chainLength += 1;
   }
 
   private afterInput(moved: boolean): boolean {
