@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Board } from './board';
 import { COLUMNS, ROWS } from './grid';
-import { findGroups, resolveChain, scoreChain } from './matching';
+import { clearStep, findGroups, resolveChain, scoreChain } from './matching';
 
 const PIECE_LETTERS: Record<string, number> = { R: 0, B: 1, G: 2, Y: 3 };
 
@@ -184,5 +184,38 @@ describe('scoring a chain', () => {
     );
 
     expect(scoreChain(twoLinks)).toBeGreaterThan(scoreChain(oneLink) * 2);
+  });
+});
+
+describe('clearing without settling', () => {
+  const hangingTrigger = () =>
+    boardFrom(
+      '. R . . . .',
+      'R B . . . .',
+      'R B . . . .',
+      'R B B . . .',
+    );
+
+  it('removes the matched group', () => {
+    const board = hangingTrigger();
+    clearStep(board);
+    expect(board.isEmpty(1, ROWS - 1)).toBe(true);
+  });
+
+  it('leaves the tile above the hole hanging, so the drop can be seen', () => {
+    const board = hangingTrigger();
+    clearStep(board);
+    expect(board.pieceAt(1, ROWS - 4)).toBe(PIECE_LETTERS.R);
+  });
+
+  it('reports nothing when there is no group to clear', () => {
+    expect(clearStep(boardFrom('R R B B . .'))).toBeNull();
+  });
+
+  it('settling afterwards drops the hanging tile to the floor', () => {
+    const board = hangingTrigger();
+    clearStep(board);
+    board.settle();
+    expect(board.pieceAt(1, ROWS - 1)).toBe(PIECE_LETTERS.R);
   });
 });

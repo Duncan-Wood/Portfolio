@@ -1,7 +1,7 @@
 import { COLUMNS } from './grid';
 import { Board } from './board';
 import { FallingPair } from './falling-pair';
-import { findGroups, resolveStep, scoreLink } from './matching';
+import { clearStep, findGroups, scoreLink } from './matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
 export const SPAWN_COLUMN = Math.floor((COLUMNS - 1) / 2);
@@ -19,6 +19,7 @@ export class Simulation {
 
   private fallProgress = 0;
   private resolveTimer = 0;
+  private settlePending = false;
   private lockTimer = 0;
 
   constructor(
@@ -43,6 +44,7 @@ export class Simulation {
           this.resolving = true;
           this.chainLength = 0;
           this.resolveTimer = 0;
+          this.settlePending = false;
         } else {
           this.pair = this.spawn();
         }
@@ -79,13 +81,21 @@ export class Simulation {
   }
 
   private advanceChain(delta: number): void {
+    const beat = this.settlePending ? this.tuning.settleDelay : this.tuning.chainLinkDelay;
+
     this.resolveTimer += delta;
-    if (this.resolveTimer < this.tuning.chainLinkDelay) {
+    if (this.resolveTimer < beat) {
       return;
     }
     this.resolveTimer = 0;
 
-    const link = resolveStep(this.board);
+    if (this.settlePending) {
+      this.board.settle();
+      this.settlePending = false;
+      return;
+    }
+
+    const link = clearStep(this.board);
     if (link === null) {
       this.resolving = false;
       this.pair = this.spawn();
@@ -94,6 +104,7 @@ export class Simulation {
 
     this.score += scoreLink(link, this.chainLength);
     this.chainLength += 1;
+    this.settlePending = true;
   }
 
   private afterInput(moved: boolean): boolean {

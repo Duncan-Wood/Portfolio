@@ -314,11 +314,23 @@ describe('resolving a chain over time', () => {
     game.update(DEFAULT_TUNING.chainLinkDelay);
     const afterFirstLink = game.score;
 
+    game.update(DEFAULT_TUNING.settleDelay);
     game.update(DEFAULT_TUNING.chainLinkDelay);
     const afterSecondLink = game.score;
 
     expect(afterFirstLink).toBeGreaterThan(0);
     expect(afterSecondLink).toBeGreaterThan(afterFirstLink);
+  });
+
+  it('holds cleared tiles in the air for a beat before settling them', () => {
+    const game = buildTwoLinkChain();
+    lockCurrentPair(game);
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    expect(game.board.pieceAt(1, ROWS - 4)).toBe(RED);
+
+    game.update(DEFAULT_TUNING.settleDelay);
+    expect(game.board.isEmpty(1, ROWS - 4)).toBe(true);
   });
 
   it('ignores input while resolving', () => {

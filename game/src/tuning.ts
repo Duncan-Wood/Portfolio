@@ -5,6 +5,7 @@ export interface Tuning {
   autoShiftDelay: number;
   autoRepeatInterval: number;
   chainLinkDelay: number;
+  settleDelay: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -14,4 +15,5 @@ export const DEFAULT_TUNING: Tuning = {
   autoShiftDelay: 130,
   autoRepeatInterval: 40,
   chainLinkDelay: 220,
+  settleDelay: 130,
 };

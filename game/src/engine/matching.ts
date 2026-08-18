@@ -46,9 +46,7 @@ export function findGroups(board: Board): Group[] {
   return groups;
 }
 
-export function resolveStep(board: Board): ChainLink | null {
-  board.settle();
-
+export function clearStep(board: Board): ChainLink | null {
   const groups = findGroups(board);
   if (groups.length === 0) {
     return null;
@@ -63,6 +61,11 @@ export function resolveStep(board: Board): ChainLink | null {
   }
 
   return { groups, cellsCleared };
+}
+
+export function resolveStep(board: Board): ChainLink | null {
+  board.settle();
+  return clearStep(board);
 }
 
 export function resolveChain(board: Board): ChainLink[] {
