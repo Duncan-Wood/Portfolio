@@ -6,14 +6,20 @@ each stage.
 
 ## Status
 
-**Stage 1 — Core drop + lock. Built and verified; awaiting the feel judgment.**
+**Stage 2 — Matching + cascades. Engine built and playable; juice and polish still to come.**
+
+Stage 1 is closed. Its benchmark (*pairs can be placed precisely and it feels instant*) was
+judged met: "responsive, just pointless" — the input is right, and what was missing was the
+loop, which is what Stage 2 adds. DAS 130 / ARR 40 stand as-is; no sweep was needed.
 
 - **Done** — Stage 0 setup (`game/` is a self-contained Vite + TypeScript + Phaser 4.2.1
   package, Node pinned in `game/mise.toml`, `/game` wired into both the root dev server
   and the production build), plus the Stage 1 engine, scene, input, and tuning.
-- **Blocking Stage 1** — the feel judgment. Only Duncan can call it.
-- **Next** — build the hidden row and next-piece preview *before* judging feel, then run
-  the benchmark below.
+- **Done in Stage 2 so far** — connected-group matching, cascade resolution, exponential
+  chain scoring, and a score readout. Verified in Chrome: 45 played moves cleared groups
+  and scored 130.
+- **Next** — the hidden row and next-piece preview, then Stage 3's juice pass, which is
+  where the design plan says "correct" becomes "fun".
 
 Verified in Chrome through the dev proxy: gravity, lock, respawn, rotation, wall blocking,
 DAS auto-repeat, `window.tuning` driving the live simulation, soft drop not carrying across
@@ -23,32 +29,6 @@ display. Re-verified after input and the accumulator were extracted into their o
 > **Testing in a browser:** Chrome pauses `requestAnimationFrame` entirely for hidden tabs,
 > so a backgrounded window renders **zero** frames and every timing measurement is
 > meaningless. The window must be visible and frontmost.
-
-## Closing Stage 1: how to run the benchmark
-
-The benchmark is *pairs can be placed precisely and it feels instant*.
-
-Judge nothing until the next-piece preview exists — half the pair is invisible at spawn, so
-the question has no fair answer yet. To test before then, press Up as a pair spawns:
-rotating to orientation 1 brings the satellite from row −1 into view.
-
-Hold `autoRepeatInterval` at 40 and sweep `autoShiftDelay` (130 → 110 → 90 → 70) live in
-the console. On a 6-wide board DAS does nearly all the work. Three repeatable tasks per
-value, rather than free play:
-
-1. **Tap precision** — tap Left once, ten times quickly. Any tap that moves two columns
-   means DAS is below your tap duration. This is the floor.
-2. **Hold traversal** — hold Right to the wall. One continuous slide, or separate steps?
-   Separate steps means DAS is too high.
-3. **Targeted placement** — name a column before the pair appears, then put it there. Ten
-   reps, count misses. This is the benchmark restated as something countable.
-
-Take the lowest DAS that still passes task 1 cleanly.
-
-For reset-on-lock the test is different: stack toward one side for a minute, holding the
-direction naturally. If a new pair ignoring the held key reads as "good, it didn't slam
-into the wall", keep it. If you re-tap with irritation, it is a dead key — see the
-DAS-charging decision below for the one-line revert.
 
 ## Live tuning
 
@@ -86,23 +66,36 @@ The file layout and APIs are readable from the source. These are the parts that 
   only the Phaser-specific parts: reading `cursors`, and the `timeDown` tie-break when both
   direction keys are held. Twelve tests cover the rules that previously could only be
   checked by playing.
+- **`src/engine/matching.ts` is the whole Stage 2 rule set**, and it is pure: `findGroups`
+  flood-fills orthogonal same-colour neighbours, `resolveChain` settles *before* each scan
+  so it never scores a floating group, then clears and loops until nothing matches, returning one `ChainLink` per link so the scene can animate them
+  separately later. Its tests build boards from ASCII pictures, which is what makes a rule
+  about *shapes* readable — L-shapes, T-shapes, and the no-diagonals rule are each one
+  picture.
 - **`src/fixed-timestep.ts` clamps the frame delta, banks it, and returns whole steps.**
   See the clamp decision below for why the clamp lives here.
 - **`BoardScene` is deliberately thin** — it owns Phaser and nothing else. Its translator
   field is named `inputTranslator`, **not** `input`: `input` is Phaser's own `Scene.input`
   plugin and shadowing it breaks `this.input.keyboard`.
 
-## Decisions locked in Stage 1
+## Locked decisions
 
-Settled and tested. Don't re-litigate without a reason.
+Settled and tested, across Stages 1 and 2. Don't re-litigate without a reason.
 
 - **Row 0 is the top**; gravity increases the row number.
 - **Pairs spawn at row 0** in the middle column.
 - **Lock delay resets on a successful move or rotate, never on a blocked one** — otherwise
   you could stall forever by mashing into a wall. There is deliberately no cap on resets
   (Puyo behaviour); Tetris caps it with a move-reset limit. Revisit when tuning feel.
-- **Soft drop swaps the fall interval** (800ms → 50ms) rather than multiplying, so the
-  timing stays predictable.
+- **Fall progress is a fraction of the current interval, not a millisecond timer.**
+  Soft drop swaps the interval (800ms → 50ms) rather than multiplying it, and the naive
+  version banked elapsed milliseconds against whichever interval was active. Press Down
+  750ms into a normal fall and the loop spent that bank at the *new* rate — `750 / 50` =
+  15 rows in one frame, so the pair teleported to the floor. Reported as "holding down
+  almost instantly drops it unless you hold the key for one frame"; a test pinned it at
+  11 rows. Tracking `fallProgress` as a 0–1 fraction means a rate change preserves *how far
+  you are toward the next row* instead of re-denominating banked time, so switching rates
+  can never produce a burst. It also makes live tuning changes safe mid-fall.
 - **Soft drop does not carry across a lock.** Holding Down used to mirror `isDown` straight
   onto `softDropping`, so a pair that spawned while the key was held fast-fell immediately —
   16× gravity, the whole board in ~600ms. Tetris lets soft drop carry over, but its soft
@@ -122,6 +115,18 @@ Settled and tested. Don't re-litigate without a reason.
   fixed-timestep loop is*; without it the loop's iteration bound lives in a third-party
   config file. `FixedTimestep`'s tests exercise the real property: `stepsFor(10_000)`
   returns a bounded step count.
+- **Match rule: connected groups of 4 (Puyo).** Four or more same-colour tiles touching
+  orthogonally, any shape. Chosen over match-3 lines because the art direction's core image
+  is a *network* — chains lighting the leading between tiles reads as a signal crossing a
+  graph, which is what connected groups are and what lines are not. Accepts the design
+  plan's warning that Puyo chain-building is hard for newcomers.
+- **Four colours, not six.** `PIECE_TYPE_COUNT` was 6; Puyo ships 4 as standard and treats 5
+  as the harder setting. On a 6-wide board, six colours made same-coloured pieces land
+  adjacent too rarely for groups to form, so the board filled before anything could be set
+  up. This was very likely the largest single reason the game read as unfun.
+- **Chain scoring is `cellsCleared × 10 × 2^linkIndex`** — deliberately a placeholder.
+  Exponential in chain depth, which is the property that matters, but not Puyo's real
+  formula (chain power + colour bonus + group bonus). Replace it when scoring is tuned.
 - **Input is polled once per frame, not event-driven.** A press must survive to the next
   poll, so a press *and* release inside one frame is dropped. Unreachable from a physical
   keyboard (a real tap is ~30ms against an 8–16ms frame) — it only shows up with synthetic
@@ -146,10 +151,6 @@ Settled and tested. Don't re-litigate without a reason.
 
 ### Blocking Stage 2
 
-- **Match rule: Puyo-style or Bejeweled-style?** Connected groups of 4+ (deep chains, higher
-  skill ceiling, "hard for newcomers") versus match-3 lines (more approachable, weaker chain
-  fantasy). The 6×12 board and pair-drop already lean Puyo. This is the core feel decision —
-  decide it before matching is built.
 - **There is no game over.** When the stack reaches the spawn cell, `spawn()` puts a pair
   inside occupied cells, `place` overwrites them, and it locks in place forever — the board
   fills and the game keeps running. Confirmed by playing. The topping-out rule comes with the

@@ -2,6 +2,7 @@ import { Input, Scene } from 'phaser';
 import { COLUMNS, PIECE_TYPE_COUNT, ROWS } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
+import { EMPTY_COLOR, PIECE_COLORS } from '../palette';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 
@@ -9,8 +10,6 @@ const CELL_SIZE = 64;
 const GAP = 4;
 const FPS_REFRESH_INTERVAL = 250;
 
-const PIECE_COLORS = [0xe4572e, 0x17bebb, 0xffc914, 0x76b041, 0x8a4fff, 0xef476f];
-const EMPTY_COLOR = 0x1c2228;
 
 const BOARD_WIDTH = COLUMNS * CELL_SIZE + (COLUMNS - 1) * GAP;
 const BOARD_HEIGHT = ROWS * CELL_SIZE + (ROWS - 1) * GAP;
@@ -42,6 +41,8 @@ export class BoardScene extends Scene {
   private pairRectangles: Phaser.GameObjects.Rectangle[];
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
+  private scoreText: Phaser.GameObjects.Text;
+  private shownScore = -1;
   private nextFpsRefresh = 0;
   private timestep: FixedTimestep;
   private inputTranslator: InputTranslator;
@@ -91,6 +92,13 @@ export class BoardScene extends Scene {
       fontSize: '16px',
       color: '#8ea3b0',
     });
+
+    this.shownScore = -1;
+    this.scoreText = this.add.text(CANVAS_WIDTH - 8, 8, '', {
+      fontFamily: 'monospace',
+      fontSize: '28px',
+      color: '#e8eef2',
+    }).setOrigin(1, 0);
   }
 
   update(time: number, delta: number): void {
@@ -102,6 +110,7 @@ export class BoardScene extends Scene {
 
     this.drawBoard();
     this.drawPair();
+    this.refreshScore();
     this.refreshFps(time);
   }
 
@@ -166,6 +175,15 @@ export class BoardScene extends Scene {
         rectangle.setFillStyle(PIECE_COLORS[cell.pieceType]);
       }
     }
+  }
+
+  private refreshScore(): void {
+    if (this.simulation.score === this.shownScore) {
+      return;
+    }
+
+    this.shownScore = this.simulation.score;
+    this.scoreText.setText(`${this.shownScore}`);
   }
 
   private refreshFps(time: number): void {

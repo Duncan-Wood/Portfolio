@@ -170,3 +170,81 @@ describe('the spawn counter', () => {
     expect(game.piecesSpawned).toBe(2);
   });
 });
+
+describe('matching after a lock', () => {
+  const lockOntoStackOf = (pieceType: number, height: number) => {
+    const game = simulation();
+    for (let offset = 0; offset < height; offset += 1) {
+      game.board.place(SPAWN_COLUMN, ROWS - 1 - offset, pieceType);
+    }
+    dropToFloor(game);
+    game.update(lockDelay);
+    return game;
+  };
+
+  it('clears a group completed by the locking pair', () => {
+    const game = lockOntoStackOf(RED, 3);
+    expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 1)).not.toBe(RED);
+  });
+
+  it('leaves the unmatched half of the pair behind', () => {
+    const game = lockOntoStackOf(RED, 3);
+    expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 1)).toBe(BLUE);
+  });
+
+  it('scores the clear', () => {
+    const game = lockOntoStackOf(RED, 3);
+    expect(game.score).toBeGreaterThan(0);
+  });
+
+  it('scores nothing when the lock completes no group', () => {
+    const game = simulation();
+    dropToFloor(game);
+    game.update(lockDelay);
+
+    expect(game.score).toBe(0);
+  });
+});
+
+describe('switching between gravity and soft drop', () => {
+  it('does not spend banked gravity time at the soft-drop rate', () => {
+    const game = simulation();
+    game.update(fallInterval - 1);
+
+    game.softDropping = true;
+    game.update(1);
+
+    expect(game.pair.row).toBe(1);
+  });
+
+  it('carries partial progress across the rate change', () => {
+    const game = simulation();
+    game.update(fallInterval / 2);
+
+    game.softDropping = true;
+    game.update(softDropInterval / 2);
+
+    expect(game.pair.row).toBe(1);
+  });
+
+  it('re-prices the remaining fraction of a row when soft drop is released', () => {
+    const game = simulation();
+    game.softDropping = true;
+    game.update(softDropInterval * 0.9);
+
+    game.softDropping = false;
+    game.update(softDropInterval * 0.1);
+    expect(game.pair.row).toBe(0);
+
+    game.update(fallInterval * 0.1);
+    expect(game.pair.row).toBe(1);
+  });
+
+  it('still falls one row per soft-drop interval while held', () => {
+    const game = simulation();
+    game.softDropping = true;
+    game.update(softDropInterval * 3);
+
+    expect(game.pair.row).toBe(3);
+  });
+});

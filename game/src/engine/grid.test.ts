@@ -7,7 +7,7 @@ describe('grid dimensions', () => {
     expect(ROWS).toBe(12);
   });
 
-  it('has six piece types', () => {
-    expect(PIECE_TYPE_COUNT).toBe(6);
+  it('has four piece types', () => {
+    expect(PIECE_TYPE_COUNT).toBe(4);
   });
 });

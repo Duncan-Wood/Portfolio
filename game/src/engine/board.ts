@@ -31,6 +31,13 @@ export class Board {
     this.cells[row * COLUMNS + column] = pieceType;
   }
 
+  clear(column: number, row: number): void {
+    if (!this.isInside(column, row)) {
+      throw new RangeError(`Cannot clear a cell outside the board at ${column},${row}`);
+    }
+    this.cells[row * COLUMNS + column] = EMPTY;
+  }
+
   settle(): void {
     for (let column = 0; column < COLUMNS; column += 1) {
       let target = ROWS - 1;

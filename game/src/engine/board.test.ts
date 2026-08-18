@@ -115,3 +115,24 @@ describe('settle', () => {
     }
   });
 });
+
+describe('clearing cells', () => {
+  it('empties a cell that held a piece', () => {
+    const board = new Board();
+    board.place(2, BOTTOM, 3);
+    board.clear(2, BOTTOM);
+    expect(board.isEmpty(2, BOTTOM)).toBe(true);
+  });
+
+  it('leaves neighbouring cells untouched', () => {
+    const board = new Board();
+    board.place(2, BOTTOM, 3);
+    board.place(3, BOTTOM, 1);
+    board.clear(2, BOTTOM);
+    expect(board.pieceAt(3, BOTTOM)).toBe(1);
+  });
+
+  it('refuses to clear a cell outside the grid', () => {
+    expect(() => new Board().clear(0, ROWS)).toThrow();
+  });
+});
