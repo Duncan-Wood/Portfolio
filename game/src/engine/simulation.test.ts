@@ -360,3 +360,53 @@ describe('resolving a chain over time', () => {
     expect(game.piecesSpawned).toBe(before + 1);
   });
 });
+
+describe('the next-piece preview', () => {
+  const GREEN = 2;
+  const YELLOW = 3;
+
+  const sequence = (...pairs: [number, number][]) => {
+    let index = 0;
+    return (): [number, number] => pairs[Math.min(index++, pairs.length - 1)];
+  };
+
+  it('exposes the upcoming pair while the current one is still falling', () => {
+    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW]));
+
+    expect(game.pair.pivotType).toBe(RED);
+    expect(game.pair.satelliteType).toBe(BLUE);
+    expect(game.upcoming).toEqual([GREEN, YELLOW]);
+  });
+
+  it('spawns exactly the pair it previewed', () => {
+    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW], [BLUE, RED]));
+    dropToFloor(game);
+    game.update(lockDelay);
+
+    expect(game.pair.pivotType).toBe(GREEN);
+    expect(game.pair.satelliteType).toBe(YELLOW);
+  });
+
+  it('shows a new upcoming pair once the previewed one has spawned', () => {
+    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW], [BLUE, RED]));
+    dropToFloor(game);
+    game.update(lockDelay);
+
+    expect(game.upcoming).toEqual([BLUE, RED]);
+  });
+
+  it('draws once per piece, staying exactly one piece ahead', () => {
+    let draws = 0;
+    const game = new Simulation((): [number, number] => {
+      draws += 1;
+      return [RED, BLUE];
+    });
+
+    expect(draws).toBe(game.piecesSpawned + 1);
+
+    dropToFloor(game);
+    game.update(lockDelay);
+
+    expect(draws).toBe(game.piecesSpawned + 1);
+  });
+});

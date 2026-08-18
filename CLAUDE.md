@@ -30,8 +30,11 @@ From `game/` — Node 24 activates on `cd` via `mise`:
 ## Architecture (non-negotiable)
 - `game/src/engine/` — pure game logic. No Phaser imports. Grid, pieces, matching,
   gravity, chains, scoring. Fully unit-tested with Vitest.
-- `game/src/scenes/` — Phaser rendering, input, audio, particles. Reads the engine.
-- Simulation uses a fixed-timestep accumulator, decoupled from render.
+- `game/src/scenes/` — Phaser only: rendering, audio, particles, and reading the keyboard.
+  Anything with rules in it belongs outside, so it can be tested without a browser.
+- `game/src/input/` — DAS/ARR and the key latches. Phaser-free, so game *feel* is testable.
+- `game/src/fixed-timestep.ts` — clamps the frame delta and returns whole steps.
+- `game/src/tuning.ts` — every feel dial; exposed as `window.tuning` in dev builds.
 
 ## Working style
 - I'm an experienced engineer but new to game dev. Explain game-dev-specific

@@ -16,6 +16,7 @@ export class Simulation {
   score = 0;
   resolving = false;
   chainLength = 0;
+  upcoming: [number, number];
 
   private fallProgress = 0;
   private resolveTimer = 0;
@@ -26,6 +27,7 @@ export class Simulation {
     private nextPieceTypes: PieceTypeSupplier,
     private tuning: Tuning = DEFAULT_TUNING,
   ) {
+    this.upcoming = this.nextPieceTypes();
     this.pair = this.spawn();
   }
 
@@ -115,7 +117,8 @@ export class Simulation {
   }
 
   private spawn(): FallingPair {
-    const [pivotType, satelliteType] = this.nextPieceTypes();
+    const [pivotType, satelliteType] = this.upcoming;
+    this.upcoming = this.nextPieceTypes();
     this.fallProgress = 0;
     this.lockTimer = 0;
     this.piecesSpawned += 1;

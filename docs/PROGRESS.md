@@ -20,9 +20,11 @@ loop, which is what Stage 2 adds. DAS 130 / ARR 40 stand as-is; no sweep was nee
   **three-link chain scoring 280** (`40 + 80 + 160`), predicted before the trigger was
   dropped and confirmed exactly. That also independently validates the exponential scoring.
 - **Done in Stage 3 so far** — the cascade resolves one link per `chainLinkDelay` instead
-  of instantly, so it can be seen at all.
-- **Next** — the rest of the juice checklist (tweens on pop and fall, particles, hit-stop,
-  screen shake, rising audio per link), then the hidden row and next-piece preview.
+  of instantly; clearing and settling are separate beats so tiles visibly hang over the
+  hole before dropping (judged "more legible"); and the next-piece preview is built.
+- **Next** — the hidden row, then the rest of the juice checklist (tweened pop and fall,
+  particles, hit-stop, screen shake, rising audio per link). Smooth tweening dropped from
+  *needed for comprehension* to *optional polish* once the two-beat split landed.
 
 ### Why Stage 3 became urgent
 
@@ -145,6 +147,18 @@ Settled and tested, across Stages 1 and 2. Don't re-litigate without a reason.
 - **Chain scoring is `cellsCleared × 10 × 2^linkIndex`** — deliberately a placeholder.
   Exponential in chain depth, which is the property that matters, but not Puyo's real
   formula (chain power + colour bonus + group bonus). Replace it when scoring is tuned.
+- **The next-piece preview is one pair of lookahead, shown beside the board.** `Simulation`
+  draws one piece ahead and exposes it as `upcoming`. This is what makes chain-building
+  plannable: a satellite spawns at row −1, off-screen, so the only way to learn its colour
+  used to be to rotate, and every piece cost an input just to see what you were holding.
+  Note the preview does **not** move the satellite on screen — it is still off-screen at
+  spawn; you simply learned its colour one piece earlier, which is how Puyo does it. Puyo
+  shows two pairs of lookahead; going deeper here is a change to the queue depth if one
+  feels thin.
+- **The board is left-aligned, not centred**, and the canvas is 620 wide rather than 480,
+  because a 404px board in a 480px canvas left only 38px of margin — no room for a preview
+  panel. The chain counter centres on the *board*, not the canvas, so it never drifts over
+  the panel.
 - **The chain resolves over time, in a `resolving` phase between lock and spawn.** Each
   link is applied one `chainLinkDelay` (220ms) apart, so a completed group is on screen as a
   group before it clears. Two rules fall out of it: input is **ignored while resolving**
@@ -152,7 +166,11 @@ Settled and tested, across Stages 1 and 2. Don't re-litigate without a reason.
   spawned, and moving it would corrupt the board), and a lock that matches nothing spawns
   **immediately** with no delay — otherwise every non-matching piece would pay the chain tax.
   `resolveChain` is now a loop over a single-step `resolveStep`, so the engine keeps its
-  all-at-once API for tests while the scene gets it link by link.
+  all-at-once API for tests while the scene gets it link by link. Clearing and settling are
+  separate beats (`clearStep` then `board.settle()`, paced by `settleDelay`), so a cleared
+  group leaves a visible hole with tiles hanging over it before they drop — that gap is what
+  makes a chain read as cause and effect, and it is also the state a future tween would
+  interpolate between.
 - **Input is polled once per frame, not event-driven.** A press must survive to the next
   poll, so a press *and* release inside one frame is dropped. Unreachable from a physical
   keyboard (a real tap is ~30ms against an 8–16ms frame) — it only shows up with synthetic
@@ -163,24 +181,29 @@ Settled and tested, across Stages 1 and 2. Don't re-litigate without a reason.
 - **Hidden 13th row — yes.** Puyo's "Ghost Puyo" row: one row above the visible field where
   pieces rest but stay inert. It buys three things — breathing room at the top, a sharp
   game-over rule ("spawn cell occupied"), and the expert technique of completing a group
-  whose last piece sits in the ghost row and only detonates when it later falls in. Build it
-  before matching, since it changes every coordinate.
+  whose last piece sits in the ghost row and only detonates when it later falls in.
+
+  The plan said to build it *before* matching, since it changes every coordinate.
+  **That did not happen** — matching went first, because the game read as unfun and matching
+  is what creates the loop. The cost is now owed: adding the row means threading a
+  visible-row floor through `findGroups`, `connectedCells`, and `resolveChain`, and
+  re-anchoring every ASCII picture in `matching.test.ts`. Budget for that rework rather than
+  being surprised by it.
   - Open sub-rule: hidden-row pieces must **not** participate in matches (Puyo's rule), or
     you get explosions the player cannot see.
-- **Next-piece preview — yes.** This, not the hidden row, is what fixes "I can't see what
-  I'm holding". The hidden row does not solve it: a satellite spawned into a hidden row is
-  still invisible. Puyo shows the incoming pair in a panel beside the board instead.
 - Blockers, Pinball, and difficulty framing are settled in
   [ART-DIRECTION.md](ART-DIRECTION.md) under "By stage".
 
 ## Open questions
 
-### Blocking Stage 2
+### Blocking the hidden row
 
-- **There is no game over.** When the stack reaches the spawn cell, `spawn()` puts a pair
-  inside occupied cells, `place` overwrites them, and it locks in place forever — the board
-  fills and the game keeps running. Confirmed by playing. The topping-out rule comes with the
-  hidden row above, but only becomes *reachable* once matching stops the board filling.
+- **There is no game over, and two failures are silent.** When the stack reaches the spawn
+  cell, `spawn()` puts a pair inside occupied cells and `place` overwrites them with no
+  occupancy check. Separately, `FallingPair.lock` skips any cell failing `isInside`, so a
+  pair locking with its satellite at row −1 **discards that half without a trace**. Both are
+  confirmed, both are silent, and both are fixed by the same change: the hidden row plus a
+  topping-out rule ("spawn cell occupied"). Matching makes them rarer, not impossible.
 
 ### Blocking Stage 4
 

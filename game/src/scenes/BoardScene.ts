@@ -13,11 +13,15 @@ const FPS_REFRESH_INTERVAL = 250;
 
 const BOARD_WIDTH = COLUMNS * CELL_SIZE + (COLUMNS - 1) * GAP;
 const BOARD_HEIGHT = ROWS * CELL_SIZE + (ROWS - 1) * GAP;
-export const CANVAS_WIDTH = 480;
+export const CANVAS_WIDTH = 620;
 export const CANVAS_HEIGHT = 900;
 
-const ORIGIN_X = (CANVAS_WIDTH - BOARD_WIDTH) / 2;
+const ORIGIN_X = 40;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
+
+const PREVIEW_CELL = 48;
+const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
+const PREVIEW_TOP_Y = ORIGIN_Y + 72;
 
 function centerOfColumn(column: number): number {
   return ORIGIN_X + column * (CELL_SIZE + GAP) + CELL_SIZE / 2;
@@ -43,6 +47,8 @@ export class BoardScene extends Scene {
   private fpsText: Phaser.GameObjects.Text;
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
+  private previewRectangles: Phaser.GameObjects.Rectangle[];
+  private shownUpcoming = '';
   private shownScore = -1;
   private shownChain = -1;
   private nextFpsRefresh = 0;
@@ -87,6 +93,24 @@ export class BoardScene extends Scene {
       this.add.rectangle(0, 0, CELL_SIZE, CELL_SIZE, EMPTY_COLOR),
     ];
 
+    this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y - 46, 'NEXT', {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#8ea3b0',
+    }).setOrigin(0.5, 0.5);
+
+    this.shownUpcoming = '';
+    this.previewRectangles = [
+      this.add.rectangle(
+        PREVIEW_CENTER_X,
+        PREVIEW_TOP_Y + PREVIEW_CELL + GAP,
+        PREVIEW_CELL,
+        PREVIEW_CELL,
+        EMPTY_COLOR,
+      ),
+      this.add.rectangle(PREVIEW_CENTER_X, PREVIEW_TOP_Y, PREVIEW_CELL, PREVIEW_CELL, EMPTY_COLOR),
+    ];
+
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     this.fpsText = this.add.text(8, 8, '', {
@@ -103,7 +127,7 @@ export class BoardScene extends Scene {
     }).setOrigin(1, 0);
 
     this.shownChain = -1;
-    this.chainText = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, '', {
+    this.chainText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2, '', {
       fontFamily: 'monospace',
       fontSize: '64px',
       color: '#ffc914',
@@ -119,6 +143,7 @@ export class BoardScene extends Scene {
 
     this.drawBoard();
     this.drawPair();
+    this.drawPreview();
     this.refreshChain();
     this.refreshScore();
     this.refreshFps(time);
@@ -192,6 +217,18 @@ export class BoardScene extends Scene {
         rectangle.setFillStyle(PIECE_COLORS[cell.pieceType]);
       }
     }
+  }
+
+  private drawPreview(): void {
+    const [pivotType, satelliteType] = this.simulation.upcoming;
+    const key = `${pivotType},${satelliteType}`;
+    if (key === this.shownUpcoming) {
+      return;
+    }
+
+    this.shownUpcoming = key;
+    this.previewRectangles[0].setFillStyle(PIECE_COLORS[pivotType]);
+    this.previewRectangles[1].setFillStyle(PIECE_COLORS[satelliteType]);
   }
 
   private refreshChain(): void {
