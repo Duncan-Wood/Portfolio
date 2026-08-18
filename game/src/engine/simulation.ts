@@ -1,10 +1,8 @@
 import { COLUMNS } from './grid';
 import { Board } from './board';
 import { FallingPair } from './falling-pair';
+import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
-export const FALL_INTERVAL = 800;
-export const SOFT_DROP_INTERVAL = 50;
-export const LOCK_DELAY = 500;
 export const SPAWN_COLUMN = Math.floor((COLUMNS - 1) / 2);
 
 export type PieceTypeSupplier = () => [number, number];
@@ -13,18 +11,22 @@ export class Simulation {
   readonly board = new Board();
   pair: FallingPair;
   softDropping = false;
+  piecesSpawned = 0;
 
   private fallTimer = 0;
   private lockTimer = 0;
 
-  constructor(private nextPieceTypes: PieceTypeSupplier) {
+  constructor(
+    private nextPieceTypes: PieceTypeSupplier,
+    private tuning: Tuning = DEFAULT_TUNING,
+  ) {
     this.pair = this.spawn();
   }
 
   update(delta: number): void {
     if (!this.pair.canFall(this.board)) {
       this.lockTimer += delta;
-      if (this.lockTimer >= LOCK_DELAY) {
+      if (this.lockTimer >= this.tuning.lockDelay) {
         this.pair.lock(this.board);
         this.pair = this.spawn();
       }
@@ -34,7 +36,9 @@ export class Simulation {
     this.lockTimer = 0;
     this.fallTimer += delta;
 
-    const interval = this.softDropping ? SOFT_DROP_INTERVAL : FALL_INTERVAL;
+    const interval = this.softDropping
+      ? this.tuning.softDropInterval
+      : this.tuning.fallInterval;
     while (this.fallTimer >= interval && this.pair.fall(this.board)) {
       this.fallTimer -= interval;
     }
@@ -63,6 +67,7 @@ export class Simulation {
     const [pivotType, satelliteType] = this.nextPieceTypes();
     this.fallTimer = 0;
     this.lockTimer = 0;
+    this.piecesSpawned += 1;
     return new FallingPair(SPAWN_COLUMN, 0, 0, pivotType, satelliteType);
   }
 }

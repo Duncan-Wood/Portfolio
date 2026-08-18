@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ROWS } from './grid';
-import {
-  FALL_INTERVAL,
-  LOCK_DELAY,
-  SOFT_DROP_INTERVAL,
-  SPAWN_COLUMN,
-  Simulation,
-} from './simulation';
+import { DEFAULT_TUNING } from '../tuning';
+import { SPAWN_COLUMN, Simulation } from './simulation';
+
+const { fallInterval, lockDelay, softDropInterval } = DEFAULT_TUNING;
 
 const RED = 0;
 const BLUE = 1;
@@ -15,7 +12,7 @@ const simulation = () => new Simulation(() => [RED, BLUE]);
 
 const dropToFloor = (game: Simulation) => {
   while (game.pair.canFall(game.board)) {
-    game.update(FALL_INTERVAL);
+    game.update(fallInterval);
   }
 };
 
@@ -37,33 +34,33 @@ describe('spawning', () => {
 describe('gravity', () => {
   it('does not fall before the interval elapses', () => {
     const game = simulation();
-    game.update(FALL_INTERVAL - 1);
+    game.update(fallInterval - 1);
     expect(game.pair.row).toBe(0);
   });
 
   it('falls one row once the interval elapses', () => {
     const game = simulation();
-    game.update(FALL_INTERVAL);
+    game.update(fallInterval);
     expect(game.pair.row).toBe(1);
   });
 
   it('accumulates time across several updates', () => {
     const game = simulation();
-    game.update(FALL_INTERVAL / 2);
-    game.update(FALL_INTERVAL / 2);
+    game.update(fallInterval / 2);
+    game.update(fallInterval / 2);
     expect(game.pair.row).toBe(1);
   });
 
   it('falls several rows when a large delta arrives at once', () => {
     const game = simulation();
-    game.update(FALL_INTERVAL * 3);
+    game.update(fallInterval * 3);
     expect(game.pair.row).toBe(3);
   });
 
   it('falls faster while soft dropping', () => {
     const game = simulation();
     game.softDropping = true;
-    game.update(SOFT_DROP_INTERVAL);
+    game.update(softDropInterval);
     expect(game.pair.row).toBe(1);
   });
 });
@@ -78,7 +75,7 @@ describe('lock delay', () => {
   it('locks once the lock delay elapses', () => {
     const game = simulation();
     dropToFloor(game);
-    game.update(LOCK_DELAY);
+    game.update(lockDelay);
     expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 1)).toBe(RED);
     expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 2)).toBe(BLUE);
   });
@@ -86,9 +83,9 @@ describe('lock delay', () => {
   it('restarts the lock delay after a successful move', () => {
     const game = simulation();
     dropToFloor(game);
-    game.update(LOCK_DELAY - 1);
+    game.update(lockDelay - 1);
     game.moveLeft();
-    game.update(LOCK_DELAY - 1);
+    game.update(lockDelay - 1);
     expect(game.board.isEmpty(SPAWN_COLUMN - 1, ROWS - 1)).toBe(true);
   });
 
@@ -97,7 +94,7 @@ describe('lock delay', () => {
     game.moveLeft();
     game.moveLeft();
     dropToFloor(game);
-    game.update(LOCK_DELAY - 1);
+    game.update(lockDelay - 1);
     game.moveLeft();
     game.update(1);
     expect(game.board.isEmpty(0, ROWS - 1)).toBe(false);
@@ -106,7 +103,7 @@ describe('lock delay', () => {
   it('spawns a fresh pair after locking', () => {
     const game = simulation();
     dropToFloor(game);
-    game.update(LOCK_DELAY);
+    game.update(lockDelay);
     expect(game.pair.row).toBe(0);
     expect(game.pair.column).toBe(SPAWN_COLUMN);
   });
@@ -114,9 +111,9 @@ describe('lock delay', () => {
   it('stacks the next pair on top of the locked one', () => {
     const game = simulation();
     dropToFloor(game);
-    game.update(LOCK_DELAY);
+    game.update(lockDelay);
     dropToFloor(game);
-    game.update(LOCK_DELAY);
+    game.update(lockDelay);
     expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 3)).toBe(RED);
     expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 4)).toBe(BLUE);
   });
@@ -124,14 +121,52 @@ describe('lock delay', () => {
   it('cancels the lock delay when a move opens space below the pair', () => {
     const game = simulation();
     dropToFloor(game);
-    game.update(LOCK_DELAY);
+    game.update(lockDelay);
 
     dropToFloor(game);
     const restingRow = game.pair.row;
-    game.update(LOCK_DELAY - 1);
+    game.update(lockDelay - 1);
     game.moveLeft();
-    game.update(FALL_INTERVAL);
+    game.update(fallInterval);
 
     expect(game.pair.row).toBeGreaterThan(restingRow);
+  });
+});
+
+describe('live tuning', () => {
+  it('re-reads the tuning object each update, so a later mutation takes effect', () => {
+    const tuning = { ...DEFAULT_TUNING };
+    const game = new Simulation(() => [RED, BLUE], tuning);
+
+    tuning.fallInterval = 100;
+    game.update(100);
+
+    expect(game.pair.row).toBe(1);
+  });
+
+  it('leaves the shared defaults untouched when a caller mutates its own tuning', () => {
+    const tuning = { ...DEFAULT_TUNING };
+    tuning.fallInterval = 1;
+
+    expect(DEFAULT_TUNING.fallInterval).toBe(800);
+  });
+});
+
+describe('the spawn counter', () => {
+  it('counts the pair the simulation starts with', () => {
+    expect(simulation().piecesSpawned).toBe(1);
+  });
+
+  it('does not change while the same pair is falling', () => {
+    const game = simulation();
+    game.update(fallInterval);
+    expect(game.piecesSpawned).toBe(1);
+  });
+
+  it('increments when a pair locks and the next one spawns', () => {
+    const game = simulation();
+    dropToFloor(game);
+    game.update(lockDelay);
+    expect(game.piecesSpawned).toBe(2);
   });
 });

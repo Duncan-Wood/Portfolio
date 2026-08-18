@@ -6,7 +6,6 @@ This repo holds two things:
 
 The matcher is the core of a larger narrative game; build and validate the matcher first.
 
-Full design plan: @docs/DESIGN-PLAN.md
 Current stage + open questions: @docs/PROGRESS.md
 Visual + thematic direction: @docs/ART-DIRECTION.md
 
