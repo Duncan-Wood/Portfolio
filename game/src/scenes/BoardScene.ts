@@ -95,6 +95,7 @@ export class BoardScene extends Scene {
   private fpsText: Phaser.GameObjects.Text;
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
+  private gameOverText: Phaser.GameObjects.Text;
   private previewRectangles: Phaser.GameObjects.Rectangle[];
   private shownUpcoming = '';
   private shownScore = -1;
@@ -203,6 +204,19 @@ export class BoardScene extends Scene {
       fontSize: '64px',
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
+
+    this.gameOverText = this.add.text(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      'TOPPED OUT',
+      {
+        fontFamily: 'monospace',
+        fontSize: '48px',
+        color: '#e8eef2',
+        backgroundColor: '#12161a',
+        padding: { x: 16, y: 10 },
+      },
+    ).setOrigin(0.5, 0.5).setVisible(false);
   }
 
   /**
@@ -214,7 +228,12 @@ export class BoardScene extends Scene {
    * there is to win.
    */
   update(time: number, delta: number): void {
-    this.readInput(delta);
+    // Nothing to read once the game is over: the simulation refuses input
+    // anyway, and polling on would keep writing `softDropping` to a pair that
+    // is already part of the board.
+    if (!this.simulation.toppedOut) {
+      this.readInput(delta);
+    }
 
     for (let step = this.timestep.stepsFor(delta); step > 0; step -= 1) {
       this.simulation.update(FIXED_STEP);
@@ -225,6 +244,7 @@ export class BoardScene extends Scene {
     this.drawPreview();
     this.refreshChain();
     this.refreshScore();
+    this.refreshGameOver();
     this.refreshFps(time);
   }
 
@@ -302,9 +322,10 @@ export class BoardScene extends Scene {
    * between cells, which fixed-position grid cells cannot do.
    */
   private drawPair(): void {
-    // While a cascade resolves, the pair's tiles are already part of the board.
-    // Drawing it too would paint a ghost duplicate.
-    if (this.simulation.resolving) {
+    // In both of these states `pair` still points at the pair whose tiles are
+    // already part of the board, so drawing it paints a ghost duplicate — and
+    // after a top-out it would hang there at its pre-settle position forever.
+    if (this.simulation.resolving || this.simulation.toppedOut) {
       for (const rectangle of this.pairRectangles) {
         rectangle.setVisible(false);
       }
@@ -370,6 +391,15 @@ export class BoardScene extends Scene {
 
     this.shownScore = this.simulation.score;
     this.scoreText.setText(`${this.shownScore}`);
+  }
+
+  /**
+   * The board is left exactly as it stood, with the readout over it — losing is
+   * information, and clearing the screen would throw away the shape that
+   * explains why. Restarting means reloading the page for now.
+   */
+  private refreshGameOver(): void {
+    this.gameOverText.setVisible(this.simulation.toppedOut);
   }
 
   private refreshFps(time: number): void {

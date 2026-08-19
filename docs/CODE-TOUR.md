@@ -174,8 +174,8 @@ second copy — open the file and the rationale is at the line.
 | Module | Owns | Open it for |
 |---|---|---|
 | `engine/grid.ts` | `COLUMNS` 6, `VISIBLE_ROWS` 12 + `HIDDEN_ROWS` 1, `PIECE_TYPE_COUNT` 4 | why row 0 is the top; why there is a hidden row; why four colours and not six |
-| `engine/board.ts` | which cell holds which colour; gravity (`settle`) | the `isBlocked` asymmetry above the board, and what it costs; why `settle` makes a locked pair split apart |
-| `engine/falling-pair.ts` | the two-tile piece, its orientation and movement | what a wall kick is and how the kick direction is derived; the silent discard in `lock()` |
+| `engine/board.ts` | which cell holds which colour; gravity (`settle`) | why `place` throws rather than overwriting; why `settle` makes a locked pair split apart |
+| `engine/falling-pair.ts` | the two-tile piece, its orientation and movement | what a wall kick is and how the kick direction is derived; why `lock()` writes both halves unconditionally |
 | `engine/matching.ts` | the match rule, clearing, cascades, scoring | why groups are connected rather than lines; why `clearStep` deliberately omits the settle; why flood fill marks visited on *push* |
 | `engine/simulation.ts` | the clock and the state machine | why `fallProgress` is a fraction; the lock-delay reset asymmetry; why input is refused mid-cascade |
 | `input/input-translator.ts` | DAS, ARR, and the two release latches | why the latches exist at 16x gravity; why a blocked shift zeroes the repeat timer |
@@ -197,8 +197,10 @@ Following a single pair end to end ties every layer together:
 
 1. **Spawn.** `Simulation.spawn()` takes the colours from `upcoming` (drawn one
    piece ahead for the preview), draws a replacement, resets the per-piece
-   timers, and constructs a `FallingPair` at column 2, row 0, orientation 0.
-   Its satellite is therefore at row −1 — off-screen, and invisible.
+   timers, and constructs a `FallingPair` at column 2, orientation 0, with its
+   pivot in the topmost visible row. Its satellite is therefore in the hidden
+   row above — on the board, but not drawn. If either of those cells is already
+   taken, no pair spawns and the game is over instead.
 2. **Fall.** Each `update`, `fallProgress` grows by `delta / interval`. When it
    crosses 1, `pair.fall()` moves down a row and 1 is subtracted.
 3. **Player input.** The scene reads the arrow keys, resolves a direction, and
@@ -265,6 +267,5 @@ visible and frontmost or every timing measurement is meaningless. See
 
 Tracked in [PROGRESS.md](PROGRESS.md) under "Open questions" and "Deferred" —
 that file is the single record, so it does not get a second copy here. The short
-version: there is no game over, a pair locking with its satellite above the board
-silently loses that half, chain scoring is a placeholder, and nothing is animated
-smoothly yet.
+version: chain scoring is a placeholder, a top-out ends the game but offers no
+restart short of a page reload, and nothing is animated smoothly yet.

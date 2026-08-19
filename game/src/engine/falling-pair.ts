@@ -117,13 +117,23 @@ export class FallingPair {
   }
 
   /**
+   * Whether this pair's current position is legal. Asked by the simulation
+   * before a spawn, so the topping-out rule reads the pair's real cells rather
+   * than re-deriving where a satellite sits at orientation 0.
+   */
+  fitsOn(board: Board): boolean {
+    return this.fits(board, this.column, this.row, this.orientation);
+  }
+
+  /**
    * Commit both halves onto the board. After this the pair is history; the
    * tiles belong to the board.
    *
-   * The `isInside` guard skips any half sitting above the board (a satellite at
-   * row -1 at spawn). That is a SILENT DISCARD — the tile vanishes with no
-   * error — and is only reachable when the stack has grown to the spawn row.
-   * The real fix is the hidden 13th row; see docs/PROGRESS.md.
+   * Writes unconditionally. Both halves are always on the board: the pivot
+   * spawns in the topmost visible row with the satellite in the hidden row
+   * above it, and a pair only ever moves down or sideways. This used to guard
+   * with `isInside` and silently discard a half at row -1, which the hidden row
+   * removed the need for — a bad write now throws out of `place` instead.
    *
    * `settle()` at the end is what makes the two halves independent: if the
    * pivot lands on the stack while the satellite is over a hole, the satellite
@@ -132,9 +142,7 @@ export class FallingPair {
    */
   lock(board: Board): void {
     for (const cell of this.cells()) {
-      if (board.isInside(cell.column, cell.row)) {
-        board.place(cell.column, cell.row, cell.pieceType);
-      }
+      board.place(cell.column, cell.row, cell.pieceType);
     }
     board.settle();
   }

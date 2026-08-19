@@ -30,10 +30,17 @@ describe('bounds', () => {
     expect(board.isInside(0, ROWS)).toBe(false);
   });
 
-  it('reports cells above the grid as outside but not blocked', () => {
+  it('reports the ceiling as blocked, like any other edge', () => {
     const board = new Board();
     expect(board.isInside(0, -1)).toBe(false);
-    expect(board.isBlocked(0, -1)).toBe(false);
+    expect(board.isBlocked(0, -1)).toBe(true);
+  });
+
+  it('refuses to place a piece on top of another', () => {
+    const board = new Board();
+    board.place(2, 5, 3);
+    expect(() => board.place(2, 5, 4)).toThrow();
+    expect(board.pieceAt(2, 5)).toBe(3);
   });
 
   it('reports walls and the floor as blocked', () => {

@@ -35,33 +35,30 @@ export class Board {
   }
 
   /**
-   * Note the asymmetry: cells above the board (`row < 0`) AND within the column
-   * range report as NOT blocked, while walls and the floor do. This is load-bearing — a pair spawns
-   * with its satellite at row -1, so without it the pair would collide with the
-   * ceiling the instant it appeared.
-   *
-   * The cost is that a pair can sit partly off the top of the board, which is
-   * why the scene skips drawing cells above row 0, and why `lock()` can discard
-   * such a half. The hidden 13th row is the real fix; see PROGRESS.md.
+   * Anything off the board or already occupied blocks a move. No exemption for
+   * cells above the board: one used to exist so a pair could spawn with its
+   * satellite at row -1, and the hidden row replaced it. Keeping it would let
+   * the ceiling silently stop blocking, which is exactly what the topping-out
+   * rule depends on.
    */
   isBlocked(column: number, row: number): boolean {
-    if (row < 0 && column >= 0 && column < COLUMNS) {
-      return false;
-    }
     return !this.isInside(column, row) || !this.isEmpty(column, row);
   }
 
   /**
-   * Throws rather than ignoring an off-board write, since a caller placing
-   * outside the board has a bug and quiet failure would hide it.
-   *
-   * Does NOT check whether the cell is already occupied — it overwrites. Known
-   * gap, reachable only when the stack reaches the spawn cell, fixed by the
-   * topping-out rule that comes with the hidden row.
+   * Throws rather than ignoring an off-board or on-top-of-something write, since
+   * a caller placing outside the board or over a tile the player built with has
+   * a bug, and quiet failure would hide it — an overwrite destroys a tile with
+   * no error and no failing test. Callers ask first: `FallingPair` via `fits`,
+   * the simulation via the topping-out rule.
    */
   place(column: number, row: number, pieceType: number): void {
     if (!this.isInside(column, row)) {
       throw new RangeError(`Cannot place a piece outside the board at ${column},${row}`);
+    }
+
+    if (!this.isEmpty(column, row)) {
+      throw new RangeError(`Cannot place a piece over the one already at ${column},${row}`);
     }
     this.cells[row * COLUMNS + column] = pieceType;
   }

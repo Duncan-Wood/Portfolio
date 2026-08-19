@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIRST_VISIBLE_ROW, ROWS } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS } from './grid';
 import { DEFAULT_TUNING } from '../tuning';
 import { SPAWN_COLUMN, SPAWN_ROW, Simulation } from './simulation';
 
@@ -440,5 +440,112 @@ describe('spawning into the hidden row', () => {
 
     expect(game.board.pieceAt(SPAWN_COLUMN, FIRST_VISIBLE_ROW)).toBe(RED);
     expect(game.board.pieceAt(SPAWN_COLUMN, FIRST_VISIBLE_ROW - 1)).toBe(BLUE);
+  });
+});
+
+describe('topping out', () => {
+  const snapshot = (game: Simulation) => {
+    const cells: (number | null)[] = [];
+    for (let row = 0; row < ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        cells.push(game.board.pieceAt(column, row));
+      }
+    }
+    return cells;
+  };
+
+  /**
+   * Fills the spawn column below the spawn row, cycling colours so the fill
+   * never forms a group of its own.
+   */
+  const fillUnderSpawn = (game: Simulation) => {
+    for (let row = SPAWN_ROW + 1; row < ROWS; row += 1) {
+      game.board.place(SPAWN_COLUMN, row, (row % 3) + 1);
+    }
+  };
+
+  const lockIntoAFullColumn = () => {
+    const game = simulation();
+    fillUnderSpawn(game);
+    game.update(lockDelay);
+    return game;
+  };
+
+  it('starts out not topped out', () => {
+    expect(simulation().toppedOut).toBe(false);
+  });
+
+  it('tops out when the next pair has nowhere to spawn', () => {
+    expect(lockIntoAFullColumn().toppedOut).toBe(true);
+  });
+
+  it('stops spawning once topped out', () => {
+    const game = lockIntoAFullColumn();
+    const spawned = game.piecesSpawned;
+
+    for (let tick = 0; tick < 20; tick += 1) {
+      game.update(fallInterval);
+    }
+
+    expect(game.piecesSpawned).toBe(spawned);
+  });
+
+  it('ignores input once topped out', () => {
+    const game = lockIntoAFullColumn();
+
+    expect(game.moveLeft()).toBe(false);
+    expect(game.moveRight()).toBe(false);
+    expect(game.rotate()).toBe(false);
+  });
+
+  /**
+   * The board must be frozen exactly as the player left it. Were a pair still
+   * to spawn, `Board.place` would either throw on the occupied spawn cell or
+   * overwrite it — this catches both, where asserting the spawn cell's colour
+   * alone caught neither, since `lock` had just written that colour itself.
+   */
+  it('leaves the final board untouched', () => {
+    const game = lockIntoAFullColumn();
+    const finalBoard = snapshot(game);
+
+    for (let tick = 0; tick < 20; tick += 1) {
+      game.update(fallInterval);
+    }
+
+    expect(snapshot(game)).toEqual(finalBoard);
+  });
+
+  /**
+   * The other route into the rule: a chain finishes and the pair after it has
+   * nowhere to go. It reaches `spawnOrTopOut` with `resolving` already cleared
+   * and the board freshly settled, so it is worth its own test — the lock-path
+   * tests above pass with this call site broken.
+   */
+  it('tops out at the end of a cascade', () => {
+    const game = simulation();
+
+    // Out of the spawn column, so the fill below can seal it completely.
+    game.moveLeft();
+    game.moveLeft();
+    for (let row = SPAWN_ROW; row < ROWS; row += 1) {
+      game.board.place(SPAWN_COLUMN, row, (row % 3) + 2);
+    }
+
+    // Three reds for the pair's red pivot to complete a group of four.
+    for (let row = ROWS - 3; row < ROWS; row += 1) {
+      game.board.place(0, row, RED);
+    }
+
+    dropToFloor(game);
+    game.update(lockDelay);
+    expect(game.resolving).toBe(true);
+
+    const beat = Math.max(DEFAULT_TUNING.chainLinkDelay, DEFAULT_TUNING.settleDelay);
+    for (let tick = 0; tick < 20 && game.resolving; tick += 1) {
+      game.update(beat);
+    }
+
+    expect(game.score).toBeGreaterThan(0);
+    expect(game.toppedOut).toBe(true);
   });
 });

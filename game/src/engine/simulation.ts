@@ -69,6 +69,13 @@ export class Simulation {
    */
   resolving = false;
 
+  /**
+   * True once a pair had nowhere to spawn. The game is over: nothing advances
+   * and input is refused, so the final board stays on screen instead of the
+   * stack silently overwriting itself.
+   */
+  toppedOut = false;
+
   chainLength = 0;
 
   /**
@@ -136,6 +143,10 @@ export class Simulation {
    * caller's job is to bound it, which `FixedTimestep` does.
    */
   update(delta: number): void {
+    if (this.toppedOut) {
+      return;
+    }
+
     if (this.resolving) {
       this.advanceChain(delta);
       return;
@@ -159,7 +170,7 @@ export class Simulation {
           this.resolveTimer = 0;
           this.settlePending = false;
         } else {
-          this.pair = this.spawn();
+          this.spawnOrTopOut();
         }
       }
       return;
@@ -195,21 +206,29 @@ export class Simulation {
   /**
    * Player input. Each returns whether the move actually happened.
    *
-   * All three refuse while a cascade is resolving. That window is real: after a
-   * lock, `pair` still points at the pair now sitting on the board, and the
-   * next one has not spawned. Moving it then would write those tiles a second
-   * time and corrupt the board.
+   * All three refuse while a cascade resolves or after a top-out, for the same
+   * reason: in both states `pair` still points at the pair now sitting on the
+   * board, and no replacement has spawned. Moving it then would write those
+   * tiles a second time and corrupt the board.
    */
   moveLeft(): boolean {
-    return this.resolving ? false : this.afterInput(this.pair.moveLeft(this.board));
+    return this.acceptsInput ? this.afterInput(this.pair.moveLeft(this.board)) : false;
   }
 
   moveRight(): boolean {
-    return this.resolving ? false : this.afterInput(this.pair.moveRight(this.board));
+    return this.acceptsInput ? this.afterInput(this.pair.moveRight(this.board)) : false;
   }
 
   rotate(): boolean {
-    return this.resolving ? false : this.afterInput(this.pair.rotateClockwise(this.board));
+    return this.acceptsInput ? this.afterInput(this.pair.rotateClockwise(this.board)) : false;
+  }
+
+  /**
+   * One home for the refusal rule, so a fourth input method cannot be added
+   * that honours only half of it.
+   */
+  private get acceptsInput(): boolean {
+    return !this.resolving && !this.toppedOut;
   }
 
   /**
@@ -243,7 +262,7 @@ export class Simulation {
     const link = clearStep(this.board);
     if (link === null) {
       this.resolving = false;
-      this.pair = this.spawn();
+      this.spawnOrTopOut();
       return;
     }
 
@@ -252,6 +271,27 @@ export class Simulation {
     this.score += scoreLink(link, this.chainLength);
     this.chainLength += 1;
     this.settlePending = true;
+  }
+
+  /**
+   * Spawn the next pair, or declare the game over if it has nowhere to go.
+   *
+   * The candidate is built and asked whether it fits, rather than testing the
+   * spawn cells by hand: `FallingPair` already owns where a satellite sits at
+   * each orientation, and a second copy of that geometry here would quietly
+   * check the wrong cells if the spawn shape or `HIDDEN_ROWS` ever changed.
+   *
+   * Asking before committing is what keeps `place` able to throw on an occupied
+   * cell — a pair spawning into occupied cells is the one path that would
+   * otherwise destroy tiles the player built with.
+   */
+  private spawnOrTopOut(): void {
+    if (!this.nextPair().fitsOn(this.board)) {
+      this.toppedOut = true;
+      return;
+    }
+
+    this.pair = this.spawn();
   }
 
   /**
@@ -278,15 +318,26 @@ export class Simulation {
    * across a lock into the next piece.
    */
   private spawn(): FallingPair {
-    const [pivotType, satelliteType] = this.upcoming;
+    const next = this.nextPair();
     this.upcoming = this.nextPieceTypes();
 
     this.fallProgress = 0;
     this.lockTimer = 0;
     this.piecesSpawned += 1;
 
-    // Orientation 0 puts the satellite directly above the pivot — in the hidden
-    // row, so it is on the board but not drawn.
+    return next;
+  }
+
+  /**
+   * The pair the preview is promising, positioned where it would spawn. Built
+   * without side effects, so `spawnOrTopOut` can ask whether it fits before
+   * anything commits to it.
+   *
+   * Orientation 0 puts the satellite directly above the pivot — in the hidden
+   * row, so it is on the board but not drawn.
+   */
+  private nextPair(): FallingPair {
+    const [pivotType, satelliteType] = this.upcoming;
     return new FallingPair(SPAWN_COLUMN, SPAWN_ROW, 0, pivotType, satelliteType);
   }
 }

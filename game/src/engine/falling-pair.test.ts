@@ -69,10 +69,11 @@ describe('moving sideways', () => {
     expect(pair.column).toBe(2);
   });
 
-  it('allows moving above the top of the board', () => {
+  it('refuses a move that would put the satellite above the board', () => {
     const board = new Board();
     const pair = pairAt(2, 0);
-    expect(pair.moveLeft(board)).toBe(true);
+    expect(pair.moveLeft(board)).toBe(false);
+    expect(pair.column).toBe(2);
   });
 });
 

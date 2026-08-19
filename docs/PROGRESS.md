@@ -18,10 +18,11 @@ piece — see [CODE-TOUR.md](CODE-TOUR.md).
   scoring 280**, predicted before the trigger dropped and confirmed exactly.
 - **Done in Stage 3** — the cascade resolves one link per beat instead of instantly;
   clearing and settling are separate beats so tiles visibly hang before dropping (judged
-  "more legible"); the next-piece preview is built; and the hidden 13th row is in.
-- **Next** — the topping-out rule (the hidden row is in; game over is not), then the rest
-  of the juice checklist: tweened pop and fall, particles, hit-stop, screen shake, audio. Smooth tweening dropped from
-  *needed for comprehension* to *optional polish* once the two-beat split landed.
+  "more legible"); the next-piece preview is built; the hidden 13th row is in; and the
+  game now ends when a pair has nowhere to spawn.
+- **Next** — the rest of the juice checklist: tweened pop and fall, particles, hit-stop,
+  screen shake, audio. Smooth tweening dropped from *needed for comprehension* to
+  *optional polish* once the two-beat split landed.
 - **Still unproven** — whether one pair of lookahead is enough to plan chains with, and
   whether the chain payoff actually feels good now that it is perceptible.
 
@@ -52,7 +53,7 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | Decision | Why it is that way |
 |---|---|
 | Row 0 is the top; gravity increases the row number | `engine/grid.ts` |
-| Pairs spawn at row 0, column 2, satellite off-screen at row −1 | `engine/simulation.ts` (`spawn`), `engine/board.ts` (`isBlocked`) |
+| Pairs spawn in column 2, pivot in the topmost visible row | `engine/simulation.ts` (`SPAWN_COLUMN`, `nextPair`) |
 | A locked pair's halves settle independently and may split | `engine/falling-pair.ts` (`lock`) |
 | Lock delay resets on a successful move, never a blocked one | `engine/simulation.ts` (`afterInput`) |
 | Fall progress is a fraction of the interval, not banked milliseconds | `engine/simulation.ts` (`fallProgress`) |
@@ -67,7 +68,10 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | Pairs spawn with the satellite in the hidden row, so no half is ever off-board | `engine/simulation.ts` (`SPAWN_ROW`) |
 | Board left-aligned in a 620-wide canvas to make room for the preview | `scenes/BoardScene.ts` |
 | The chain resolves over time: clear, then settle, one beat each | `engine/simulation.ts` (`advanceChain`), `engine/matching.ts` (`clearStep`) |
-| Input is refused while a cascade resolves | `engine/simulation.ts` |
+| Input is refused while a cascade resolves, and after a top-out | `engine/simulation.ts` (`acceptsInput`) |
+| The spawn cells being occupied ends the game; the board is left on screen | `engine/simulation.ts` (`spawnOrTopOut`), `scenes/BoardScene.ts` (`refreshGameOver`) |
+| `Board.place` throws on an off-board **or** occupied write | `engine/board.ts` (`place`) |
+| Nothing is exempt from `isBlocked`; the ceiling blocks like any other edge | `engine/board.ts` (`isBlocked`) |
 
 Two that are recorded here as well as in the code, deliberately:
 
@@ -88,14 +92,6 @@ Two that are recorded here as well as in the code, deliberately:
   [ART-DIRECTION.md](ART-DIRECTION.md) under "By stage".
 
 ## Open questions
-
-### Blocking the hidden row
-
-- **There is still no game over.** The hidden row is built, which fixed the silent
-  half-discard (a pair now spawns with its satellite inside the board, not at row −1). What
-  remains is the topping-out rule: when the spawn cells are occupied, `place` still
-  overwrites with no occupancy check and the board fills forever. The rule to implement is
-  "the spawn cell is occupied → topped out", plus whatever the scene should do about it.
 
 ### Blocking Stage 4
 
