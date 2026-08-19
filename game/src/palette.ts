@@ -23,13 +23,60 @@ export const PIECE_COLORS = [0xe4572e, 0x17bebb, 0xffc914, 0x8a4fff];
  * pressure everybody reads a silhouette faster than a hue — which matters in a
  * game whose whole skill is spotting groups at speed.
  *
- * The storyboard drew the board this way from the first panel: panes with
- * figures in them, not flat swatches. Indexed by piece type, like the colours,
- * and held to the same one-per-type test for the same reason.
+ * These four are drawn from ONE vocabulary on purpose: the parts of a circuit.
+ * A pad, an open via, a chip, a branching trace. The first pass here used a
+ * star, a circle, a square and a diamond, which read fine and meant nothing —
+ * that is Bejeweled's vocabulary, and borrowing it made the board generic. A
+ * tile in this game is a node in a network, so it should look like one.
+ *
+ * Indexed by piece type, like the colours, and held to the same one-per-type
+ * test for the same reason.
  */
-export type PieceShape = 'star' | 'circle' | 'square' | 'diamond';
+export type PieceShape = 'pad' | 'via' | 'chip' | 'branch';
 
-export const PIECE_SHAPES: readonly PieceShape[] = ['star', 'circle', 'square', 'diamond'];
+export const PIECE_SHAPES: readonly PieceShape[] = ['pad', 'via', 'chip', 'branch'];
+
+/**
+ * Blend `color` toward `toward` by `amount` (0 = unchanged, 1 = fully
+ * `toward`). Here rather than in the scene so it stays Phaser-free: the trace
+ * colours below are data, and the tile baking needs the same arithmetic.
+ */
+export function mix(color: number, toward: number, amount: number): number {
+  const blend = (shift: number): number => {
+    const from = (color >> shift) & 0xff;
+    const to = (toward >> shift) & 0xff;
+    return Math.round(from + (to - from) * amount) << shift;
+  };
+
+  return blend(16) | blend(8) | blend(0);
+}
+
+/**
+ * The colour a lit connection is drawn in — the tile's own colour, pushed
+ * toward white so the trace reads as current running through it rather than as
+ * more tile.
+ */
+export const TRACE_COLORS = PIECE_COLORS.map((color) => mix(color, 0xffffff, 0.35));
+
+/**
+ * The ground the whole canvas sits on.
+ *
+ * The portfolio's own deep purple rather than the neutral slate it started as.
+ * The game and the site were visibly two different products, and one shared
+ * ground is the cheapest thing that makes them one.
+ */
+export const GROUND_COLOR = 0x221038;
+
+/**
+ * The progress track that rings the board: its dormant colour, and the colour
+ * of the part that has been energised.
+ *
+ * Lit is the portfolio's own purple, lightened so it separates from the purple
+ * PIECE type sitting on the board beside it.
+ */
+export const TRACK_COLOR = 0x3b2352;
+
+export const TRACK_LIT_COLOR = 0xc98cff;
 
 /** An unoccupied cell. Drawn rather than left blank so the grid stays legible. */
-export const EMPTY_COLOR = 0x1c2228;
+export const EMPTY_COLOR = 0x241038;

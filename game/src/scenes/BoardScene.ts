@@ -1,15 +1,23 @@
-import { Input, Scene } from 'phaser';
+import { BlendModes, Input, Scene } from 'phaser';
 import { COLUMNS, FIRST_VISIBLE_ROW, PIECE_TYPE_COUNT, ROWS, VISIBLE_ROWS } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
-import { PIECE_COLORS } from '../palette';
-import { bakeTileTextures, tileTexture } from './tile-textures';
+import { TRACE_COLORS, TRACK_COLOR, TRACK_LIT_COLOR, PIECE_COLORS } from '../palette';
+import { TRACE_TEXTURE, bakeTileTextures, tileTexture } from './tile-textures';
+import { TrackPath, mitredRectangle } from '../track-geometry';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 import { SoundBoard } from '../audio/sound-board';
-import { chainVoices, hardDropVoice, landVoice, popVoice, topOutVoice } from '../audio/voices';
+import {
+  chainVoices,
+  hardDropVoice,
+  landVoice,
+  nodeVoice,
+  popVoice,
+  topOutVoice,
+} from '../audio/voices';
 
 /*
  * The only file where Phaser and game logic meet. (`main.ts` also imports
@@ -37,6 +45,32 @@ const GAP = 4;
  */
 const FPS_REFRESH_INTERVAL = 250;
 
+/*
+ * The progress track: a circuit that rings the board, divided into pads that
+ * light one at a time.
+ *
+ * Discrete pads and not a smooth bar, because progress you cannot see happen is
+ * progress that may as well not exist. The first attempt raised the brightness
+ * of the board's traces continuously with cells cleared — arithmetically
+ * correct, and invisible: one clear moved the alpha by a hundredth, over a ramp
+ * lasting minutes. Eyes register events, not ramps. A pad lighting is an event:
+ * it has a moment, a place, a spark and a note.
+ *
+ * How many pads, and what each costs, are feel dials and live in `tuning.ts`.
+ */
+const TRACK_MARGIN = 15;
+
+/** Corner cut. Square corners read as a border; mitred ones read as routing. */
+const TRACK_CHAMFER = 20;
+
+/** How far the little tap stubs branch off the bus at each pad. */
+const TRACK_STUB = 7;
+
+/** Milliseconds for a pulse of current to travel the whole energised run. */
+const PULSE_PERIOD = 2400;
+
+const TRACK_PULSES = 3;
+
 const SPARK_TEXTURE = 'spark';
 const SPARK_RADIUS = 6;
 const SPARKS_PER_CELL = 7;
@@ -61,6 +95,17 @@ const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
 const PREVIEW_TOP_Y = ORIGIN_Y + 72;
+
+/** The bus the progress pads sit on, as a mitred rectangle around the board. */
+const trackPath = new TrackPath(
+  mitredRectangle(
+    ORIGIN_X - TRACK_MARGIN,
+    ORIGIN_Y - TRACK_MARGIN,
+    BOARD_WIDTH + TRACK_MARGIN * 2,
+    BOARD_HEIGHT + TRACK_MARGIN * 2,
+    TRACK_CHAMFER,
+  ),
+);
 
 function centerOfColumn(column: number): number {
   return ORIGIN_X + column * (CELL_SIZE + GAP) + CELL_SIZE / 2;
@@ -125,6 +170,21 @@ function visibleCellIndex(column: number, row: number): number {
 }
 
 /**
+ * One drawable link between two neighbouring cells.
+ *
+ * Every slot the board could ever light is built once, at a fixed position,
+ * and then only ever shown or hidden. A connection has nowhere else to be, so
+ * there is nothing to move and nothing to allocate mid-cascade.
+ */
+interface ConnectionSlot {
+  trace: Phaser.GameObjects.Image;
+  column: number;
+  row: number;
+  toColumn: number;
+  toRow: number;
+}
+
+/**
  * Randomness lives here, in the scene, NOT in the engine. The engine takes a
  * supplier function instead, which is what keeps it deterministic and its tests
  * seedless.
@@ -177,6 +237,36 @@ export class BoardScene extends Scene {
    */
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
+
+  /**
+   * The traces between matching neighbours — the board wiring itself up as it
+   * fills. ART-DIRECTION has called this the highest-value idea in the document
+   * since Stage 2: the leading between panes IS the pathway, so a group is
+   * visibly a connected circuit before it ever pops, and a cascade is a signal
+   * crossing it.
+   */
+  private connections: ConnectionSlot[];
+
+  /**
+   * The progress circuit around the board, and how many of its pads are lit.
+   *
+   * Redrawn only when the count changes — which is a handful of times per run —
+   * so this is a `Graphics` rather than another pool of images.
+   */
+  private progressTrack: Phaser.GameObjects.Graphics;
+
+  private litPads = 0;
+
+  /**
+   * Sparks of current running the energised part of the track, and how far
+   * round the leading one is.
+   *
+   * A lit circuit that does not move reads as a drawn border. Something
+   * travelling it is what says the thing is switched on.
+   */
+  private trackPulses: Phaser.GameObjects.Image[];
+
+  private pulsePhase = 0;
 
   /**
    * Visible-cell indices that `drawBoard` must leave empty because a
@@ -280,10 +370,23 @@ export class BoardScene extends Scene {
     // flattened ellipse in perspective, after the playtest.
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
 
+    this.progressTrack = this.add.graphics();
+
+    // `filters` is null until filters are enabled. Asserting past it with `!` is
+    // exactly what hid a black screen during the juice pass, so enable first and
+    // then read it as a value.
+    //
+    // Kept as a shader rather than drawn, after trying the other way: stacking
+    // four wide translucent strokes costs no fill rate, but a hard-edged stroke
+    // is a poor gaussian and the halo barely read. Cost is linear in
+    // quality x distance, so those are as low as they go while still blooming.
+    this.progressTrack.enableFilters();
+    this.progressTrack.filters?.internal.addGlow(TRACK_LIT_COLOR, 2.5, 0, 1, false, 4, 8);
+
     // Every texture the board draws with, before the first thing that asks for
     // one. Baking after the fact is how the sparks first shipped as Phaser's
     // missing-texture placeholder.
-    bakeTileTextures(this, CELL_SIZE);
+    bakeTileTextures(this, CELL_SIZE, GAP);
 
     // One image per VISIBLE cell. The hidden row is deliberately not drawn, so
     // it gets no image and the array is indexed from FIRST_VISIBLE_ROW.
@@ -293,6 +396,20 @@ export class BoardScene extends Scene {
         this.cellTiles.push(
           this.add.image(centerOfColumn(column), centerOfRow(row), tileTexture(null)),
         );
+      }
+    }
+
+    // After the cells so traces sit on top of them, before the pair so a
+    // falling piece still passes over the wiring.
+    this.connections = [];
+    for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        if (column + 1 < COLUMNS) {
+          this.connections.push(this.addConnection(column, row, column + 1, row));
+        }
+        if (row + 1 < ROWS) {
+          this.connections.push(this.addConnection(column, row, column, row + 1));
+        }
       }
     }
 
@@ -325,6 +442,17 @@ export class BoardScene extends Scene {
       gravityY: 380,
       emitting: false,
     });
+
+    this.trackPulses = [];
+    for (let index = 0; index < TRACK_PULSES; index += 1) {
+      this.trackPulses.push(
+        this.add
+          .image(0, 0, SPARK_TEXTURE)
+          .setTint(0xffffff)
+          .setBlendMode(BlendModes.ADD)
+          .setVisible(false),
+      );
+    }
 
     this.scorePopups = [];
     for (let index = 0; index < SCORE_POPUP_POOL; index += 1) {
@@ -387,7 +515,7 @@ export class BoardScene extends Scene {
         fontFamily: 'monospace',
         fontSize: '48px',
         color: '#e8eef2',
-        backgroundColor: '#12161a',
+        backgroundColor: '#221038',
         padding: { x: 16, y: 10 },
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
@@ -429,6 +557,9 @@ export class BoardScene extends Scene {
     this.playCascadeBeat();
     this.playSounds();
     this.drawBoard();
+    this.drawConnections();
+    this.drawProgress();
+    this.advanceTrackPulses(delta);
     this.drawPair();
     this.drawPreview();
     this.refreshChain();
@@ -484,6 +615,9 @@ export class BoardScene extends Scene {
     this.chainAwaitingFlourish = 0;
     this.hitStopRemaining = 0;
     this.nextScorePopup = 0;
+
+    this.litPads = 0;
+    this.redrawTrack();
   }
 
   private readInput(delta: number): void {
@@ -556,13 +690,189 @@ export class BoardScene extends Scene {
   private drawBoard(): void {
     for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
-        const index = visibleCellIndex(column, row);
-        const pieceType = this.simulation.board.pieceAt(column, row);
-        this.cellTiles[index].setTexture(
-          tileTexture(this.cellsBeingFilled.has(index) ? null : pieceType),
+        this.cellTiles[visibleCellIndex(column, row)].setTexture(
+          tileTexture(this.settledPieceAt(column, row)),
         );
       }
     }
+  }
+
+  /**
+   * Build one connection slot, positioned in the gap between its two cells and
+   * turned to face along it. Hidden until the board gives it something to link.
+   */
+  private addConnection(
+    column: number,
+    row: number,
+    toColumn: number,
+    toRow: number,
+  ): ConnectionSlot {
+    const x = (centerOfColumn(column) + centerOfColumn(toColumn)) / 2;
+    const y = (centerOfRow(row) + centerOfRow(toRow)) / 2;
+
+    const trace = this.add.image(x, y, TRACE_TEXTURE).setVisible(false);
+    if (toRow !== row) {
+      trace.setAngle(90);
+    }
+
+    return { trace, column, row, toColumn, toRow };
+  }
+
+  /**
+   * Light every trace whose two cells hold the same colour, and dim the rest.
+   *
+   * A cell still being animated into counts as empty here, exactly as it does
+   * in `drawBoard`, or a trace would connect to a tile that has not landed.
+   */
+  private drawConnections(): void {
+    for (const slot of this.connections) {
+      const pieceType = this.settledPieceAt(slot.column, slot.row);
+      const linked = pieceType !== null && pieceType === this.settledPieceAt(slot.toColumn, slot.toRow);
+
+      slot.trace.setVisible(linked);
+      if (linked) {
+        slot.trace.setTint(TRACE_COLORS[pieceType]);
+      }
+    }
+  }
+
+  /**
+   * Light the next pad on the progress track when the run has earned it.
+   *
+   * Deliberately a whole number of pads, not a fraction: a pad either is or is
+   * not lit, so every unit of progress arrives as something the player watches
+   * happen rather than as a value drifting upward.
+   */
+  private drawProgress(): void {
+    const pads = this.tuning.progressPads;
+    const progress = Math.min(this.simulation.cellsCleared / this.tuning.cellsPerTrackLoop, 1);
+    const lit = Math.floor(progress * pads);
+
+    if (lit === this.litPads) {
+      return;
+    }
+
+    const gainedFrom = this.litPads;
+    this.litPads = lit;
+    this.redrawTrack();
+
+    // One announcement per pad, not one per frame. A big chain can clear enough
+    // cells to cross two or three boundaries at once, and collapsing those into
+    // a single blip would under-sell exactly the moment that earned the most.
+    // Staggered rather than simultaneous, so a chain that jumps several pads
+    // walks up the track audibly instead of landing as one chord.
+    this.sparks.setParticleTint(TRACK_LIT_COLOR);
+    for (let pad = gainedFrom; pad < lit; pad += 1) {
+      const point = trackPath.pointAt(pad / pads);
+      this.sparks.emitParticleAt(point.x, point.y, SPARKS_PER_CELL);
+      this.soundBoard.play({
+        ...nodeVoice(pad, pads),
+        delay: (pad - gainedFrom) * 70,
+      });
+    }
+  }
+
+  /**
+   * Paint the whole track: the dormant bus, the energised run up to the last lit
+   * pad, then every pad and its tap stub on top.
+   *
+   * Every fifth pad is a square rather than a round one, which divides the loop
+   * into quarters you can count at a glance instead of a uniform ring of dots.
+   */
+  private redrawTrack(): void {
+    const track = this.progressTrack;
+    const pads = this.tuning.progressPads;
+    track.clear();
+
+    this.strokeTrackRun(TRACK_COLOR, 2, 1, 1);
+    if (this.litPads > 0) {
+      this.strokeTrackRun(TRACK_LIT_COLOR, 3, this.litPads / pads, 1);
+    }
+
+    for (let pad = 0; pad < pads; pad += 1) {
+      const point = trackPath.pointAt(pad / pads);
+      const lit = pad < this.litPads;
+      const color = lit ? TRACK_LIT_COLOR : TRACK_COLOR;
+      // Every fifth pad is bigger, dividing the loop into quarters you can
+      // count at a glance rather than a uniform ring of dots.
+      const size = (lit ? 5 : 3.5) * (pad % 5 === 0 ? 1.5 : 1);
+
+      track.lineStyle(lit ? 3 : 2, color, 1);
+      track.lineBetween(
+        point.x,
+        point.y,
+        point.x + point.outX * TRACK_STUB,
+        point.y + point.outY * TRACK_STUB,
+      );
+
+      // Square pads, not round. Phaser's Graphics keeps no retained geometry —
+      // it re-walks its command buffer every frame — and it steps arcs at a
+      // fixed 1/100 turn, so each round pad cost a hundred vertices per frame
+      // however small it was. A rect submits directly.
+      track.fillStyle(color, 1);
+      track.fillRect(point.x - size, point.y - size, size * 2, size * 2);
+    }
+  }
+
+  /**
+   * Trace the bus from its start to `reached` of the way round.
+   *
+   * Walks the polyline's own corners and stops at the exact point, rather than
+   * sampling it at a fixed resolution — which the first version did 240 times
+   * per stroke, spending about thirty vertices a corner to draw each corner
+   * slightly wrong.
+   */
+  private strokeTrackRun(color: number, width: number, reached: number, alpha: number): void {
+    const track = this.progressTrack;
+    const path = trackPath.pathUpTo(reached);
+
+    track.lineStyle(width, color, alpha);
+    track.beginPath();
+    track.moveTo(path[0].x, path[0].y);
+    for (let index = 1; index < path.length; index += 1) {
+      track.lineTo(path[index].x, path[index].y);
+    }
+    track.strokePath();
+  }
+
+  /**
+   * Run the pulses along the part of the track that has been energised.
+   *
+   * They travel only as far as the circuit reaches, so early in a run they
+   * shuttle round a short arc and late in one they sweep the whole board.
+   */
+  private advanceTrackPulses(delta: number): void {
+    const reached = this.litPads / this.tuning.progressPads;
+
+    if (reached === 0) {
+      for (const pulse of this.trackPulses) {
+        pulse.setVisible(false);
+      }
+      return;
+    }
+
+    this.pulsePhase = (this.pulsePhase + delta / PULSE_PERIOD) % 1;
+
+    for (let index = 0; index < this.trackPulses.length; index += 1) {
+      const along = (this.pulsePhase + index / this.trackPulses.length) % 1;
+      const point = trackPath.pointAt(along * reached);
+      // Brightest in the middle of its run and faint at either end, so a pulse
+      // arrives and leaves rather than blinking into existence at the corner.
+      const fade = Math.sin(along * Math.PI);
+      this.trackPulses[index]
+        .setVisible(true)
+        .setPosition(point.x, point.y)
+        .setAlpha(0.35 + 0.65 * fade)
+        .setScale(0.5 + 0.7 * fade);
+    }
+  }
+
+  /** The piece in a cell, treating one mid-animation as not yet arrived. */
+  private settledPieceAt(column: number, row: number): number | null {
+    if (this.cellsBeingFilled.has(visibleCellIndex(column, row))) {
+      return null;
+    }
+    return this.simulation.board.pieceAt(column, row);
   }
 
   /**

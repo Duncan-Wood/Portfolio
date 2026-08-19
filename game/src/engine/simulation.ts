@@ -98,6 +98,20 @@ export class Simulation {
   chainLength = 0;
 
   /**
+   * Every cell this run has cleared, added up.
+   *
+   * The score cannot serve this purpose. It is exponential in chain length, so
+   * one lucky cascade moves it by an amount the player could not have planned
+   * toward, and a meter driven by it would lurch. Cells cleared is linear and
+   * countable: a chain still pays more because it clears more, and the player
+   * can see every unit of it happen.
+   *
+   * This is what progression is measured in — see PROGRESS.md, "the score is
+   * not the progression".
+   */
+  cellsCleared = 0;
+
+  /**
    * What the most recent cascade beat did, and a counter that ticks once per
    * beat so the scene can notice a new one.
    *
@@ -253,6 +267,7 @@ export class Simulation {
     this.board.reset();
 
     this.score = 0;
+    this.cellsCleared = 0;
     this.chainLength = 0;
     this.resolving = false;
     this.settlePending = false;
@@ -361,6 +376,7 @@ export class Simulation {
     // cascade scores at 1x and each subsequent one doubles.
     const points = scoreLink(link, this.chainLength);
     this.score += points;
+    this.cellsCleared += link.cellsCleared;
     this.chainLength += 1;
     this.settlePending = true;
     this.recordBeat({ kind: 'clear', link, points });

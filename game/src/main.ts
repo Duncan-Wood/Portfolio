@@ -1,5 +1,6 @@
 import { Game, Scale, WEBGL } from 'phaser';
 import { BoardScene, CANVAS_HEIGHT, CANVAS_WIDTH } from './scenes/BoardScene';
+import { GROUND_COLOR } from './palette';
 
 /*
  * Entry point. Vite loads this from `index.html`; it builds the Phaser game and
@@ -29,7 +30,7 @@ const config: Phaser.Types.Core.GameConfig = {
   width: CANVAS_WIDTH,
   height: CANVAS_HEIGHT,
 
-  backgroundColor: '#12161a',
+  backgroundColor: GROUND_COLOR,
 
   scale: {
     /**

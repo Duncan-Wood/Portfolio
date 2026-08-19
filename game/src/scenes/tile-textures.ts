@@ -1,6 +1,5 @@
-import { Math as PhaserMath } from 'phaser';
 import { PIECE_TYPE_COUNT } from '../engine/grid';
-import { EMPTY_COLOR, PIECE_COLORS, PIECE_SHAPES, type PieceShape } from '../palette';
+import { EMPTY_COLOR, PIECE_COLORS, PIECE_SHAPES, mix, type PieceShape } from '../palette';
 
 /*
  * What a tile looks like, baked once into a texture per piece type.
@@ -17,10 +16,23 @@ import { EMPTY_COLOR, PIECE_COLORS, PIECE_SHAPES, type PieceShape } from '../pal
  *
  * The look follows ART-DIRECTION: a jewel-toned pane, the leading around it
  * drawn dark, and the figure inside drawn in that same lead. The figure is not
- * decoration — see `PIECE_SHAPES` for why colour alone will not do.
+ * decoration — see `PIECE_SHAPES` for why colour alone will not do, and why
+ * these four are circuit parts rather than arbitrary shapes.
  */
 
 const EMPTY_TILE_TEXTURE = 'tile-empty';
+
+/**
+ * The trace that runs between two matching tiles: a segment with a pad at each
+ * end, baked white so one texture can be tinted to any piece colour.
+ *
+ * Drawn horizontally and rotated for the vertical case, because a trace is
+ * symmetrical and a second bake would be a second thing to keep in step.
+ */
+export const TRACE_TEXTURE = 'trace';
+
+/** How far a trace reaches onto the tile at each end, beyond the gap it spans. */
+const TRACE_OVERLAP = 11;
 
 /** The texture key for a piece type. Bake before any of these are used. */
 export function tileTexture(pieceType: number | null): string {
@@ -28,70 +40,58 @@ export function tileTexture(pieceType: number | null): string {
 }
 
 /**
- * Blend `color` toward `toward` by `amount` (0 = unchanged, 1 = fully
- * `toward`). Phaser has colour objects for this, but they allocate; these
- * run a handful of times at boot and the arithmetic is the whole story.
+ * One figure from the circuit vocabulary, centred in the tile.
+ *
+ * Every one of these is built from the same two primitives the traces between
+ * tiles use — a straight run and a round pad — so a tile reads as a piece of
+ * the same network rather than as an icon sitting on top of one. They are
+ * deliberately blunt: at 64px, travelling, the silhouette is all the player
+ * gets, and ART-DIRECTION puts readability above ornament.
  */
-function mix(color: number, toward: number, amount: number): number {
-  const blend = (shift: number): number => {
-    const from = (color >> shift) & 0xff;
-    const to = (toward >> shift) & 0xff;
-    return Math.round(from + (to - from) * amount) << shift;
-  };
-
-  return blend(16) | blend(8) | blend(0);
-}
-
-/**
- * The points of a five-pointed star, alternating between the outer radius and
- * an inner one. Starts at -90° so a point faces up; a star resting on a vertex
- * reads as an error rather than as a star.
- */
-function starPoints(centerX: number, centerY: number, radius: number): PhaserMath.Vector2[] {
-  const points: PhaserMath.Vector2[] = [];
-
-  for (let index = 0; index < 10; index += 1) {
-    const reach = index % 2 === 0 ? radius : radius * 0.45;
-    const angle = -Math.PI / 2 + (index * Math.PI) / 5;
-    points.push(
-      new PhaserMath.Vector2(centerX + Math.cos(angle) * reach, centerY + Math.sin(angle) * reach),
-    );
-  }
-
-  return points;
-}
-
 function drawShape(
   graphics: Phaser.GameObjects.Graphics,
   shape: PieceShape,
   center: number,
   radius: number,
+  leading: number,
 ): void {
-  if (shape === 'circle') {
-    graphics.fillCircle(center, center, radius);
+  const run = Math.max(3, Math.round(radius * 0.28));
+  graphics.fillStyle(leading, 1);
+
+  if (shape === 'pad') {
+    // A solid pad on a stub of trace: the plainest terminal there is.
+    graphics.fillRect(center - run / 2, center - radius, run, radius * 2);
+    graphics.fillCircle(center, center, radius * 0.72);
     return;
   }
 
-  if (shape === 'square') {
-    const side = radius * 1.7;
-    graphics.fillRect(center - side / 2, center - side / 2, side, side);
+  if (shape === 'via') {
+    // A pad drilled through. Stroked rather than two filled circles, so the
+    // hole shows the actual pane — highlight included — instead of a flat disc
+    // of the base colour painted back over it.
+    graphics.lineStyle(radius * 0.49, leading, 1);
+    graphics.strokeCircle(center, center, radius * 0.7);
     return;
   }
 
-  if (shape === 'diamond') {
-    graphics.fillPoints(
-      [
-        new PhaserMath.Vector2(center, center - radius),
-        new PhaserMath.Vector2(center + radius, center),
-        new PhaserMath.Vector2(center, center + radius),
-        new PhaserMath.Vector2(center - radius, center),
-      ],
-      true,
-    );
+  if (shape === 'chip') {
+    // The block at the leaf's midrib: a body with legs down both sides.
+    const half = radius * 0.62;
+    for (const offset of [-half * 0.75, 0, half * 0.75]) {
+      graphics.fillRect(center - radius, center + offset - run / 2, radius * 2, run);
+    }
+    graphics.fillRect(center - half, center - radius * 0.95, half * 2, radius * 1.9);
     return;
   }
 
-  graphics.fillPoints(starPoints(center, center, radius), true);
+  // A trace that forks: one run in from the top, two out to the sides. Stops at
+  // the centre rather than continuing down — a full cross is symmetrical, and
+  // symmetrical it just reads as a plus sign.
+  graphics.fillRect(center - run / 2, center - radius, run, radius);
+  graphics.fillRect(center - radius, center - run / 2, radius * 2, run);
+  graphics.fillCircle(center - radius, center, run);
+  graphics.fillCircle(center + radius, center, run);
+  graphics.fillCircle(center, center - radius, run);
 }
 
 function bakeOne(
@@ -119,8 +119,7 @@ function bakeOne(
   graphics.strokeRoundedRect(inset, inset, size - inset * 2, size - inset * 2, radius);
 
   if (shape !== null) {
-    graphics.fillStyle(leading, 1);
-    drawShape(graphics, shape, size / 2, size * 0.22);
+    drawShape(graphics, shape, size / 2, size * 0.24, leading);
   }
 
   graphics.generateTexture(key, size, size);
@@ -133,7 +132,7 @@ function bakeOne(
  * against a texture that does not exist yet renders as Phaser's missing-texture
  * placeholder and never recovers, which is how the spark texture first shipped.
  */
-export function bakeTileTextures(scene: Phaser.Scene, size: number): void {
+export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number): void {
   const graphics = scene.add.graphics();
 
   for (let pieceType = 0; pieceType < PIECE_TYPE_COUNT; pieceType += 1) {
@@ -144,5 +143,27 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number): void {
   // whose only per-frame change is which key it points at.
   bakeOne(graphics, EMPTY_TILE_TEXTURE, size, EMPTY_COLOR, null);
 
+  bakeTrace(graphics, gap);
+
   graphics.destroy();
+}
+
+/**
+ * The connector drawn between two matching neighbours.
+ *
+ * White, so one texture tints to any of the four colours. Long enough to span
+ * the gap and reach `TRACE_OVERLAP` onto the tile at each end, which is what
+ * makes it look soldered to both rather than floating between them.
+ */
+function bakeTrace(graphics: Phaser.GameObjects.Graphics, gap: number): void {
+  const length = gap + TRACE_OVERLAP * 2;
+  const thickness = 12;
+  const middle = thickness / 2;
+
+  graphics.clear();
+  graphics.fillStyle(0xffffff, 1);
+  graphics.fillRect(0, middle - 2, length, 4);
+  graphics.fillCircle(3, middle, 4);
+  graphics.fillCircle(length - 3, middle, 4);
+  graphics.generateTexture(TRACE_TEXTURE, length, thickness);
 }

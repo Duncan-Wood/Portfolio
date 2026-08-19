@@ -22,6 +22,30 @@
  */
 export interface Tuning {
   /**
+   * Cells cleared to close the progress track once, and how many pads it is
+   * divided into.
+   *
+   * They belong together because the number that actually governs pacing is the
+   * quotient — at 120 over 20 pads, a pad costs 6 cells, about three or four
+   * pieces. Splitting them across two files meant editing one silently changed
+   * the pacing AND falsified the arithmetic written beside the other, and it
+   * broke live tuning in the direction that matters: setting
+   * `window.tuning.cellsPerTrackLoop` tells you nothing about what a pad costs
+   * unless the divisor is in the same object.
+   *
+   * Measured, not guessed; the run data behind 120 is in `docs/PROGRESS.md`
+   * under "How much progress a memory costs". The value tried first was 300,
+   * which put one loop at 176 pieces — ten minutes for a single payoff.
+   *
+   * When memories arrive this stops being one number: the thresholds escalate,
+   * and the FIRST is deliberately tiny. Dr. Mario opens on four viruses, and
+   * that miniature first goal is what teaches the game without a tutorial.
+   */
+  cellsPerTrackLoop: number;
+
+  progressPads: number;
+
+  /**
    * Milliseconds per row of normal gravity. Lower = faster falling.
    *
    * 800 meant a piece took nearly ten seconds to cross the board, which read as
@@ -123,6 +147,8 @@ export interface Tuning {
  * DAS/ARR were never swept.
  */
 export const DEFAULT_TUNING: Tuning = {
+  cellsPerTrackLoop: 120,
+  progressPads: 20,
   fallInterval: 400,
   softDropInterval: 50,
   lockDelay: 500,

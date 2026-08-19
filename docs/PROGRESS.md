@@ -125,6 +125,20 @@ Two that are recorded here as well as in the code, deliberately:
 ## Decided, pending build
 
 - **Next-piece preview — built.** See the locked decisions above.
+- **How much progress a memory costs — measured.** A greedy bot run through the real
+  engine clears **1.6-1.8 cells per piece**, and a strong run lasts 270-410 pieces, so a
+  whole run is worth roughly **450-700 cells**. Four memories therefore want escalating
+  thresholds that fit inside that, with a deliberately tiny first one:
+
+  | Memory | Cells | Cumulative | Roughly |
+  |---|---|---|---|
+  | 1 | 30 | 30 | ~18 pieces, under a minute |
+  | 2 | 60 | 90 | ~53 pieces |
+  | 3 | 120 | 210 | ~124 pieces |
+  | 4 | 240 | 450 | a strong run |
+
+  A weak run earns one or two, which is what gives replaying a point. The tiny first one
+  is Dr. Mario's trick — its level 0 is four viruses, and that is the tutorial.
 - **The score is not the progression, and never was.** `scoreLink` has always been marked a
   placeholder, and a number in the corner is the reason a long session reads as pointless.
   The storyboard already settled what replaces it: *"Neurons unlock memories & appear after a

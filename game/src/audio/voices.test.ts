@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  nodeVoice,
   BASE_POP_FREQUENCY,
   MAX_POP_FREQUENCY,
   chainVoices,
@@ -102,5 +103,22 @@ describe('the top-out', () => {
   it('falls in pitch, so it reads as a loss', () => {
     const voice = topOutVoice();
     expect(voice.endFrequency).toBeLessThan(voice.startFrequency);
+  });
+});
+
+describe('the progress-track voice', () => {
+  it('climbs exactly one octave across the whole loop', () => {
+    const first = nodeVoice(0, 20);
+    const last = nodeVoice(20, 20);
+
+    expect(last.startFrequency).toBeCloseTo(first.startFrequency * 2);
+  });
+
+  it('rises with every pad, so pitch alone reports progress', () => {
+    const pitches = Array.from({ length: 8 }, (_unused, index) =>
+      nodeVoice(index, 8).startFrequency);
+
+    const rising = pitches.every((pitch, index) => index === 0 || pitch > pitches[index - 1]);
+    expect(rising).toBe(true);
   });
 });

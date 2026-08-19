@@ -340,6 +340,49 @@ describe('resolving a chain over time', () => {
     expect(afterSecondLink).toBeGreaterThan(afterFirstLink);
   });
 
+  it('counts no cleared cells before anything clears', () => {
+    const game = buildTwoLinkChain();
+    expect(game.cellsCleared).toBe(0);
+  });
+
+  it('adds up every cell the chain clears, across both links', () => {
+    const game = buildTwoLinkChain();
+    lockCurrentPair(game);
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    const afterFirstLink = game.cellsCleared;
+
+    game.update(DEFAULT_TUNING.settleDelay);
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+
+    expect(afterFirstLink).toBe(5);
+    expect(game.cellsCleared).toBe(10);
+  });
+
+  it('counts cells rather than tracking the score, which is exponential', () => {
+    const game = buildTwoLinkChain();
+    lockCurrentPair(game);
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    game.update(DEFAULT_TUNING.settleDelay);
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+
+    // Both links cleared the same number of cells; only the score doubled.
+    expect(game.cellsCleared).toBe(10);
+    expect(game.score).toBe(50 + 100);
+  });
+
+  it('forgets the count on restart', () => {
+    const game = buildTwoLinkChain();
+    lockCurrentPair(game);
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    expect(game.cellsCleared).toBeGreaterThan(0);
+
+    game.restart();
+
+    expect(game.cellsCleared).toBe(0);
+  });
+
   it('holds cleared tiles in the air for a beat before settling them', () => {
     const game = buildTwoLinkChain();
     lockCurrentPair(game);

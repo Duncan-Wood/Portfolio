@@ -97,6 +97,25 @@ export function topOutVoice(): Voice {
 }
 
 /**
+ * One pad on the progress track lighting up.
+ *
+ * Climbs a full octave across the whole loop, so the pitch alone tells you how
+ * close the circuit is to closing — the last pad is an octave above the first.
+ */
+export function nodeVoice(padIndex: number, padCount: number): Voice {
+  const frequency = 330 * 2 ** (padIndex / padCount);
+
+  return {
+    waveform: 'triangle',
+    startFrequency: frequency,
+    endFrequency: frequency * 1.5,
+    duration: 110,
+    gain: 0.1,
+    delay: 0,
+  };
+}
+
+/**
  * The flourish after a real chain resolves: an ascending arpeggio, one note per
  * link, played over the top of the pops that already happened.
  *
