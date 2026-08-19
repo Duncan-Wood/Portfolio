@@ -29,5 +29,8 @@ notes.txt
 
 # sources
 career-audit-2026
-storyboard
 notes.md
+
+# The storyboard's mechanical panels are tracked; the memory panels are not.
+# They hold personal biography and this repository is public.
+storyboard/memory-*
