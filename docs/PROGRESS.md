@@ -33,6 +33,15 @@ carries a header explaining what it owns and why.
 > **Testing in a browser:** Chrome pauses `requestAnimationFrame` entirely for hidden tabs,
 > so a backgrounded window renders **zero** frames and every timing measurement is
 > meaningless. The window must be visible and frontmost.
+>
+> **A frame that throws stops the game for good.** An exception escaping `BoardScene.update`
+> propagates out of Phaser's `TimeStep.step` and the rAF chain is never re-requested — the
+> game is dead until a reload. It *reads* exactly like the hidden-tab problem above, because
+> the tab still reports `visible`, still reports `hasFocus`, and the FPS readout keeps
+> showing whatever it last rendered. Tell them apart by checking whether `game.loop.frame`
+> advances while your own `requestAnimationFrame` callback still ticks; then read the
+> console. `Board.place` throwing on an occupied write is deliberate, so scripting the board
+> from the console is the likely way to trip this.
 
 ## Live tuning
 
