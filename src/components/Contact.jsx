@@ -1,11 +1,37 @@
 import { useRef, useState } from "react";
 import emailjs from "emailjs-com";
+
+/*
+ * The contact form — and the only part of the portfolio that talks to anything
+ * external.
+ *
+ * THERE IS NO BACKEND. EmailJS is a third-party service that accepts the form
+ * contents straight from the browser and relays them as an email. That is why
+ * this site can be hosted as pure static files with no server anywhere.
+ *
+ * The trade-off: the service id, template id and public key below are visible
+ * in the shipped JavaScript. That is by design — EmailJS calls it a *public*
+ * key precisely because it is meant to be exposed, and abuse is limited on
+ * their side by domain allow-listing and rate limits. It is NOT a secret that
+ * has leaked. A private key would be a different matter and must never appear
+ * in client code.
+ */
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
 import resume from "../assets/resume.png";
 
 const Contact = () => {
+  /**
+   * A ref to the <form> DOM node. EmailJS's `sendForm` reads the live element
+   * and its named inputs directly, rather than taking a JavaScript object — so
+   * this is an uncontrolled form, with no React state per field. The `name`
+   * attributes on the inputs (`from_name`, `user_email`, `message`) are what
+   * the EmailJS template expects, so renaming one silently empties a field in
+   * the delivered email.
+   */
   const form = useRef();
+
+  /** null before submitting, then "success" or "error". Drives the message below. */
   const [status, setStatus] = useState(null);
 
   const sendEmail = (e) => {
@@ -30,7 +56,12 @@ const Contact = () => {
   };
 
   return (
-    <div id='contact' className="bg-white p-8 rounded-lg shadow-lg">
+    <div
+      // Scroll target for the nav link of the same name; renaming it
+      // silently breaks that link. See nav.jsx.
+      id='contact'
+      className="bg-white p-8 rounded-lg shadow-lg"
+    >
       <div
         id="contact-header"
         className="flex flex-col items-center justify-center"
@@ -130,6 +161,11 @@ const Contact = () => {
               Send
             </button>
           </div>
+          {/*
+            `role="status"` is announced politely by screen readers, while
+            `role="alert"` below interrupts — the right split for a confirmation
+            versus a failure the user must act on.
+          */}
           {status === "success" && (
             <p role="status" className="text-center text-green-600 font-medium">
               Thanks — your message is on its way.

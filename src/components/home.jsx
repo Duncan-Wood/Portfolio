@@ -1,3 +1,14 @@
+/**
+ * The hero section: headshot, name, social links, one-line summary.
+ *
+ * Images are IMPORTED rather than referenced by path. That matters — the build
+ * fingerprints them (`headshot.4f3a....png`) and rewrites the reference, so
+ * they can be cached forever and a changed image busts its own cache. A raw
+ * `src="/assets/headshot.png"` would skip all of that.
+ *
+ * The exception is `/resume.pdf` below, which lives in `public/` and is served
+ * verbatim — correct for a file whose URL should stay stable and shareable.
+ */
 import headshot from "../assets/headshot.png";
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
@@ -6,6 +17,7 @@ import resume from "../assets/resume.png";
 const Home = () => {
   return (
     <div
+      // `id` is the scroll target for the nav link of the same name.
       id="home"
       className="flex flex-col items-center justify-center p-8 lg:p-12 m-10"
     >
@@ -29,6 +41,12 @@ const Home = () => {
             Hello! My name is Duncan Wood
           </h2>
           <div id="contact-icons" className="flex flex-row mt-4 ">
+            {/*
+              `noreferrer` suppresses the Referer header, and implies `noopener`
+              (the attribute that actually severs `window.opener`). Modern
+              browsers imply `noopener` for `target="_blank"` anyway, so this is
+              belt-and-braces plus referrer privacy.
+            */}
             <a
               href="https://www.linkedin.com/in/duncanwoodpro/"
               target="_blank"

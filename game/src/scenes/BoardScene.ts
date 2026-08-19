@@ -6,8 +6,30 @@ import { EMPTY_COLOR, PIECE_COLORS } from '../palette';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 
+/*
+ * The only file where Phaser and game logic meet. (`main.ts` also imports
+ * Phaser, but only to build the config object.)
+ *
+ * Its job is deliberately narrow: read the keyboard, drive the clock, and draw
+ * whatever the engine says is true. Every rule — gravity, matching, DAS, the
+ * cascade — lives in a Phaser-free module elsewhere, so it can be tested
+ * without a browser. If logic starts accumulating here, it is in the wrong
+ * place.
+ *
+ * The scene is a pure function of engine state: `drawBoard` reads the board
+ * every frame and paints it. There is no separate copy of the game to keep in
+ * sync, which is the class of bug that would otherwise dominate.
+ */
+
 const CELL_SIZE = 64;
 const GAP = 4;
+
+/*
+ * How often the FPS readout is rewritten. Phaser's `Text` rasterises glyphs to
+ * an offscreen canvas and uploads them whenever the string CHANGES (`setText`
+ * short-circuits on an unchanged one), and `Math.round(actualFps)` changes
+ * often enough to be worth throttling — it also stops the readout flickering.
+ */
 const FPS_REFRESH_INTERVAL = 250;
 
 
@@ -16,6 +38,13 @@ const BOARD_HEIGHT = ROWS * CELL_SIZE + (ROWS - 1) * GAP;
 export const CANVAS_WIDTH = 620;
 export const CANVAS_HEIGHT = 900;
 
+/**
+ * Top-left corner of the board in canvas pixels.
+ *
+ * The board is left-aligned rather than centred because the preview panel needs
+ * room beside it: a 404px board in the original 480px canvas left only 38px of
+ * margin. The canvas was widened to 620 and the board pinned left.
+ */
 const ORIGIN_X = 40;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 
@@ -31,6 +60,16 @@ function centerOfRow(row: number): number {
   return ORIGIN_Y + row * (CELL_SIZE + GAP) + CELL_SIZE / 2;
 }
 
+/**
+ * Randomness lives here, in the scene, NOT in the engine. The engine takes a
+ * supplier function instead, which is what keeps it deterministic and its tests
+ * seedless.
+ *
+ * A module-level function rather than an arrow defined inside the scene: an
+ * arrow would capture `this`, and handing that to the long-lived `Simulation`
+ * would keep the entire scene — and every object it owns — alive for as long as
+ * the simulation existed.
+ */
 function randomPieceType(): number {
   return Math.floor(Math.random() * PIECE_TYPE_COUNT);
 }
@@ -53,15 +92,33 @@ export class BoardScene extends Scene {
   private shownChain = -1;
   private nextFpsRefresh = 0;
   private timestep: FixedTimestep;
+  /**
+   * Named `inputTranslator`, NOT `input` — `input` is Phaser's own
+   * `Scene.input` plugin, and shadowing it breaks `this.input.keyboard`.
+   */
   private inputTranslator: InputTranslator;
   private lastPiecesSpawned = 0;
+
+  /**
+   * This scene's own copy of the tuning values, handed to both the simulation
+   * and the input translator so all three read the same live object.
+   */
   private tuning: Tuning;
 
   constructor() {
     super('Board');
   }
 
+  /**
+   * Phaser calls this once when the scene starts. Everything drawn is allocated
+   * here — 72 board cells, 2 pair cells, 2 preview cells and the text — and
+   * never again — the frame loop only changes colour and position. Not strictly
+   * allocation-free: `drawPair` builds a fresh cells array each frame and
+   * `drawPreview` a key string. Both are tiny and short-lived.
+   */
   create(): void {
+    // A COPY of the defaults, so mutating this scene's tuning at runtime cannot
+    // corrupt the shared defaults that the engine tests rely on.
     this.tuning = { ...DEFAULT_TUNING };
     this.simulation = new Simulation(randomPieceTypes, this.tuning);
     this.timestep = new FixedTimestep();
@@ -69,6 +126,9 @@ export class BoardScene extends Scene {
     this.lastPiecesSpawned = this.simulation.piecesSpawned;
     this.nextFpsRefresh = 0;
 
+    // Live tuning hook. `import.meta.env.DEV` is replaced with `false` at build
+    // time, so this branch is removed entirely from the production bundle —
+    // verified: `window.tuning` appears zero times in the built output.
     if (import.meta.env.DEV) {
       window.tuning = this.tuning;
     }
@@ -134,6 +194,14 @@ export class BoardScene extends Scene {
     }).setOrigin(0.5, 0.5).setVisible(false);
   }
 
+  /**
+   * Phaser calls this once per rendered frame. `delta` is milliseconds since
+   * the last one.
+   *
+   * Order matters: input is read FIRST so a keypress affects the very next
+   * simulation step rather than waiting a frame, which is the cheapest latency
+   * there is to win.
+   */
   update(time: number, delta: number): void {
     this.readInput(delta);
 
@@ -150,6 +218,8 @@ export class BoardScene extends Scene {
   }
 
   private readInput(delta: number): void {
+    // Rotation is edge-triggered — `JustDown` fires once per physical press, so
+    // holding Up does not spin the piece continuously.
     if (Input.Keyboard.JustDown(this.cursors.up)) {
       this.simulation.rotate();
     }
@@ -168,8 +238,15 @@ export class BoardScene extends Scene {
     );
   }
 
+  /**
+   * Which way the player is pressing. The only genuinely Phaser-specific piece
+   * of input logic, which is why it stayed in the scene: resolving both keys
+   * being held needs `timeDown`, a Phaser Key property.
+   */
   private pressedDirection(): HorizontalDirection | null {
     const { left, right } = this.cursors;
+    // Both held: the most recently pressed wins, which is what a player means
+    // when they roll from one direction into the other.
     if (left.isDown && right.isDown) {
       return left.timeDown > right.timeDown ? -1 : 1;
     }
@@ -186,6 +263,15 @@ export class BoardScene extends Scene {
     return direction === -1 ? this.simulation.moveLeft() : this.simulation.moveRight();
   }
 
+  /**
+   * Repaint all 72 cells from board state.
+   *
+   * Unconditionally, every frame, even though the board only changes when a
+   * pair locks. That is knowingly wasteful and knowingly negligible: measured
+   * at roughly 126 nanoseconds — 0.0008% of a 60fps frame. A dirty flag would
+   * save nothing and add a piece of cache-invalidation state for the cascade to
+   * keep correct.
+   */
   private drawBoard(): void {
     for (let row = 0; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
@@ -197,7 +283,16 @@ export class BoardScene extends Scene {
     }
   }
 
+  /**
+   * Draw the two halves of the falling pair on top of the board.
+   *
+   * These are separate rectangles from the board grid because the pair moves
+   * independently of the cell layout — and later will need to move smoothly
+   * between cells, which fixed-position grid cells cannot do.
+   */
   private drawPair(): void {
+    // While a cascade resolves, the pair's tiles are already part of the board.
+    // Drawing it too would paint a ghost duplicate.
     if (this.simulation.resolving) {
       for (const rectangle of this.pairRectangles) {
         rectangle.setVisible(false);
@@ -209,6 +304,10 @@ export class BoardScene extends Scene {
     for (let index = 0; index < cells.length; index += 1) {
       const cell = cells[index];
       const rectangle = this.pairRectangles[index];
+      // A satellite spawns at row -1, above the board, so it genuinely has no
+      // cell to be drawn in for the first row of its fall. Using the board's own
+      // bounds check rather than an inline `row >= 0` keeps one definition of
+      // "on the board" — which matters when the hidden 13th row lands.
       const isOnBoard = this.simulation.board.isInside(cell.column, cell.row);
 
       rectangle.setVisible(isOnBoard);
@@ -219,6 +318,11 @@ export class BoardScene extends Scene {
     }
   }
 
+  /**
+   * Paint the "NEXT" panel. Repainted only when the upcoming pair actually
+   * changes, tracked by a string key — cheap, and it keeps the per-frame path
+   * free of pointless writes.
+   */
   private drawPreview(): void {
     const [pivotType, satelliteType] = this.simulation.upcoming;
     const key = `${pivotType},${satelliteType}`;
@@ -227,10 +331,17 @@ export class BoardScene extends Scene {
     }
 
     this.shownUpcoming = key;
+    // Index 0 is the lower rectangle (the pivot) and index 1 the upper (the
+    // satellite), matching orientation 0 — how the pair will actually appear.
     this.previewRectangles[0].setFillStyle(PIECE_COLORS[pivotType]);
     this.previewRectangles[1].setFillStyle(PIECE_COLORS[satelliteType]);
   }
 
+  /**
+   * The "N CHAIN" callout. Shown only from the second link onward, because
+   * every single clear is technically a one-link chain and announcing those
+   * would make the label meaningless.
+   */
   private refreshChain(): void {
     const { resolving, chainLength } = this.simulation;
     const showing = resolving && chainLength >= 2;

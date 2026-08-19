@@ -1,3 +1,11 @@
+/**
+ * Skills, grouped by category.
+ *
+ * `url` is optional, and its presence is what decides how a tag renders: with a
+ * link it becomes an anchor with hover styling, without one it is plain text.
+ * That is why concepts like "Structured Output" — which have no canonical home
+ * page to link to — sit happily in the same list as named technologies.
+ */
 const skillGroups = [
   {
     label: "Languages",
@@ -71,7 +79,12 @@ const SkillTag = ({ skill }) =>
 
 const Skills = () => {
   return (
-    <div id="skills" className="m-10">
+    <div
+      // Scroll target for the nav link of the same name; renaming it
+      // silently breaks that link. See nav.jsx.
+      id="skills"
+      className="m-10"
+    >
       <h2 className="text-3xl font-bold mb-10 text-center">Skills</h2>
       <div className="max-w-4xl mx-auto space-y-6">
         {skillGroups.map((group) => (

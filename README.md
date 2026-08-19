@@ -48,4 +48,4 @@ Software engineer with a background in writing and rhetoric — I turn ambiguous
 
 ---
 
-This repository is a React (Create React App) + Tailwind CSS site. See [`CLAUDE.md`](./CLAUDE.md) and [`docs/`](./docs/) for the build plan and conventions.
+This repository is a React (Create React App) + Tailwind CSS site, plus a Phaser 4 + TypeScript puzzle game served at `/game`. See [`docs/CODE-TOUR.md`](./docs/CODE-TOUR.md) for a full walkthrough of how it works, [`docs/PROGRESS.md`](./docs/PROGRESS.md) for current state, and [`CLAUDE.md`](./CLAUDE.md) for conventions.

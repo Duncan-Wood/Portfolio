@@ -1,5 +1,14 @@
 import { useState } from "react";
 
+/*
+ * The projects section: professional work first, then personal projects.
+ *
+ * The two lists render differently on purpose. Professional projects are mostly
+ * internal or private, so they get a text card with no screenshot and no links.
+ * Personal projects are public, so they get an image that swaps to an animated
+ * GIF on hover, plus a source link and — where one exists — a live link.
+ */
+
 import github from "../assets/github.png";
 import link from "../assets/link.png";
 
@@ -101,6 +110,8 @@ const LinkButton = ({ href, icon, alt, color }) => (
   </a>
 );
 
+/** Text-only: professional work is largely internal, so there is nothing public
+ * to screenshot or link to. */
 const ProfessionalCard = ({ project }) => (
   <div className={cardClasses}>
     <div className="h-40 bg-gradient-to-br from-purple-700 to-purple-900 flex items-center justify-center p-4">
@@ -125,6 +136,20 @@ const ProfessionalCard = ({ project }) => (
   </div>
 );
 
+/**
+ * Card with a hover preview: a still screenshot that swaps to an animated GIF
+ * while the pointer is over it.
+ *
+ * State is held per-card rather than in the parent, so hovering one card cannot
+ * re-render the others.
+ *
+ * The GIFs are 1-41MB, far over CRA's 10KB inline limit, so they are emitted as
+ * separate files and the browser does not fetch one until `src` first points at
+ * it — the first hover on each card pays that download.
+ *
+ * Pointer-driven, so touch devices only ever see the still. Acceptable, since
+ * the still is a full screenshot rather than a placeholder.
+ */
 const PersonalCard = ({ project }) => {
   const [isHovering, setIsHovering] = useState(false);
   return (
@@ -178,7 +203,12 @@ const Projects = () => {
     : personalProjects.slice(0, PERSONAL_PREVIEW_COUNT);
 
   return (
-    <div id="projects" className="m-10">
+    <div
+      // Scroll target for the nav link of the same name; renaming it
+      // silently breaks that link. See nav.jsx.
+      id="projects"
+      className="m-10"
+    >
       <h2 className="text-3xl font-bold mb-10 text-center">Projects</h2>
 
       <section className="mb-14">

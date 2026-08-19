@@ -2,12 +2,37 @@ import { useState } from "react";
 import { Link as ScrollLink } from "react-scroll";
 import purple_leaf_stroke from "../assets/design/purple-leaf-stroke.png";
 
+/*
+ * The top navigation bar.
+ *
+ * IMPORTANT: these are NOT router links. The whole portfolio is a single route,
+ * and every nav item scrolls to a section id on the same page via
+ * `react-scroll`. That is why `Link` is aliased to `ScrollLink` on import — to
+ * stop it being mistaken for `react-router-dom`'s `Link`, which would try to
+ * navigate and blank the page.
+ *
+ * The bar is responsive in the usual Tailwind way: a horizontal row on
+ * medium-and-up screens, and a collapsible hamburger menu below that. Both
+ * render the SAME link list via `NavLinks` so the two can never drift apart —
+ * only the styling differs.
+ */
+
+/**
+ * The nav items, in display order. `to` must match the `id` of the
+ * corresponding section wrapper rendered by `StandardPortfolio`; nothing
+ * enforces that link, so renaming a section id silently breaks its nav item.
+ *
+ * Only the first entry carries an `image`, which is what makes it render as the
+ * name-plus-logo home button rather than a plain text link.
+ */
 const scrollLinks = [
   { to: "home", label: "Duncan Wood", image: purple_leaf_stroke },
   { to: "about", label: "About" },
   { to: "experience", label: "Experience" },
   { to: "projects", label: "Projects" },
   { to: "skills", label: "Skills" },
+  // Contact is the last section, so it can sit flush at the top of the viewport
+  // — it needs no offset to clear the nav bar the way the others do.
   { to: "contact", label: "Contact", offset: 0 },
 ];
 
@@ -21,6 +46,13 @@ const homeRowClass = {
   mobile: "flex flex-row items-center",
 };
 
+/**
+ * Renders the link list once, in either the desktop or mobile style.
+ *
+ * Extracted so the two menus cannot fall out of sync. `onNavigate` closes the
+ * mobile menu after a tap; on desktop it is harmless, since the menu is never
+ * open there.
+ */
 const NavLinks = ({ variant, onNavigate }) => {
   const className = (extra) =>
     `${linkBase} ${variantClass[variant]}${extra ? ` ${extra}` : ""}`;
@@ -32,6 +64,9 @@ const NavLinks = ({ variant, onNavigate }) => {
           to={link.to}
           smooth={true}
           duration={500}
+          // Scroll 100px SHORT of the section, so the fixed nav bar does not
+          // cover the heading. `??` rather than `||` so an explicit 0 is
+          // honoured — `||` would treat 0 as missing and apply -100.
           offset={link.offset ?? -100}
           onClick={onNavigate}
           className={className(link.image ? homeRowClass[variant] : "")}
@@ -42,6 +77,7 @@ const NavLinks = ({ variant, onNavigate }) => {
           {link.label}
         </ScrollLink>
       ))}
+      {/* A real link, not a scroll target — the PDF is served from `public/`. */}
       <a
         href="/resume.pdf"
         target="_blank"
@@ -112,6 +148,11 @@ const Nav = () => {
           </div>
         </div>
 
+        {/*
+          The mobile menu is toggled with CSS classes rather than by
+          conditionally rendering, so its contents stay mounted. `md:hidden`
+          means it is never shown on desktop regardless of `isOpen`.
+        */}
         <div
           className={`${isOpen ? "block" : "hidden"} md:hidden`}
           id="mobile-menu"

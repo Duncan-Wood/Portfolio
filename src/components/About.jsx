@@ -1,6 +1,8 @@
 const About = () => {
   return (
     <div
+      // Scroll target for the nav link of the same name; renaming it
+      // silently breaks that link. See nav.jsx.
       id="about"
       className="flex flex-col items-center justify-center md:justify-start px-8 "
     >

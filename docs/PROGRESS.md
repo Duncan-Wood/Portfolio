@@ -4,47 +4,26 @@ Current stage, decisions, and open questions. Stages are defined in
 [DESIGN-PLAN.md](DESIGN-PLAN.md) under Recommendations. Update this file at the end of
 each stage.
 
+For how the code actually works — the layers, the data flow, and the life of a single
+piece — see [CODE-TOUR.md](CODE-TOUR.md).
+
 ## Status
 
-**Stage 3 — Juice. Started: the cascade is now visible. Stage 2's benchmark is met.**
+**Stage 3 — Juice. The cascade is visible; the rest of the checklist is open.**
 
-Stage 1 is closed. Its benchmark (*pairs can be placed precisely and it feels instant*) was
-judged met: "responsive, just pointless" — the input is right, and what was missing was the
-loop, which is what Stage 2 adds. DAS 130 / ARR 40 stand as-is; no sweep was needed.
-
-- **Done** — Stage 0 setup (`game/` is a self-contained Vite + TypeScript + Phaser 4.2.1
-  package, Node pinned in `game/mise.toml`, `/game` wired into both the root dev server
-  and the production build), plus the Stage 1 engine, scene, input, and tuning.
-- **Stage 2 is closed.** Its benchmark — *a deliberately buried trigger sets off a
-  multi-step chain* — was met by hand-building one: nine placed pieces produced a
-  **three-link chain scoring 280** (`40 + 80 + 160`), predicted before the trigger was
-  dropped and confirmed exactly. That also independently validates the exponential scoring.
-- **Done in Stage 3 so far** — the cascade resolves one link per `chainLinkDelay` instead
-  of instantly; clearing and settling are separate beats so tiles visibly hang over the
-  hole before dropping (judged "more legible"); and the next-piece preview is built.
-- **Next** — the hidden row, then the rest of the juice checklist (tweened pop and fall,
-  particles, hit-stop, screen shake, rising audio per link). Smooth tweening dropped from
+- **Stages 0–2 are closed.** Setup, the engine, the scene, input, tuning, matching,
+  cascades and exponential chain scoring are all built and verified in Chrome.
+  Stage 1's benchmark was judged met ("responsive, just pointless" — DAS 130 / ARR 40
+  stand, no sweep needed). Stage 2's was met by hand-building a **three-link chain
+  scoring 280**, predicted before the trigger dropped and confirmed exactly.
+- **Done in Stage 3** — the cascade resolves one link per beat instead of instantly;
+  clearing and settling are separate beats so tiles visibly hang before dropping (judged
+  "more legible"); the next-piece preview is built.
+- **Next** — the hidden row, then the rest of the juice checklist: tweened pop and fall,
+  particles, hit-stop, screen shake, rising audio per link. Smooth tweening dropped from
   *needed for comprehension* to *optional polish* once the two-beat split landed.
-
-### Why Stage 3 became urgent
-
-Building that chain by hand exposed the real reason the game read as unfun: **the payoff
-was invisible.** The whole cascade resolved between two frames. The only evidence it had
-happened was the score jumping 0 → 280 and three columns vanishing — no falling, no
-clearing, nothing to watch or react to. The best thing the game could do was imperceptible.
-
-Two other things that session surfaced, both arguing for the preview:
-
-- Every one of the nine pieces had to be **rotated purely to discover the satellite's
-  colour**, since it spawns at row −1 off-screen. You cannot plan a chain when half the
-  information costs an input to reveal.
-- Four of nine pairs were unusable for the plan and got parked in corners. That is normal
-  for 4 colours, but it means chain-building leans on lookahead the game does not offer.
-
-Verified in Chrome through the dev proxy: gravity, lock, respawn, rotation, wall blocking,
-DAS auto-repeat, `window.tuning` driving the live simulation, soft drop not carrying across
-a lock, and a held direction not carrying either. No console errors; 120fps on a 120Hz
-display. Re-verified after input and the accumulator were extracted into their own modules.
+- **Still unproven** — whether one pair of lookahead is enough to plan chains with, and
+  whether the chain payoff actually feels good now that it is perceptible.
 
 > **Testing in a browser:** Chrome pauses `requestAnimationFrame` entirely for hidden tabs,
 > so a backgrounded window renders **zero** frames and every timing measurement is
@@ -52,129 +31,53 @@ display. Re-verified after input and the accumulator were extracted into their o
 
 ## Live tuning
 
-`src/tuning.ts` holds every feel dial in one pure, Phaser-free object: `fallInterval` 800ms,
-`softDropInterval` 50ms, `lockDelay` 500ms, `autoShiftDelay` 130ms, `autoRepeatInterval`
-40ms.
-
-`BoardScene` takes a **copy** of `DEFAULT_TUNING` and hands it to `Simulation`, so both read
-the same live object. In dev builds only, that copy is exposed as `window.tuning`:
-
-```js
-tuning.autoShiftDelay = 100      // DAS — the dial that matters most on a 6-wide board
-tuning.autoRepeatInterval = 30   // ARR; 0 means "slide to the wall in one frame"
-tuning.fallInterval = 600
-```
-
-Changes take effect on the next frame — no reload, no rebuild. Write down what feels right,
-then change `DEFAULT_TUNING`.
+`src/tuning.ts` holds every feel dial, and dev builds expose the scene's copy as
+`window.tuning` — changes take effect on the next frame. The dials and what each
+one does are documented in that file; the console recipe is in
+[CODE-TOUR.md](CODE-TOUR.md) §6.
 
 ## Why the code is shaped this way
 
-The file layout and APIs are readable from the source. These are the parts that are not.
-
-- **`src/engine/` is pure.** No Phaser, fully unit-tested. Piece types come from
-  `Math.random` in the scene via a supplier, so the engine stays deterministic and its
-  tests stay seedless.
-- **`Simulation.piecesSpawned` exists so the scene can detect "a piece locked and a new one
-  spawned" without comparing `FallingPair` references.** Identity comparison worked but was
-  silent and fragile: the engine never promised to allocate a fresh pair per spawn, so
-  pooling or a `pair.reset()` refactor would have quietly resurrected the soft-drop
-  carryover bug with no failing test. The engine owns the lock→spawn transition, so it owns
-  the signal.
-- **`src/input/InputTranslator` lives outside the scene so game *feel* is testable.** It
-  owns DAS/ARR and both "awaiting release" latches, and is Phaser-free. `BoardScene` keeps
-  only the Phaser-specific parts: reading `cursors`, and the `timeDown` tie-break when both
-  direction keys are held. Twelve tests cover the rules that previously could only be
-  checked by playing.
-- **`src/engine/matching.ts` is the whole Stage 2 rule set**, and it is pure: `findGroups`
-  flood-fills orthogonal same-colour neighbours, `resolveChain` settles *before* each scan
-  so it never scores a floating group, then clears and loops until nothing matches, returning one `ChainLink` per link so the scene can animate them
-  separately later. Its tests build boards from ASCII pictures, which is what makes a rule
-  about *shapes* readable — L-shapes, T-shapes, and the no-diagonals rule are each one
-  picture.
-- **`src/fixed-timestep.ts` clamps the frame delta, banks it, and returns whole steps.**
-  See the clamp decision below for why the clamp lives here.
-- **`BoardScene` is deliberately thin** — it owns Phaser and nothing else. Its translator
-  field is named `inputTranslator`, **not** `input`: `input` is Phaser's own `Scene.input`
-  plugin and shadowing it breaks `this.input.keyboard`.
+Read the source — every module carries a header explaining what it owns and why,
+and the traps are commented at the lines they apply to.
+[CODE-TOUR.md](CODE-TOUR.md) §3–4 is the map of which file to open.
 
 ## Locked decisions
 
 Settled and tested, across Stages 1 and 2. Don't re-litigate without a reason.
 
-- **Row 0 is the top**; gravity increases the row number.
-- **Pairs spawn at row 0** in the middle column.
-- **Lock delay resets on a successful move or rotate, never on a blocked one** — otherwise
-  you could stall forever by mashing into a wall. There is deliberately no cap on resets
-  (Puyo behaviour); Tetris caps it with a move-reset limit. Revisit when tuning feel.
-- **Fall progress is a fraction of the current interval, not a millisecond timer.**
-  Soft drop swaps the interval (800ms → 50ms) rather than multiplying it, and the naive
-  version banked elapsed milliseconds against whichever interval was active. Press Down
-  750ms into a normal fall and the loop spent that bank at the *new* rate — `750 / 50` =
-  15 rows in one frame, so the pair teleported to the floor. Reported as "holding down
-  almost instantly drops it unless you hold the key for one frame"; a test pinned it at
-  11 rows. Tracking `fallProgress` as a 0–1 fraction means a rate change preserves *how far
-  you are toward the next row* instead of re-denominating banked time, so switching rates
-  can never produce a burst. It also makes live tuning changes safe mid-fall.
-- **Soft drop does not carry across a lock.** Holding Down used to mirror `isDown` straight
-  onto `softDropping`, so a pair that spawned while the key was held fast-fell immediately —
-  16× gravity, the whole board in ~600ms. Tetris lets soft drop carry over, but its soft
-  drop is ~2× gravity, not 16×.
-- **DAS does not stay charged across a lock.** A new pair requires the direction key to be
-  released and pressed again, matching the soft-drop rule. Tetris deliberately keeps DAS
-  charged and good players rely on it, so if this reads as a dead key rather than as safety,
-  the softer variant is one line in `src/input/input-translator.ts`: drop
-  `shiftAwaitingRelease` and let the still-held key re-trigger as a fresh press.
-- **The engine never clamps its own delta.** `Simulation.update` trusts its caller.
-- **The frame-delta clamp lives inside `FixedTimestep`.** This flip-flopped once; the
-  warning is here so it doesn't again. Phaser *does* clamp on its own (`TimeStep.smoothDelta`
-  caps delta at 200ms via `fps.min`), and the clamp was deleted on that basis — replaced by
-  a test comparing config constants. That test could not fail for the reason it existed,
-  because you cannot unit-test another library's runtime from your own config file, and it
-  asserted something false besides. Clamping before accumulating is part of *what a
-  fixed-timestep loop is*; without it the loop's iteration bound lives in a third-party
-  config file. `FixedTimestep`'s tests exercise the real property: `stepsFor(10_000)`
-  returns a bounded step count.
-- **Match rule: connected groups of 4 (Puyo).** Four or more same-colour tiles touching
-  orthogonally, any shape. Chosen over match-3 lines because the art direction's core image
-  is a *network* — chains lighting the leading between tiles reads as a signal crossing a
-  graph, which is what connected groups are and what lines are not. Accepts the design
-  plan's warning that Puyo chain-building is hard for newcomers.
-- **Four colours, not six.** `PIECE_TYPE_COUNT` was 6; Puyo ships 4 as standard and treats 5
-  as the harder setting. On a 6-wide board, six colours made same-coloured pieces land
-  adjacent too rarely for groups to form, so the board filled before anything could be set
-  up. This was very likely the largest single reason the game read as unfun.
-- **Chain scoring is `cellsCleared × 10 × 2^linkIndex`** — deliberately a placeholder.
-  Exponential in chain depth, which is the property that matters, but not Puyo's real
-  formula (chain power + colour bonus + group bonus). Replace it when scoring is tuned.
-- **The next-piece preview is one pair of lookahead, shown beside the board.** `Simulation`
-  draws one piece ahead and exposes it as `upcoming`. This is what makes chain-building
-  plannable: a satellite spawns at row −1, off-screen, so the only way to learn its colour
-  used to be to rotate, and every piece cost an input just to see what you were holding.
-  Note the preview does **not** move the satellite on screen — it is still off-screen at
-  spawn; you simply learned its colour one piece earlier, which is how Puyo does it. Puyo
-  shows two pairs of lookahead; going deeper here is a change to the queue depth if one
-  feels thin.
-- **The board is left-aligned, not centred**, and the canvas is 620 wide rather than 480,
-  because a 404px board in a 480px canvas left only 38px of margin — no room for a preview
-  panel. The chain counter centres on the *board*, not the canvas, so it never drifts over
-  the panel.
-- **The chain resolves over time, in a `resolving` phase between lock and spawn.** Each
-  link is applied one `chainLinkDelay` (220ms) apart, so a completed group is on screen as a
-  group before it clears. Two rules fall out of it: input is **ignored while resolving**
-  (there is now a real window where `pair` is locked onto the board but the next one has not
-  spawned, and moving it would corrupt the board), and a lock that matches nothing spawns
-  **immediately** with no delay — otherwise every non-matching piece would pay the chain tax.
-  `resolveChain` is now a loop over a single-step `resolveStep`, so the engine keeps its
-  all-at-once API for tests while the scene gets it link by link. Clearing and settling are
-  separate beats (`clearStep` then `board.settle()`, paced by `settleDelay`), so a cleared
-  group leaves a visible hole with tiles hanging over it before they drop — that gap is what
-  makes a chain read as cause and effect, and it is also the state a future tween would
-  interpolate between.
-- **Input is polled once per frame, not event-driven.** A press must survive to the next
-  poll, so a press *and* release inside one frame is dropped. Unreachable from a physical
-  keyboard (a real tap is ~30ms against an 8–16ms frame) — it only shows up with synthetic
-  key events, so it is not worth event-driven input. Note it before "fixing" it again.
+The **reasoning for each lives as a comment on the code it governs** — this list
+records *what* was decided and where to read *why*, so the two cannot drift.
+
+| Decision | Why it is that way |
+|---|---|
+| Row 0 is the top; gravity increases the row number | `engine/grid.ts` |
+| Pairs spawn at row 0, column 2, satellite off-screen at row −1 | `engine/simulation.ts` (`spawn`), `engine/board.ts` (`isBlocked`) |
+| A locked pair's halves settle independently and may split | `engine/falling-pair.ts` (`lock`) |
+| Lock delay resets on a successful move, never a blocked one | `engine/simulation.ts` (`afterInput`) |
+| Fall progress is a fraction of the interval, not banked milliseconds | `engine/simulation.ts` (`fallProgress`) |
+| Soft drop does not carry across a lock | `input/input-translator.ts` (the latches) |
+| DAS does not stay charged across a lock | `input/input-translator.ts` |
+| The engine never clamps its own delta; the caller does | `engine/simulation.ts`, `fixed-timestep.ts` |
+| Match rule: connected groups of 4, any shape (Puyo, not lines) | `engine/matching.ts` |
+| Four colours, not six | `engine/grid.ts` |
+| Chain scoring is `cellsCleared × 10 × 2^linkIndex` — a placeholder | `engine/matching.ts` (`scoreLink`) |
+| One pair of lookahead, shown beside the board | `engine/simulation.ts` (`upcoming`) |
+| Board left-aligned in a 620-wide canvas to make room for the preview | `scenes/BoardScene.ts` |
+| The chain resolves over time: clear, then settle, one beat each | `engine/simulation.ts` (`advanceChain`), `engine/matching.ts` (`clearStep`) |
+| Input is refused while a cascade resolves | `engine/simulation.ts` |
+
+Two that are recorded here as well as in the code, deliberately:
+
+- **The frame-delta clamp lives inside `FixedTimestep`.** This flip-flopped once. It was
+  deleted on the grounds that Phaser smooths deltas itself, and replaced by a test comparing
+  two of our own constants — a test that could not fail for the reason it existed, because
+  you cannot unit-test another library's runtime from your own config file. Clamping before
+  accumulating is part of *what a fixed-timestep loop is*. Don't delete it again.
+- **Input is polled once per frame, not event-driven.** A press *and* release inside one
+  frame is therefore dropped. Unreachable from a physical keyboard (a real tap is ~30ms
+  against an 8–16ms frame) — it only shows up with synthetic key events. Note this before
+  "fixing" it again.
 
 ## Decided, pending build
 
@@ -222,21 +125,15 @@ Settled and tested, across Stages 1 and 2. Don't re-litigate without a reason.
 
 ## Deferred (deliberately not built yet)
 
-- **Capping the frame rate and stripping the FPS counter from production.** Phaser's
-  `fps.limit` defaults to 0, so the game runs at the display's refresh rate — 120fps on a
-  120Hz screen, double the work for a 60fps requirement. Too early to limit: measure real
-  cost first, and do not trade away input latency before the feel is settled.
-- **Verifying `/game` on the deployed site.** Netlify serves real files before applying the
-  `/*` rewrite in `public/_redirects` — confirmed against the live host, where a real
-  `/static/*` asset returns JavaScript rather than the rewritten index. What is still
-  unproven is that a *directory* request (`/game/`) resolves to `/game/index.html` before the
-  rewrite. If `/game` ever serves the portfolio after a deploy, the fix is one rule above the
-  catch-all: `/game/*  /game/:splat  200`.
+- **Capping the frame rate, and stripping the FPS counter from production.** Too early —
+  measure real cost first, and do not trade input latency away before feel is settled.
+- **Verifying `/game` on the deployed site.** Real files beat the `/*` rewrite on Netlify
+  (confirmed against the live host); what is unproven is that a *directory* request
+  resolves before the rewrite. If `/game` ever serves the portfolio, add
+  `/game/*  /game/:splat  200` above the catch-all in `public/_redirects`.
 - **A link from the portfolio to the game.** `/game` works but nothing points at it.
-- **Migrating the portfolio from Create React App to Vite.** CRA is unmaintained, and it is
-  why the two toolchains need `concurrently` and `src/setupProxy.js` to share a dev server.
-  Migrating collapses both into one Vite app and deletes that seam — along with the `/game`
-  path currently repeated across `setupProxy.js`, `vite.config.ts`, and the root `build`
-  script.
+- **Migrating the portfolio from CRA to Vite.** CRA is unmaintained and is why the two
+  toolchains need `concurrently` and `src/setupProxy.js`. Do it at a natural pause, not
+  mid-feature — the failure mode is the live site breaking, not a red test.
 - **The narrative wrapper** — hallway, face, eye, brain intro, memory vignettes. A separate
-  workstream after the core matcher is proven fun.
+  workstream once the core matcher is proven fun.
