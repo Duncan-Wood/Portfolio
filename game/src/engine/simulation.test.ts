@@ -16,6 +16,23 @@ const dropToFloor = (game: Simulation) => {
   }
 };
 
+/**
+ * Fills the spawn column below the spawn row, cycling colours so the fill never
+ * forms a group of its own.
+ */
+const fillUnderSpawn = (game: Simulation) => {
+  for (let row = SPAWN_ROW + 1; row < ROWS; row += 1) {
+    game.board.place(SPAWN_COLUMN, row, (row % 3) + 1);
+  }
+};
+
+/** Stacks `height` tiles of one colour under the spawn column. */
+const stackUnderSpawn = (game: Simulation, pieceType: number, height: number) => {
+  for (let row = ROWS - height; row < ROWS; row += 1) {
+    game.board.place(SPAWN_COLUMN, row, pieceType);
+  }
+};
+
 describe('spawning', () => {
   it('starts with a pair at the top of the spawn column', () => {
     const game = simulation();
@@ -145,10 +162,11 @@ describe('live tuning', () => {
   });
 
   it('leaves the shared defaults untouched when a caller mutates its own tuning', () => {
+    const original = DEFAULT_TUNING.fallInterval;
     const tuning = { ...DEFAULT_TUNING };
-    tuning.fallInterval = 1;
+    tuning.fallInterval = original + 1;
 
-    expect(DEFAULT_TUNING.fallInterval).toBe(800);
+    expect(DEFAULT_TUNING.fallInterval).toBe(original);
   });
 });
 
@@ -454,16 +472,6 @@ describe('topping out', () => {
     return cells;
   };
 
-  /**
-   * Fills the spawn column below the spawn row, cycling colours so the fill
-   * never forms a group of its own.
-   */
-  const fillUnderSpawn = (game: Simulation) => {
-    for (let row = SPAWN_ROW + 1; row < ROWS; row += 1) {
-      game.board.place(SPAWN_COLUMN, row, (row % 3) + 1);
-    }
-  };
-
   const lockIntoAFullColumn = () => {
     const game = simulation();
     fillUnderSpawn(game);
@@ -547,5 +555,349 @@ describe('topping out', () => {
 
     expect(game.score).toBeGreaterThan(0);
     expect(game.toppedOut).toBe(true);
+  });
+});
+
+describe('restarting', () => {
+  const toppedOutGame = () => {
+    const game = simulation();
+    fillUnderSpawn(game);
+    game.update(lockDelay);
+    return game;
+  };
+
+  it('clears the topped-out state', () => {
+    const game = toppedOutGame();
+    game.restart();
+    expect(game.toppedOut).toBe(false);
+  });
+
+  it('empties the board', () => {
+    const game = toppedOutGame();
+    game.restart();
+
+    for (let row = 0; row < ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        expect(game.board.isEmpty(column, row)).toBe(true);
+      }
+    }
+  });
+
+  it('resets the score', () => {
+    const game = toppedOutGame();
+    game.score = 480;
+    game.restart();
+    expect(game.score).toBe(0);
+  });
+
+  it('puts a fresh pair back at the spawn point', () => {
+    const game = toppedOutGame();
+    game.restart();
+
+    expect(game.pair.column).toBe(SPAWN_COLUMN);
+    expect(game.pair.row).toBe(SPAWN_ROW);
+    expect(game.pair.orientation).toBe(0);
+  });
+
+  it('accepts input and gravity again', () => {
+    const game = toppedOutGame();
+    game.restart();
+
+    expect(game.moveLeft()).toBe(true);
+    game.update(fallInterval);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
+  });
+
+  it('abandons a cascade in progress', () => {
+    const game = simulation();
+    stackUnderSpawn(game, RED, 3);
+    dropToFloor(game);
+    game.update(lockDelay);
+    expect(game.resolving).toBe(true);
+
+    game.restart();
+
+    expect(game.resolving).toBe(false);
+    expect(game.chainLength).toBe(0);
+  });
+});
+
+describe('reporting each cascade beat to the scene', () => {
+  /** A red trio under the spawn column, so the pair's red pivot completes four. */
+  const chainingGame = () => {
+    const game = simulation();
+    stackUnderSpawn(game, RED, 3);
+    dropToFloor(game);
+    game.update(lockDelay);
+    return game;
+  };
+
+  it('reports no beats before anything resolves', () => {
+    const game = simulation();
+    expect(game.beatsPlayed).toBe(0);
+    expect(game.lastBeat).toBe(null);
+  });
+
+  it('counts a beat each time the cascade advances', () => {
+    const game = chainingGame();
+    const before = game.beatsPlayed;
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+
+    expect(game.beatsPlayed).toBe(before + 1);
+  });
+
+  /**
+   * The cascade ending is not a beat. Counting it would have the scene reach
+   * for a `lastBeat` describing the previous one and replay it.
+   */
+  it('does not count the step that finds nothing left to clear', () => {
+    const game = chainingGame();
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    game.update(DEFAULT_TUNING.settleDelay);
+    const afterSettle = game.beatsPlayed;
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+
+    expect(game.resolving).toBe(false);
+    expect(game.beatsPlayed).toBe(afterSettle);
+  });
+
+  it('hands the scene the cells that just popped', () => {
+    const game = chainingGame();
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+
+    const beat = game.lastBeat!;
+    expect(beat.kind).toBe('clear');
+    if (beat.kind !== 'clear') {
+      return;
+    }
+
+    const popped = beat.link.groups.flatMap((group) => group.cells);
+    expect(popped).toHaveLength(4);
+    expect(popped.every((cell) => cell.column === SPAWN_COLUMN)).toBe(true);
+  });
+
+  /**
+   * The link's own score, not the running total. A reader differencing `score`
+   * would need its own copy of the previous value, which is what the scene used
+   * to do — against a field whose real job was caching rendered text.
+   */
+  it('hands the scene what this link alone scored', () => {
+    const game = chainingGame();
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+
+    const beat = game.lastBeat!;
+    expect(beat.kind === 'clear' && beat.points).toBe(40);
+    expect(game.score).toBe(40);
+  });
+
+  it('hands the scene the tiles that just fell', () => {
+    const game = chainingGame();
+    // The red pivot completes the trio and pops with it, leaving the blue
+    // satellite stranded one row above the hole it now has to fall through.
+    const strandedRow = game.pair.row - 1;
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    game.update(DEFAULT_TUNING.settleDelay);
+
+    const beat = game.lastBeat!;
+    expect(beat.kind).toBe('settle');
+    if (beat.kind !== 'settle') {
+      return;
+    }
+    expect(beat.moves).toEqual([{ column: SPAWN_COLUMN, fromRow: strandedRow, toRow: ROWS - 1 }]);
+  });
+
+  it('forgets the previous beat when a new game starts', () => {
+    const game = chainingGame();
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+
+    game.restart();
+
+    expect(game.lastBeat).toBe(null);
+    expect(game.beatsPlayed).toBe(0);
+  });
+});
+
+describe('how far the pair has fallen toward the next row', () => {
+  it('starts a piece at zero', () => {
+    expect(simulation().fallProgress).toBe(0);
+  });
+
+  it('grows as a fraction of the interval', () => {
+    const game = simulation();
+    game.update(fallInterval / 4);
+    expect(game.fallProgress).toBeCloseTo(0.25);
+  });
+
+  it('wraps back toward zero once a row is crossed', () => {
+    const game = simulation();
+    game.update(fallInterval * 1.25);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
+    expect(game.fallProgress).toBeCloseTo(0.25);
+  });
+});
+
+describe('hard drop', () => {
+  it('slams the pair to the floor', () => {
+    const game = simulation();
+    game.hardDrop();
+
+    expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 1)).toBe(RED);
+    expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 2)).toBe(BLUE);
+  });
+
+  it('lands on top of the stack rather than through it', () => {
+    const game = simulation();
+    game.board.place(SPAWN_COLUMN, ROWS - 1, 3);
+    game.hardDrop();
+
+    expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 1)).toBe(3);
+    expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 2)).toBe(RED);
+  });
+
+  it('returns how far the pair travelled', () => {
+    const game = simulation();
+    expect(game.hardDrop()).toBe(ROWS - 1 - SPAWN_ROW);
+  });
+
+  it('returns zero when the pair is already resting', () => {
+    const game = simulation();
+    fillUnderSpawn(game);
+
+    expect(game.hardDrop()).toBe(0);
+  });
+
+  /**
+   * The point of the whole feature: no waiting. A pair that lands on the lock
+   * timer takes `lockDelay` to commit, and this must not.
+   */
+  it('commits without waiting out the lock delay', () => {
+    const game = simulation();
+    const spawned = game.piecesSpawned;
+
+    game.hardDrop();
+
+    expect(game.piecesSpawned).toBe(spawned + 1);
+    expect(game.pair.row).toBe(SPAWN_ROW);
+  });
+
+  it('starts a cascade when the slam completes a group', () => {
+    const game = simulation();
+    stackUnderSpawn(game, RED, 3);
+
+    game.hardDrop();
+
+    expect(game.resolving).toBe(true);
+  });
+
+  it('tops out when the slam fills the spawn column', () => {
+    const game = simulation();
+    fillUnderSpawn(game);
+
+    game.hardDrop();
+
+    expect(game.toppedOut).toBe(true);
+  });
+
+  it('is refused while a cascade resolves', () => {
+    const game = simulation();
+    stackUnderSpawn(game, RED, 3);
+    game.hardDrop();
+    expect(game.resolving).toBe(true);
+
+    const spawned = game.piecesSpawned;
+    expect(game.hardDrop()).toBe(0);
+    expect(game.piecesSpawned).toBe(spawned);
+  });
+
+  it('is refused after a top-out', () => {
+    const game = simulation();
+    fillUnderSpawn(game);
+    game.hardDrop();
+    expect(game.toppedOut).toBe(true);
+
+    expect(game.hardDrop()).toBe(0);
+  });
+
+  it('does not carry fall progress into the next piece', () => {
+    const game = simulation();
+    game.update(fallInterval * 0.9);
+    game.hardDrop();
+
+    expect(game.fallProgress).toBe(0);
+  });
+});
+
+describe('reporting where a pair came to rest', () => {
+  it('counts nothing locked before the first pair lands', () => {
+    const game = simulation();
+    expect(game.piecesLocked).toBe(0);
+    expect(game.lastLanded).toEqual([]);
+  });
+
+  it('reports both halves once a pair locks', () => {
+    const game = simulation();
+    game.hardDrop();
+
+    expect(game.piecesLocked).toBe(1);
+    expect(game.lastLanded).toEqual([
+      { column: SPAWN_COLUMN, row: ROWS - 1, pieceType: RED },
+      { column: SPAWN_COLUMN, row: ROWS - 2, pieceType: BLUE },
+    ]);
+  });
+
+  /**
+   * The reason this is reported rather than derived. A half that settles into a
+   * hole ends up somewhere neither the pair's last position nor a scan of the
+   * column's topmost tile would find.
+   */
+  it('reports where a half ended up after settling, not where it was placed', () => {
+    const game = new Simulation(() => [RED, BLUE]);
+    // A ledge one column over, so the horizontal pair straddles a gap and its
+    // right half keeps falling after the left half stops.
+    game.board.place(SPAWN_COLUMN, ROWS - 1, 3);
+    game.rotate();
+    game.hardDrop();
+
+    const [pivot, satellite] = game.lastLanded;
+    expect(pivot).toEqual({ column: SPAWN_COLUMN, row: ROWS - 2, pieceType: RED });
+    expect(satellite).toEqual({ column: SPAWN_COLUMN + 1, row: ROWS - 1, pieceType: BLUE });
+  });
+
+  /**
+   * The landings the whole game is about. Inferring a lock from `piecesSpawned`
+   * missed these, because a lock that starts a cascade spawns nothing.
+   */
+  it('counts a lock that starts a cascade, which spawns no pair', () => {
+    const game = simulation();
+    stackUnderSpawn(game, RED, 3);
+    const spawned = game.piecesSpawned;
+
+    game.hardDrop();
+
+    expect(game.resolving).toBe(true);
+    expect(game.piecesSpawned).toBe(spawned);
+    expect(game.piecesLocked).toBe(1);
+  });
+
+  it('counts a lock that tops the board out', () => {
+    const game = simulation();
+    fillUnderSpawn(game);
+
+    game.update(lockDelay);
+
+    expect(game.toppedOut).toBe(true);
+    expect(game.piecesLocked).toBe(1);
+  });
+
+  it('forgets the last landing when a new game starts', () => {
+    const game = simulation();
+    game.hardDrop();
+    game.restart();
+
+    expect(game.piecesLocked).toBe(0);
+    expect(game.lastLanded).toEqual([]);
   });
 });

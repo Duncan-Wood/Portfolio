@@ -1,7 +1,7 @@
 import { COLUMNS, FIRST_VISIBLE_ROW } from './grid';
-import { Board } from './board';
-import { FallingPair } from './falling-pair';
-import { clearStep, findGroups, scoreLink } from './matching';
+import { Board, type TileMove } from './board';
+import { FallingPair, type PairCell } from './falling-pair';
+import { clearStep, findGroups, scoreLink, type ChainLink } from './matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
 /*
@@ -42,10 +42,29 @@ export const SPAWN_ROW = FIRST_VISIBLE_ROW;
  */
 export type PieceTypeSupplier = () => [number, number];
 
+/**
+ * One beat of a cascade, tagged with which kind it was.
+ *
+ * A discriminated union rather than two independent fields, because the scene's
+ * question is "what happened this beat?" and that has exactly one answer. It
+ * used to be a `lastLink` and a `lastSettle` that the scene told apart by
+ * checking which object had been reallocated — the same fragile identity
+ * comparison that `piecesSpawned` exists to avoid, and one that would have
+ * broken silently the day `settle` started returning a shared empty array for
+ * the no-move case.
+ *
+ * `points` rides along on a clear because the engine is the only thing that
+ * knows what this link alone scored; the running total cannot be differenced
+ * without the reader keeping its own copy of the previous value.
+ */
+export type CascadeBeat =
+  | { kind: 'clear'; link: ChainLink; points: number }
+  | { kind: 'settle'; moves: readonly TileMove[] };
+
 export class Simulation {
   readonly board = new Board();
 
-  pair: FallingPair;
+  pair!: FallingPair;
 
   softDropping = false;
 
@@ -79,6 +98,33 @@ export class Simulation {
   chainLength = 0;
 
   /**
+   * What the most recent cascade beat did, and a counter that ticks once per
+   * beat so the scene can notice a new one.
+   *
+   * The board is already in its post-beat state by the time a frame renders, so
+   * the scene cannot see what popped or what fell by looking at it. Rather than
+   * have the engine call into the scene, the engine leaves the last beat's
+   * result here and the scene watches `beatsPlayed` — the same shape as
+   * `piecesSpawned`, and it keeps the engine free of callbacks.
+   */
+  beatsPlayed = 0;
+
+  lastBeat: CascadeBeat | null = null;
+
+  /**
+   * Pairs committed to the board, and where the halves of the last one came to
+   * rest after settling.
+   *
+   * Separate from `piecesSpawned` because they are different events: a lock
+   * that starts a cascade, and a lock that tops the board out, both commit a
+   * pair without spawning another. Inferring "a pair landed" from the spawn
+   * counter therefore misses exactly the landings that matter most.
+   */
+  piecesLocked = 0;
+
+  lastLanded: readonly PairCell[] = [];
+
+  /**
    * The colours of the NEXT pair, drawn one piece ahead so the scene can show a
    * preview. This is what makes chain-building plannable — a satellite spawns
    * off-screen at row -1, so without a preview the only way to learn its colour
@@ -88,7 +134,7 @@ export class Simulation {
    * colour a piece earlier, which is how Puyo does it. Puyo shows TWO pairs of
    * lookahead — going deeper is a change to this queue's depth.
    */
-  upcoming: [number, number];
+  upcoming!: [number, number];
 
   /**
    * Progress toward the next row, as a FRACTION of the current interval (0 to
@@ -102,8 +148,11 @@ export class Simulation {
    * fraction means a rate change preserves HOW FAR you are toward the next row
    * rather than re-pricing banked time, so switching rates can never burst. It
    * also makes changing `fallInterval` live, mid-fall, safe.
+   *
+   * Public because the scene draws the pair at `row + fallProgress`, which is
+   * what makes gravity look like falling rather than stepping.
    */
-  private fallProgress = 0;
+  fallProgress = 0;
 
   private resolveTimer = 0;
 
@@ -126,9 +175,11 @@ export class Simulation {
      */
     private tuning: Tuning = DEFAULT_TUNING,
   ) {
-    // Seed the preview before the first spawn consumes it.
-    this.upcoming = this.nextPieceTypes();
-    this.pair = this.spawn();
+    // A new simulation and a restarted one are the same thing, so there is one
+    // description of what a fresh game looks like rather than two that a
+    // compiler will never reconcile. `pair` and `upcoming` carry definite
+    // assignment assertions because TypeScript cannot see through the call.
+    this.restart();
   }
 
   /**
@@ -159,19 +210,7 @@ export class Simulation {
       this.lockTimer += delta;
 
       if (this.lockTimer >= this.tuning.lockDelay) {
-        this.pair.lock(this.board);
-
-        // Peek before committing to a cascade: if the lock matched nothing, the
-        // next pair spawns immediately. Otherwise every ordinary piece would
-        // pay a chain-link delay it did not earn, and the game would stutter.
-        if (findGroups(this.board).length > 0) {
-          this.resolving = true;
-          this.chainLength = 0;
-          this.resolveTimer = 0;
-          this.settlePending = false;
-        } else {
-          this.spawnOrTopOut();
-        }
+        this.lockPair();
       }
       return;
     }
@@ -204,6 +243,35 @@ export class Simulation {
   }
 
   /**
+   * Start a new game on the same simulation, from any state.
+   *
+   * Works mid-run as well as after a top-out: a run you can already tell is
+   * lost is a run you want to abandon, and needing to reach the top first would
+   * make playtesting slower than the game.
+   */
+  restart(): void {
+    this.board.reset();
+
+    this.score = 0;
+    this.chainLength = 0;
+    this.resolving = false;
+    this.settlePending = false;
+    this.resolveTimer = 0;
+    this.softDropping = false;
+    this.toppedOut = false;
+
+    this.beatsPlayed = 0;
+    this.lastBeat = null;
+    this.piecesLocked = 0;
+    this.lastLanded = [];
+
+    this.piecesSpawned = 0;
+    // Seed the preview before the first spawn consumes it.
+    this.upcoming = this.nextPieceTypes();
+    this.pair = this.spawn();
+  }
+
+  /**
    * Player input. Each returns whether the move actually happened.
    *
    * All three refuse while a cascade resolves or after a top-out, for the same
@@ -221,6 +289,28 @@ export class Simulation {
 
   rotate(): boolean {
     return this.acceptsInput ? this.afterInput(this.pair.rotateClockwise(this.board)) : false;
+  }
+
+  /**
+   * Slam the pair down and commit it immediately, skipping the lock delay.
+   * Returns how far it fell, which the scene scales its screen shake by — a
+   * drop from the top should land harder than a drop of one row.
+   *
+   * Deliberately not routed through `afterInput`: that resets the lock timer to
+   * give the player more time, and this is the input that says the opposite.
+   */
+  hardDrop(): number {
+    if (!this.acceptsInput) {
+      return 0;
+    }
+
+    let distance = 0;
+    while (this.pair.fall(this.board)) {
+      distance += 1;
+    }
+
+    this.lockPair();
+    return distance;
   }
 
   /**
@@ -254,13 +344,14 @@ export class Simulation {
     this.resolveTimer = 0;
 
     if (this.settlePending) {
-      this.board.settle();
       this.settlePending = false;
+      this.recordBeat({ kind: 'settle', moves: this.board.settle() });
       return;
     }
 
     const link = clearStep(this.board);
     if (link === null) {
+      // Not a beat: the cascade is simply over, and nothing moved to show.
       this.resolving = false;
       this.spawnOrTopOut();
       return;
@@ -268,9 +359,42 @@ export class Simulation {
 
     // `chainLength` is the 0-based index of this link, so the first link of a
     // cascade scores at 1x and each subsequent one doubles.
-    this.score += scoreLink(link, this.chainLength);
+    const points = scoreLink(link, this.chainLength);
+    this.score += points;
     this.chainLength += 1;
     this.settlePending = true;
+    this.recordBeat({ kind: 'clear', link, points });
+  }
+
+  private recordBeat(beat: CascadeBeat): void {
+    this.lastBeat = beat;
+    this.beatsPlayed += 1;
+  }
+
+  /**
+   * Commit the pair to the board and decide what happens next.
+   *
+   * Peek before committing to a cascade: if the lock matched nothing, the next
+   * pair spawns immediately. Otherwise every ordinary piece would pay a
+   * chain-link delay it did not earn, and the game would stutter.
+   *
+   * Shared by the lock delay and by `hardDrop`, which is the whole reason it is
+   * a method — two callers deciding separately what a lock means is how the two
+   * paths drift apart.
+   */
+  private lockPair(): void {
+    this.lastLanded = this.pair.lock(this.board);
+    this.piecesLocked += 1;
+
+    if (findGroups(this.board).length > 0) {
+      this.resolving = true;
+      this.chainLength = 0;
+      this.resolveTimer = 0;
+      this.settlePending = false;
+      return;
+    }
+
+    this.spawnOrTopOut();
   }
 
   /**

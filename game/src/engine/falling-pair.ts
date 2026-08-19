@@ -126,8 +126,7 @@ export class FallingPair {
   }
 
   /**
-   * Commit both halves onto the board. After this the pair is history; the
-   * tiles belong to the board.
+   * Commit both halves onto the board and report where they came to rest.
    *
    * Writes unconditionally. Both halves are always on the board: the pivot
    * spawns in the topmost visible row with the satellite in the hidden row
@@ -135,16 +134,28 @@ export class FallingPair {
    * with `isInside` and silently discard a half at row -1, which the hidden row
    * removed the need for — a bad write now throws out of `place` instead.
    *
-   * `settle()` at the end is what makes the two halves independent: if the
-   * pivot lands on the stack while the satellite is over a hole, the satellite
-   * keeps falling on its own. Tetris pieces stay rigid; Puyo pairs split. This
-   * one line is that entire design decision.
+   * `settle()` is what makes the two halves independent: if the pivot lands on
+   * the stack while the satellite is over a hole, the satellite keeps falling
+   * on its own. Tetris pieces stay rigid; Puyo pairs split. That one call is
+   * that entire design decision — and it is also why the resting cells have to
+   * be returned rather than assumed, since either half may have moved after it
+   * was placed.
    */
-  lock(board: Board): void {
-    for (const cell of this.cells()) {
+  lock(board: Board): PairCell[] {
+    const placed = this.cells();
+    for (const cell of placed) {
       board.place(cell.column, cell.row, cell.pieceType);
     }
-    board.settle();
+
+    const moves = board.settle();
+
+    return placed.map((cell) => {
+      // Within one column a tile is uniquely identified by the row it left.
+      const move = moves.find(
+        (candidate) => candidate.column === cell.column && candidate.fromRow === cell.row,
+      );
+      return move === undefined ? cell : { ...cell, row: move.toRow };
+    });
   }
 
   /**

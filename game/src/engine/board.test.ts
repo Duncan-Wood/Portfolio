@@ -143,3 +143,53 @@ describe('clearing cells', () => {
     expect(() => new Board().clear(0, ROWS)).toThrow();
   });
 });
+
+describe('reporting what settling moved', () => {
+  it('reports nothing when every column is already packed', () => {
+    const board = new Board();
+    board.place(0, BOTTOM, 3);
+    board.place(0, BOTTOM - 1, 4);
+    expect(board.settle()).toEqual([]);
+  });
+
+  it('reports each tile that fell, bottom-most first', () => {
+    const board = new Board();
+    board.place(0, 5, 3);
+    board.place(0, 10, 4);
+
+    expect(board.settle()).toEqual([
+      { column: 0, fromRow: 10, toRow: BOTTOM },
+      { column: 0, fromRow: 5, toRow: BOTTOM - 1 },
+    ]);
+  });
+
+  it('leaves tiles that did not move out of the report', () => {
+    const board = new Board();
+    board.place(1, BOTTOM, 3);
+    board.place(1, 4, 4);
+
+    expect(board.settle()).toEqual([{ column: 1, fromRow: 4, toRow: BOTTOM - 1 }]);
+  });
+});
+
+describe('resetting', () => {
+  it('empties every cell', () => {
+    const board = new Board();
+    board.place(0, BOTTOM, 3);
+    board.place(4, 2, 5);
+
+    board.reset();
+
+    expect(board.isEmpty(0, BOTTOM)).toBe(true);
+    expect(board.isEmpty(4, 2)).toBe(true);
+  });
+
+  it('leaves the board usable afterwards', () => {
+    const board = new Board();
+    board.place(0, BOTTOM, 3);
+    board.reset();
+
+    expect(() => board.place(0, BOTTOM, 4)).not.toThrow();
+    expect(board.pieceAt(0, BOTTOM)).toBe(4);
+  });
+});

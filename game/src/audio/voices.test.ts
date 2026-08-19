@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import {
+  BASE_POP_FREQUENCY,
+  MAX_POP_FREQUENCY,
+  chainVoices,
+  hardDropVoice,
+  landVoice,
+  popVoice,
+  topOutVoice,
+} from './voices';
+
+const everyVoice = [
+  popVoice(0),
+  popVoice(4),
+  landVoice(),
+  hardDropVoice(0),
+  hardDropVoice(11),
+  topOutVoice(),
+  ...chainVoices(3),
+];
+
+describe('every voice', () => {
+  it('lasts a positive amount of time', () => {
+    for (const voice of everyVoice) {
+      expect(voice.duration).toBeGreaterThan(0);
+    }
+  });
+
+  it('stays audible and inside the hearing range', () => {
+    for (const voice of everyVoice) {
+      expect(voice.gain).toBeGreaterThan(0);
+      expect(voice.startFrequency).toBeGreaterThan(20);
+      expect(voice.endFrequency).toBeGreaterThan(20);
+      expect(voice.startFrequency).toBeLessThan(20000);
+      expect(voice.endFrequency).toBeLessThan(20000);
+    }
+  });
+});
+
+describe('the pop, which carries the chain escalation', () => {
+  it('starts at the base pitch on the first link', () => {
+    expect(popVoice(0).startFrequency).toBe(BASE_POP_FREQUENCY);
+  });
+
+  it('rises with every further link', () => {
+    const pitches = [0, 1, 2, 3, 4].map((link) => popVoice(link).startFrequency);
+
+    for (let index = 1; index < pitches.length; index += 1) {
+      expect(pitches[index]).toBeGreaterThan(pitches[index - 1]);
+    }
+  });
+
+  /**
+   * Chains have no theoretical ceiling, and an uncapped ratio would walk a long
+   * one straight out of the hearing range — the payoff getting quieter the
+   * better you play.
+   */
+  it('stops climbing before it leaves the hearing range', () => {
+    expect(popVoice(200).startFrequency).toBe(MAX_POP_FREQUENCY);
+  });
+});
+
+describe('the hard drop, which reports its own impact', () => {
+  it('hits harder the further the pair fell', () => {
+    expect(hardDropVoice(11).gain).toBeGreaterThan(hardDropVoice(1).gain);
+  });
+
+  it('still makes a sound when the pair had nowhere to fall', () => {
+    expect(hardDropVoice(0).gain).toBeGreaterThan(0);
+  });
+
+  it('drops in pitch, the way an impact does', () => {
+    const voice = hardDropVoice(6);
+    expect(voice.endFrequency).toBeLessThan(voice.startFrequency);
+  });
+});
+
+describe('the chain flourish', () => {
+  it('stays silent for a single link, which is not a chain', () => {
+    expect(chainVoices(1)).toEqual([]);
+  });
+
+  it('plays an ascending arpeggio once a real chain lands', () => {
+    const pitches = chainVoices(2).map((voice) => voice.startFrequency);
+
+    expect(pitches.length).toBeGreaterThan(1);
+    for (let index = 1; index < pitches.length; index += 1) {
+      expect(pitches[index]).toBeGreaterThan(pitches[index - 1]);
+    }
+  });
+
+  it('reaches higher for a longer chain', () => {
+    const short = chainVoices(2);
+    const long = chainVoices(6);
+    expect(long[long.length - 1].startFrequency).toBeGreaterThan(
+      short[short.length - 1].startFrequency,
+    );
+  });
+});
+
+describe('the top-out', () => {
+  it('falls in pitch, so it reads as a loss', () => {
+    const voice = topOutVoice();
+    expect(voice.endFrequency).toBeLessThan(voice.startFrequency);
+  });
+});

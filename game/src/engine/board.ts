@@ -13,6 +13,18 @@ import { COLUMNS, ROWS } from './grid';
  */
 const EMPTY = null;
 
+/**
+ * One tile's journey during a settle. `settle` returns these so the scene can
+ * animate the drop: the board itself is already in its final state by the time
+ * anything renders, so without a record of where each tile came from the fall
+ * can only be drawn as a teleport.
+ */
+export interface TileMove {
+  column: number;
+  fromRow: number;
+  toRow: number;
+}
+
 export class Board {
   /**
    * Flat rather than 2D, indexed `row * COLUMNS + column`. Private so the
@@ -83,7 +95,9 @@ export class Board {
    * Tetris piece stays rigid) and the cascade's settle beat. `resolveStep` is a
    * third caller, reached only from the test-only `resolveChain`.
    */
-  settle(): void {
+  settle(): TileMove[] {
+    const moves: TileMove[] = [];
+
     for (let column = 0; column < COLUMNS; column += 1) {
       let target = ROWS - 1;
 
@@ -93,10 +107,23 @@ export class Board {
           continue;
         }
 
+        // A tile already resting on the packed floor has not moved, and
+        // reporting it would make the scene animate a zero-length drop.
+        if (row !== target) {
+          moves.push({ column, fromRow: row, toRow: target });
+        }
+
         this.cells[row * COLUMNS + column] = EMPTY;
         this.cells[target * COLUMNS + column] = pieceType;
         target -= 1;
       }
     }
+
+    return moves;
+  }
+
+  /** Empty every cell, for a restart. */
+  reset(): void {
+    this.cells.fill(EMPTY);
   }
 }

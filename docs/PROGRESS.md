@@ -4,8 +4,8 @@ Current stage, decisions, and open questions. Stages are defined in
 [DESIGN-PLAN.md](DESIGN-PLAN.md) under Recommendations. Update this file at the end of
 each stage.
 
-For how the code actually works — the layers, the data flow, and the life of a single
-piece — see [CODE-TOUR.md](CODE-TOUR.md).
+For how the code works, read the source: `CLAUDE.md` maps the layers, and every module
+carries a header explaining what it owns and why.
 
 ## Status
 
@@ -17,14 +17,18 @@ piece — see [CODE-TOUR.md](CODE-TOUR.md).
   stand, no sweep needed). Stage 2's was met by hand-building a **three-link chain
   scoring 280**, predicted before the trigger dropped and confirmed exactly.
 - **Done in Stage 3** — the cascade resolves one link per beat instead of instantly;
-  clearing and settling are separate beats so tiles visibly hang before dropping (judged
-  "more legible"); the next-piece preview is built; the hidden 13th row is in; and the
-  game now ends when a pair has nowhere to spawn.
-- **Next** — the rest of the juice checklist: tweened pop and fall, particles, hit-stop,
-  screen shake, audio. Smooth tweening dropped from *needed for comprehension* to
-  *optional polish* once the two-beat split landed.
+  clearing and settling are separate beats; the next-piece preview is built; the hidden
+  13th row is in; the game ends when a pair has nowhere to spawn, and **R starts a new
+  one**; and nothing teleports any more — the pair descends between rows, cleared tiles
+  shrink away, and settled tiles fall into their holes.
+- **Stage 3's checklist is now complete.** Hard drop and a 400ms gravity fixed the pacing;
+  procedural Web Audio, particles, hit-stop, screen shake, the landing bounce, score popups
+  and a vignette fixed the presentation. Comfortably over 60fps with the filter running.
+- **Next** — the Stage 3 benchmark itself: *playtesters visibly react to a big chain.* That
+  needs another person, and it is the only thing that closes Stage 3 and unblocks Stage 4.
 - **Still unproven** — whether one pair of lookahead is enough to plan chains with, and
-  whether the chain payoff actually feels good now that it is perceptible.
+  whether the chain payoff actually feels good. That is a playtest with another person,
+  and it is Stage 3's real benchmark: *playtesters visibly react to a big chain.*
 
 > **Testing in a browser:** Chrome pauses `requestAnimationFrame` entirely for hidden tabs,
 > so a backgrounded window renders **zero** frames and every timing measurement is
@@ -33,15 +37,14 @@ piece — see [CODE-TOUR.md](CODE-TOUR.md).
 ## Live tuning
 
 `src/tuning.ts` holds every feel dial, and dev builds expose the scene's copy as
-`window.tuning` — changes take effect on the next frame. The dials and what each
-one does are documented in that file; the console recipe is in
-[CODE-TOUR.md](CODE-TOUR.md) §6.
+`window.tuning` — changes take effect on the next frame. The dials, what each one
+does, and the console recipe are all documented in that file.
 
 ## Why the code is shaped this way
 
 Read the source — every module carries a header explaining what it owns and why,
-and the traps are commented at the lines they apply to.
-[CODE-TOUR.md](CODE-TOUR.md) §3–4 is the map of which file to open.
+and the traps are commented at the lines they apply to. `CLAUDE.md` under
+"Architecture" is the map of which file to open.
 
 ## Locked decisions
 
@@ -67,8 +70,26 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | A hidden row above the visible field, where tiles rest but stay inert | `engine/grid.ts` (`HIDDEN_ROWS`), `engine/matching.ts` (`findGroups`) |
 | Pairs spawn with the satellite in the hidden row, so no half is ever off-board | `engine/simulation.ts` (`SPAWN_ROW`) |
 | Board left-aligned in a 620-wide canvas to make room for the preview | `scenes/BoardScene.ts` |
+| Space hard-drops: slam, commit, no lock delay | `engine/simulation.ts` (`hardDrop`) |
+| Gravity is 400ms/row, because nobody waits for gravity in this genre | `tuning.ts` (`fallInterval`) |
+| Audio is synthesised, not sampled — no asset files, no licences | `audio/voices.ts`, `audio/sound-board.ts` |
+| Sound decisions are pure data and unit-tested; only playback touches the browser | `audio/voices.ts` |
+| Chain pitch rises a semitone per link, capped two octaves up | `audio/voices.ts` (`popVoice`) |
+| The camera rolls as well as shakes — translation alone reads as a glitch | `scenes/BoardScene.ts` (`kickCamera`) |
+| Hit-stop freezes the simulation without banking the frozen time | `scenes/BoardScene.ts` (`update`) |
+| Particles are tinted from one runtime-baked texture, so no art is needed | `scenes/BoardScene.ts` (`SPARK_TEXTURE`) |
+| The vignette is deliberately weak: readability beats atmosphere | `scenes/BoardScene.ts` |
+| **No** lit platform — built, judged wrong, and cut. Revisit after the playtest | `scenes/BoardScene.ts` (comment above the vignette) |
 | The chain resolves over time: clear, then settle, one beat each | `engine/simulation.ts` (`advanceChain`), `engine/matching.ts` (`clearStep`) |
 | Input is refused while a cascade resolves, and after a top-out | `engine/simulation.ts` (`acceptsInput`) |
+| R restarts from any state, without tearing the scene down | `engine/simulation.ts` (`restart`), `scenes/BoardScene.ts` (`restart`) |
+| `settle` reports which tiles moved, so the scene can animate the drop | `engine/board.ts` (`TileMove`) |
+| The engine leaves each cascade beat's result for the scene to read; no callbacks | `engine/simulation.ts` (`beatsPlayed`, `lastBeat`) |
+| A beat is one tagged `CascadeBeat`, not two fields told apart by object identity | `engine/simulation.ts` (`CascadeBeat`) |
+| `piecesLocked` and `lastLanded` announce a landing; the spawn counter misses two | `engine/simulation.ts` (`lockPair`) |
+| The pair is drawn at `row + fallProgress`, so gravity looks like falling | `scenes/BoardScene.ts` (`drawPair`) |
+| The pair's hidden-row half is clipped to the board, not hidden or floated | `scenes/BoardScene.ts` (`drawClippedToBoard`) |
+| Clipping is arithmetic, not a mask — Phaser 4's `setMask` is inert | `scenes/BoardScene.ts` (`drawClippedToBoard`) |
 | The spawn cells being occupied ends the game; the board is left on screen | `engine/simulation.ts` (`spawnOrTopOut`), `scenes/BoardScene.ts` (`refreshGameOver`) |
 | `Board.place` throws on an off-board **or** occupied write | `engine/board.ts` (`place`) |
 | Nothing is exempt from `isBlocked`; the ceiling blocks like any other edge | `engine/board.ts` (`isBlocked`) |

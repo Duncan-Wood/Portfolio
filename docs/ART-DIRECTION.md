@@ -18,6 +18,10 @@ publicly under Duncan's name.
 
 - **1 — Drop + lock.** The board sits on a circular lit platform in darkness, not a bare
   rectangle. Free now, and every later beat assumes it.
+  *Attempted and cut.* A circle big enough to sit under the board does not fit a 620-wide
+  canvas — it clipped on all four sides and read as stray arcs. A flattened ellipse in
+  perspective is the shape that fits. Only a weak vignette ships today, and per the rule at
+  the top of this file, the rest waits until the loop is proven fun.
 - **2 — Cascades.** Chains light the leading between cleared tiles, so a cascade is
   visibly a signal crossing the network. Highest-value idea here: nearly free, and it
   makes chains legible.
