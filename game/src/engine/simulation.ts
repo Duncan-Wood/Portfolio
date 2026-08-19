@@ -1,4 +1,4 @@
-import { COLUMNS } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW } from './grid';
 import { Board } from './board';
 import { FallingPair } from './falling-pair';
 import { clearStep, findGroups, scoreLink } from './matching';
@@ -21,6 +21,17 @@ import { DEFAULT_TUNING, type Tuning } from '../tuning';
  * centre column, and biasing left is arbitrary but consistent.
  */
 export const SPAWN_COLUMN = Math.floor((COLUMNS - 1) / 2);
+
+/**
+ * The row the pivot spawns on: the topmost VISIBLE row, which puts the
+ * satellite one row above it, in the hidden field.
+ *
+ * That is the whole point of the hidden row. Spawning the pivot at row 0 left
+ * the satellite at row -1, off the board entirely, where `lock()` silently
+ * discarded it. Now both halves are inside the board from the moment they
+ * appear.
+ */
+export const SPAWN_ROW = FIRST_VISIBLE_ROW;
 
 /**
  * Where new piece colours come from. Injected rather than called directly so
@@ -274,8 +285,8 @@ export class Simulation {
     this.lockTimer = 0;
     this.piecesSpawned += 1;
 
-    // Orientation 0 puts the satellite directly above the pivot, which means it
-    // starts at row -1 — off the top of the board, and invisible.
-    return new FallingPair(SPAWN_COLUMN, 0, 0, pivotType, satelliteType);
+    // Orientation 0 puts the satellite directly above the pivot — in the hidden
+    // row, so it is on the board but not drawn.
+    return new FallingPair(SPAWN_COLUMN, SPAWN_ROW, 0, pivotType, satelliteType);
   }
 }

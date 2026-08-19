@@ -173,7 +173,7 @@ second copy — open the file and the rationale is at the line.
 
 | Module | Owns | Open it for |
 |---|---|---|
-| `engine/grid.ts` | `COLUMNS` 6, `ROWS` 12, `PIECE_TYPE_COUNT` 4 | why row 0 is the top; why four colours and not six |
+| `engine/grid.ts` | `COLUMNS` 6, `VISIBLE_ROWS` 12 + `HIDDEN_ROWS` 1, `PIECE_TYPE_COUNT` 4 | why row 0 is the top; why there is a hidden row; why four colours and not six |
 | `engine/board.ts` | which cell holds which colour; gravity (`settle`) | the `isBlocked` asymmetry above the board, and what it costs; why `settle` makes a locked pair split apart |
 | `engine/falling-pair.ts` | the two-tile piece, its orientation and movement | what a wall kick is and how the kick direction is derived; the silent discard in `lock()` |
 | `engine/matching.ts` | the match rule, clearing, cascades, scoring | why groups are connected rather than lines; why `clearStep` deliberately omits the settle; why flood fill marks visited on *push* |

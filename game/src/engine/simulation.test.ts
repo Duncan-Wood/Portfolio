@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ROWS } from './grid';
+import { FIRST_VISIBLE_ROW, ROWS } from './grid';
 import { DEFAULT_TUNING } from '../tuning';
-import { SPAWN_COLUMN, Simulation } from './simulation';
+import { SPAWN_COLUMN, SPAWN_ROW, Simulation } from './simulation';
 
 const { fallInterval, lockDelay, softDropInterval } = DEFAULT_TUNING;
 
@@ -20,7 +20,7 @@ describe('spawning', () => {
   it('starts with a pair at the top of the spawn column', () => {
     const game = simulation();
     expect(game.pair.column).toBe(SPAWN_COLUMN);
-    expect(game.pair.row).toBe(0);
+    expect(game.pair.row).toBe(SPAWN_ROW);
     expect(game.pair.orientation).toBe(0);
   });
 
@@ -35,33 +35,33 @@ describe('gravity', () => {
   it('does not fall before the interval elapses', () => {
     const game = simulation();
     game.update(fallInterval - 1);
-    expect(game.pair.row).toBe(0);
+    expect(game.pair.row).toBe(SPAWN_ROW);
   });
 
   it('falls one row once the interval elapses', () => {
     const game = simulation();
     game.update(fallInterval);
-    expect(game.pair.row).toBe(1);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
   });
 
   it('accumulates time across several updates', () => {
     const game = simulation();
     game.update(fallInterval / 2);
     game.update(fallInterval / 2);
-    expect(game.pair.row).toBe(1);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
   });
 
   it('falls several rows when a large delta arrives at once', () => {
     const game = simulation();
     game.update(fallInterval * 3);
-    expect(game.pair.row).toBe(3);
+    expect(game.pair.row).toBe(SPAWN_ROW + 3);
   });
 
   it('falls faster while soft dropping', () => {
     const game = simulation();
     game.softDropping = true;
     game.update(softDropInterval);
-    expect(game.pair.row).toBe(1);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
   });
 });
 
@@ -104,7 +104,7 @@ describe('lock delay', () => {
     const game = simulation();
     dropToFloor(game);
     game.update(lockDelay);
-    expect(game.pair.row).toBe(0);
+    expect(game.pair.row).toBe(SPAWN_ROW);
     expect(game.pair.column).toBe(SPAWN_COLUMN);
   });
 
@@ -141,7 +141,7 @@ describe('live tuning', () => {
     tuning.fallInterval = 100;
     game.update(100);
 
-    expect(game.pair.row).toBe(1);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
   });
 
   it('leaves the shared defaults untouched when a caller mutates its own tuning', () => {
@@ -219,7 +219,7 @@ describe('switching between gravity and soft drop', () => {
     game.softDropping = true;
     game.update(1);
 
-    expect(game.pair.row).toBe(1);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
   });
 
   it('carries partial progress across the rate change', () => {
@@ -229,7 +229,7 @@ describe('switching between gravity and soft drop', () => {
     game.softDropping = true;
     game.update(softDropInterval / 2);
 
-    expect(game.pair.row).toBe(1);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
   });
 
   it('re-prices the remaining fraction of a row when soft drop is released', () => {
@@ -239,10 +239,10 @@ describe('switching between gravity and soft drop', () => {
 
     game.softDropping = false;
     game.update(softDropInterval * 0.1);
-    expect(game.pair.row).toBe(0);
+    expect(game.pair.row).toBe(SPAWN_ROW);
 
     game.update(fallInterval * 0.1);
-    expect(game.pair.row).toBe(1);
+    expect(game.pair.row).toBe(SPAWN_ROW + 1);
   });
 
   it('still falls one row per soft-drop interval while held', () => {
@@ -250,7 +250,7 @@ describe('switching between gravity and soft drop', () => {
     game.softDropping = true;
     game.update(softDropInterval * 3);
 
-    expect(game.pair.row).toBe(3);
+    expect(game.pair.row).toBe(SPAWN_ROW + 3);
   });
 });
 
@@ -408,5 +408,37 @@ describe('the next-piece preview', () => {
     game.update(lockDelay);
 
     expect(draws).toBe(game.piecesSpawned + 1);
+  });
+});
+
+describe('spawning into the hidden row', () => {
+  it('puts the pivot on the first visible row', () => {
+    expect(simulation().pair.row).toBe(FIRST_VISIBLE_ROW);
+  });
+
+  it('puts the satellite in the hidden row above it', () => {
+    const [, satellite] = simulation().pair.cells();
+    expect(satellite.row).toBe(FIRST_VISIBLE_ROW - 1);
+  });
+
+  it('keeps both halves inside the board, unlike spawning at row 0', () => {
+    const game = simulation();
+    for (const cell of game.pair.cells()) {
+      expect(game.board.isInside(cell.column, cell.row)).toBe(true);
+    }
+  });
+
+  it('locks both halves onto the board instead of discarding one', () => {
+    const game = simulation();
+    for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
+      if (row > FIRST_VISIBLE_ROW) {
+        game.board.place(SPAWN_COLUMN, row, 2);
+      }
+    }
+
+    game.update(lockDelay);
+
+    expect(game.board.pieceAt(SPAWN_COLUMN, FIRST_VISIBLE_ROW)).toBe(RED);
+    expect(game.board.pieceAt(SPAWN_COLUMN, FIRST_VISIBLE_ROW - 1)).toBe(BLUE);
   });
 });

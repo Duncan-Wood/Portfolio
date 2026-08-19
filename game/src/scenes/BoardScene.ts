@@ -1,5 +1,5 @@
 import { Input, Scene } from 'phaser';
-import { COLUMNS, PIECE_TYPE_COUNT, ROWS } from '../engine/grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, PIECE_TYPE_COUNT, ROWS, VISIBLE_ROWS } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 import { EMPTY_COLOR, PIECE_COLORS } from '../palette';
@@ -34,7 +34,7 @@ const FPS_REFRESH_INTERVAL = 250;
 
 
 const BOARD_WIDTH = COLUMNS * CELL_SIZE + (COLUMNS - 1) * GAP;
-const BOARD_HEIGHT = ROWS * CELL_SIZE + (ROWS - 1) * GAP;
+const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE + (VISIBLE_ROWS - 1) * GAP;
 export const CANVAS_WIDTH = 620;
 export const CANVAS_HEIGHT = 900;
 
@@ -56,8 +56,17 @@ function centerOfColumn(column: number): number {
   return ORIGIN_X + column * (CELL_SIZE + GAP) + CELL_SIZE / 2;
 }
 
+/**
+ * Board row to canvas pixel. Offset by `FIRST_VISIBLE_ROW`, so the hidden row
+ * maps above the top of the board and is simply never drawn.
+ */
 function centerOfRow(row: number): number {
-  return ORIGIN_Y + row * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+  return ORIGIN_Y + (row - FIRST_VISIBLE_ROW) * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+}
+
+/** Whether a cell is in the part of the board the player can see. */
+function isVisibleRow(row: number): boolean {
+  return row >= FIRST_VISIBLE_ROW && row < ROWS;
 }
 
 /**
@@ -133,8 +142,10 @@ export class BoardScene extends Scene {
       window.tuning = this.tuning;
     }
 
+    // One rectangle per VISIBLE cell. The hidden row is deliberately not drawn,
+    // so it gets no rectangle and the array is indexed from FIRST_VISIBLE_ROW.
     this.cellRectangles = [];
-    for (let row = 0; row < ROWS; row += 1) {
+    for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
         this.cellRectangles.push(
           this.add.rectangle(
@@ -273,10 +284,10 @@ export class BoardScene extends Scene {
    * keep correct.
    */
   private drawBoard(): void {
-    for (let row = 0; row < ROWS; row += 1) {
+    for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
         const pieceType = this.simulation.board.pieceAt(column, row);
-        this.cellRectangles[row * COLUMNS + column].setFillStyle(
+        this.cellRectangles[(row - FIRST_VISIBLE_ROW) * COLUMNS + column].setFillStyle(
           pieceType === null ? EMPTY_COLOR : PIECE_COLORS[pieceType],
         );
       }
@@ -304,14 +315,13 @@ export class BoardScene extends Scene {
     for (let index = 0; index < cells.length; index += 1) {
       const cell = cells[index];
       const rectangle = this.pairRectangles[index];
-      // A satellite spawns at row -1, above the board, so it genuinely has no
-      // cell to be drawn in for the first row of its fall. Using the board's own
-      // bounds check rather than an inline `row >= 0` keeps one definition of
-      // "on the board" — which matters when the hidden 13th row lands.
-      const isOnBoard = this.simulation.board.isInside(cell.column, cell.row);
+      // A satellite spawns in the hidden row, so it is ON the board but must
+      // not be drawn. Bounds and visibility stopped being the same question the
+      // moment the hidden row existed.
+      const showing = isVisibleRow(cell.row);
 
-      rectangle.setVisible(isOnBoard);
-      if (isOnBoard) {
+      rectangle.setVisible(showing);
+      if (showing) {
         rectangle.setPosition(centerOfColumn(cell.column), centerOfRow(cell.row));
         rectangle.setFillStyle(PIECE_COLORS[cell.pieceType]);
       }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Board } from './board';
-import { COLUMNS, ROWS } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS } from './grid';
 import { clearStep, findGroups, resolveChain, scoreChain } from './matching';
 
 const PIECE_LETTERS: Record<string, number> = { R: 0, B: 1, G: 2, Y: 3 };
@@ -217,5 +217,51 @@ describe('clearing without settling', () => {
     clearStep(board);
     board.settle();
     expect(board.pieceAt(1, ROWS - 1)).toBe(PIECE_LETTERS.R);
+  });
+});
+
+describe('the hidden row is inert', () => {
+  const RED = PIECE_LETTERS.R;
+
+  /** Three reds stacked at the top of the visible field, in one column. */
+  const threeVisibleReds = () => {
+    const board = new Board();
+    for (let offset = 0; offset < 3; offset += 1) {
+      board.place(0, FIRST_VISIBLE_ROW + offset, RED);
+    }
+    return board;
+  };
+
+  it('does not count a hidden-row tile toward a group', () => {
+    const board = threeVisibleReds();
+    board.place(0, FIRST_VISIBLE_ROW - 1, RED);
+
+    expect(findGroups(board)).toEqual([]);
+  });
+
+  it('clears once a fourth tile joins inside the visible field', () => {
+    const board = threeVisibleReds();
+    board.place(1, FIRST_VISIBLE_ROW, RED);
+
+    expect(findGroups(board)).toHaveLength(1);
+  });
+
+  it('leaves a hidden-row tile on the board when the group below clears', () => {
+    const board = threeVisibleReds();
+    board.place(1, FIRST_VISIBLE_ROW, RED);
+    board.place(0, FIRST_VISIBLE_ROW - 1, RED);
+
+    clearStep(board);
+
+    expect(board.pieceAt(0, FIRST_VISIBLE_ROW - 1)).toBe(RED);
+  });
+
+  it('never starts a group from a hidden-row tile', () => {
+    const board = new Board();
+    for (let column = 0; column < 4; column += 1) {
+      board.place(column, FIRST_VISIBLE_ROW - 1, RED);
+    }
+
+    expect(findGroups(board)).toEqual([]);
   });
 });

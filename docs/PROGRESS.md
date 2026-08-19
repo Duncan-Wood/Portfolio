@@ -18,9 +18,9 @@ piece — see [CODE-TOUR.md](CODE-TOUR.md).
   scoring 280**, predicted before the trigger dropped and confirmed exactly.
 - **Done in Stage 3** — the cascade resolves one link per beat instead of instantly;
   clearing and settling are separate beats so tiles visibly hang before dropping (judged
-  "more legible"); the next-piece preview is built.
-- **Next** — the hidden row, then the rest of the juice checklist: tweened pop and fall,
-  particles, hit-stop, screen shake, rising audio per link. Smooth tweening dropped from
+  "more legible"); the next-piece preview is built; and the hidden 13th row is in.
+- **Next** — the topping-out rule (the hidden row is in; game over is not), then the rest
+  of the juice checklist: tweened pop and fall, particles, hit-stop, screen shake, audio. Smooth tweening dropped from
   *needed for comprehension* to *optional polish* once the two-beat split landed.
 - **Still unproven** — whether one pair of lookahead is enough to plan chains with, and
   whether the chain payoff actually feels good now that it is perceptible.
@@ -63,6 +63,8 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | Four colours, not six | `engine/grid.ts` |
 | Chain scoring is `cellsCleared × 10 × 2^linkIndex` — a placeholder | `engine/matching.ts` (`scoreLink`) |
 | One pair of lookahead, shown beside the board | `engine/simulation.ts` (`upcoming`) |
+| A hidden row above the visible field, where tiles rest but stay inert | `engine/grid.ts` (`HIDDEN_ROWS`), `engine/matching.ts` (`findGroups`) |
+| Pairs spawn with the satellite in the hidden row, so no half is ever off-board | `engine/simulation.ts` (`SPAWN_ROW`) |
 | Board left-aligned in a 620-wide canvas to make room for the preview | `scenes/BoardScene.ts` |
 | The chain resolves over time: clear, then settle, one beat each | `engine/simulation.ts` (`advanceChain`), `engine/matching.ts` (`clearStep`) |
 | Input is refused while a cascade resolves | `engine/simulation.ts` |
@@ -81,19 +83,7 @@ Two that are recorded here as well as in the code, deliberately:
 
 ## Decided, pending build
 
-- **Hidden 13th row — yes.** Puyo's "Ghost Puyo" row: one row above the visible field where
-  pieces rest but stay inert. It buys three things — breathing room at the top, a sharp
-  game-over rule ("spawn cell occupied"), and the expert technique of completing a group
-  whose last piece sits in the ghost row and only detonates when it later falls in.
-
-  The plan said to build it *before* matching, since it changes every coordinate.
-  **That did not happen** — matching went first, because the game read as unfun and matching
-  is what creates the loop. The cost is now owed: adding the row means threading a
-  visible-row floor through `findGroups`, `connectedCells`, and `resolveChain`, and
-  re-anchoring every ASCII picture in `matching.test.ts`. Budget for that rework rather than
-  being surprised by it.
-  - Open sub-rule: hidden-row pieces must **not** participate in matches (Puyo's rule), or
-    you get explosions the player cannot see.
+- **Next-piece preview — built.** See the locked decisions above.
 - Blockers, Pinball, and difficulty framing are settled in
   [ART-DIRECTION.md](ART-DIRECTION.md) under "By stage".
 
@@ -101,12 +91,11 @@ Two that are recorded here as well as in the code, deliberately:
 
 ### Blocking the hidden row
 
-- **There is no game over, and two failures are silent.** When the stack reaches the spawn
-  cell, `spawn()` puts a pair inside occupied cells and `place` overwrites them with no
-  occupancy check. Separately, `FallingPair.lock` skips any cell failing `isInside`, so a
-  pair locking with its satellite at row −1 **discards that half without a trace**. Both are
-  confirmed, both are silent, and both are fixed by the same change: the hidden row plus a
-  topping-out rule ("spawn cell occupied"). Matching makes them rarer, not impossible.
+- **There is still no game over.** The hidden row is built, which fixed the silent
+  half-discard (a pair now spawns with its satellite inside the board, not at row −1). What
+  remains is the topping-out rule: when the spawn cells are occupied, `place` still
+  overwrites with no occupancy check and the board fills forever. The rule to implement is
+  "the spawn cell is occupied → topped out", plus whatever the scene should do about it.
 
 ### Blocking Stage 4
 

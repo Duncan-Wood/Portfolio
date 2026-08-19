@@ -1,5 +1,5 @@
 import { Board } from './board';
-import { COLUMNS, ROWS } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS } from './grid';
 
 /*
  * The match rule and the cascade: what counts as a group, what clearing does,
@@ -62,7 +62,10 @@ export function findGroups(board: Board): Group[] {
   const visited = new Set<number>();
   const groups: Group[] = [];
 
-  for (let row = 0; row < ROWS; row += 1) {
+  // Starts at the first VISIBLE row: a tile resting in the hidden field is
+  // inert. It neither forms a group of its own nor joins one below it, so the
+  // player never sees tiles vanish because of something they cannot see.
+  for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
     for (let column = 0; column < COLUMNS; column += 1) {
       const pieceType = board.pieceAt(column, row);
 
@@ -172,6 +175,8 @@ export function scoreChain(links: ChainLink[]): number {
  * Iterative with an explicit stack rather than recursive, so a region spanning
  * the whole board cannot overflow the call stack.
  *
+ * Never enters the hidden field — see `findGroups`.
+ *
  * Cells are marked visited when they are PUSHED, not when they are popped.
  * Marking on pop would let the same cell be pushed several times by different
  * neighbours before any of them is processed, and it would then be counted more
@@ -196,7 +201,14 @@ function connectedCells(
       const column = cell.column + offset.column;
       const row = cell.row + offset.row;
 
-      if (!board.isInside(column, row) || visited.has(keyOf(column, row))) {
+      // `row < FIRST_VISIBLE_ROW` stops the fill leaking upward into the hidden
+      // field, which is what keeps an inert tile from being swept into a group
+      // that is otherwise entirely visible.
+      if (
+        row < FIRST_VISIBLE_ROW ||
+        !board.isInside(column, row) ||
+        visited.has(keyOf(column, row))
+      ) {
         continue;
       }
       if (board.pieceAt(column, row) !== pieceType) {
