@@ -24,6 +24,11 @@ carries a header explaining what it owns and why.
 - **Stage 3's checklist is now complete.** Hard drop and a 400ms gravity fixed the pacing;
   procedural Web Audio, particles, hit-stop, screen shake, the landing bounce, score popups
   and a vignette fixed the presentation. Comfortably over 60fps with the filter running.
+- **The identity pass has started.** Tiles carry a **figure** as well as a colour — star,
+  circle, square, diamond, straight off the storyboard's first panel — drawn as jewel-toned
+  panes with the leading around them dark. This was the cheapest identity available and it
+  fixes a real accessibility problem: four hues alone are not separable by every player, and
+  everybody reads a silhouette faster than a hue under time pressure.
 - **Next** — the Stage 3 benchmark itself: *playtesters visibly react to a big chain.* That
   needs another person, and it is the only thing that closes Stage 3 and unblocks Stage 4.
 - **Still unproven** — whether one pair of lookahead is enough to plan chains with, and
@@ -98,7 +103,9 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | `piecesLocked` and `lastLanded` announce a landing; the spawn counter misses two | `engine/simulation.ts` (`lockPair`) |
 | The pair is drawn at `row + fallProgress`, so gravity looks like falling | `scenes/BoardScene.ts` (`drawPair`) |
 | The pair's hidden-row half is clipped to the board, not hidden or floated | `scenes/BoardScene.ts` (`drawClippedToBoard`) |
-| Clipping is arithmetic, not a mask — Phaser 4's `setMask` is inert | `scenes/BoardScene.ts` (`drawClippedToBoard`) |
+| The hidden-row half is **cropped**, not resized and not masked | `scenes/BoardScene.ts` (`drawClippedToBoard`) |
+| Every piece type has a distinct shape as well as a distinct colour | `palette.ts` (`PIECE_SHAPES`) |
+| Tile art is baked into textures once at boot, not drawn per frame or loaded | `scenes/tile-textures.ts` |
 | The spawn cells being occupied ends the game; the board is left on screen | `engine/simulation.ts` (`spawnOrTopOut`), `scenes/BoardScene.ts` (`refreshGameOver`) |
 | `Board.place` throws on an off-board **or** occupied write | `engine/board.ts` (`place`) |
 | Nothing is exempt from `isBlocked`; the ceiling blocks like any other edge | `engine/board.ts` (`isBlocked`) |
@@ -118,6 +125,15 @@ Two that are recorded here as well as in the code, deliberately:
 ## Decided, pending build
 
 - **Next-piece preview — built.** See the locked decisions above.
+- **The score is not the progression, and never was.** `scoreLink` has always been marked a
+  placeholder, and a number in the corner is the reason a long session reads as pointless.
+  The storyboard already settled what replaces it: *"Neurons unlock memories & appear after a
+  certain # of box clears. Activated by popping an adjacent block."* So the HUD wants a meter
+  filling toward the next Neuron, and a Neuron that pays out a memory. `DESIGN-PLAN.md` says
+  the same thing — *"Make this the flagship. Tie the count cleared directly to memory unlocks
+  so the puzzle **is** the narrative progression."*
+- **The watching brain**, in the empty panel below NEXT. ART-DIRECTION already lists it under
+  Stage 3, the storyboard draws it beside the board, and the space is sitting there.
 - Blockers, Pinball, and difficulty framing are settled in
   [ART-DIRECTION.md](ART-DIRECTION.md) under "By stage".
 

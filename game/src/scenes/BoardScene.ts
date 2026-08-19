@@ -4,7 +4,8 @@ import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
-import { EMPTY_COLOR, PIECE_COLORS } from '../palette';
+import { PIECE_COLORS } from '../palette';
+import { bakeTileTextures, tileTexture } from './tile-textures';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 import { SoundBoard } from '../audio/sound-board';
@@ -82,29 +83,32 @@ function centerOfRow(row: number): number {
  * above the board's top edge. Clipping gives the third answer: it emerges from
  * under the edge a sliver at a time, the way it should.
  *
- * Done by resizing the rectangle rather than with a mask. Phaser 4 folded masks
- * into its filter pipeline and the old `setMask` is inert — it fails silently,
- * leaving the tile drawn in full. Arithmetic cannot fail silently.
+ * NOT a mask: Phaser 4 folded masks into its filter pipeline and the old
+ * `setMask` is inert — it compiles, runs, and leaves the tile drawn in full.
+ *
+ * `setCrop` rather than the resize this used to do. Both hid the right number
+ * of pixels while a tile was a flat colour, but resizing squashes the texture,
+ * so a half-hidden tile would show a whole squat star instead of the bottom of
+ * a tall one. Cropping cuts the texture and leaves the rest where it was, which
+ * is what an edge does.
  */
 function drawClippedToBoard(
-  rectangle: Phaser.GameObjects.Rectangle,
+  tile: Phaser.GameObjects.Image,
   centerX: number,
   centerY: number,
-  color: number,
+  textureKey: string,
 ): void {
-  const bottom = centerY + CELL_SIZE / 2;
-  const visibleTop = Math.max(centerY - CELL_SIZE / 2, ORIGIN_Y);
-  const height = bottom - visibleTop;
+  const hidden = Math.max(ORIGIN_Y - (centerY - CELL_SIZE / 2), 0);
 
-  if (height <= 0) {
-    rectangle.setVisible(false);
+  if (hidden >= CELL_SIZE) {
+    tile.setVisible(false);
     return;
   }
 
-  rectangle.setVisible(true);
-  rectangle.setDisplaySize(CELL_SIZE, height);
-  rectangle.setPosition(centerX, visibleTop + height / 2);
-  rectangle.setFillStyle(color);
+  tile.setVisible(true);
+  tile.setTexture(textureKey);
+  tile.setPosition(centerX, centerY);
+  tile.setCrop(0, hidden, CELL_SIZE, CELL_SIZE - hidden);
 }
 
 /** Whether a cell is in the part of the board the player can see. */
@@ -140,14 +144,14 @@ function randomPieceTypes(): [number, number] {
 
 export class BoardScene extends Scene {
   private simulation: Simulation;
-  private cellRectangles: Phaser.GameObjects.Rectangle[];
-  private pairRectangles: Phaser.GameObjects.Rectangle[];
+  private cellTiles: Phaser.GameObjects.Image[];
+  private pairTiles: Phaser.GameObjects.Image[];
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
   private gameOverText: Phaser.GameObjects.Text;
-  private previewRectangles: Phaser.GameObjects.Rectangle[];
+  private previewTiles: Phaser.GameObjects.Image[];
   private shownPivotType = -1;
   private shownSatelliteType = -1;
   private shownScore = -1;
@@ -164,19 +168,19 @@ export class BoardScene extends Scene {
   private hardDropKey: Phaser.Input.Keyboard.Key;
 
   /**
-   * Rectangles borrowed for the duration of one cascade beat: `popRectangles`
-   * shrink where a tile just cleared, `fallRectangles` travel from a tile's old
-   * row to its new one.
+   * Tiles borrowed for the duration of one cascade beat: `popTiles` shrink
+   * where a tile just cleared, `fallTiles` travel from a tile's old row to its
+   * new one.
    *
    * Pooled at full board size and reused, so a cascade allocates nothing. A
    * beat can touch at most every visible cell, which is the pool size.
    */
-  private popRectangles: Phaser.GameObjects.Rectangle[];
-  private fallRectangles: Phaser.GameObjects.Rectangle[];
+  private popTiles: Phaser.GameObjects.Image[];
+  private fallTiles: Phaser.GameObjects.Image[];
 
   /**
    * Visible-cell indices that `drawBoard` must leave empty because a
-   * `fallRectangle` is currently animating into them. Without this the board
+   * `fallTile` is currently animating into them. Without this the board
    * would paint the tile at its destination the instant the engine settled,
    * and the travelling copy would be a duplicate rather than the fall itself.
    */
@@ -276,39 +280,34 @@ export class BoardScene extends Scene {
     // flattened ellipse in perspective, after the playtest.
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
 
-    // One rectangle per VISIBLE cell. The hidden row is deliberately not drawn,
-    // so it gets no rectangle and the array is indexed from FIRST_VISIBLE_ROW.
-    this.cellRectangles = [];
+    // Every texture the board draws with, before the first thing that asks for
+    // one. Baking after the fact is how the sparks first shipped as Phaser's
+    // missing-texture placeholder.
+    bakeTileTextures(this, CELL_SIZE);
+
+    // One image per VISIBLE cell. The hidden row is deliberately not drawn, so
+    // it gets no image and the array is indexed from FIRST_VISIBLE_ROW.
+    this.cellTiles = [];
     for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
-        this.cellRectangles.push(
-          this.add.rectangle(
-            centerOfColumn(column),
-            centerOfRow(row),
-            CELL_SIZE,
-            CELL_SIZE,
-            EMPTY_COLOR,
-          ),
+        this.cellTiles.push(
+          this.add.image(centerOfColumn(column), centerOfRow(row), tileTexture(null)),
         );
       }
     }
 
-    this.pairRectangles = [
-      this.add.rectangle(0, 0, CELL_SIZE, CELL_SIZE, EMPTY_COLOR),
-      this.add.rectangle(0, 0, CELL_SIZE, CELL_SIZE, EMPTY_COLOR),
+    this.pairTiles = [
+      this.add.image(0, 0, tileTexture(null)),
+      this.add.image(0, 0, tileTexture(null)),
     ];
 
     // Created after the board so they draw on top of it, and before the text so
     // the text still draws on top of them.
-    this.popRectangles = [];
-    this.fallRectangles = [];
+    this.popTiles = [];
+    this.fallTiles = [];
     for (let index = 0; index < COLUMNS * VISIBLE_ROWS; index += 1) {
-      this.popRectangles.push(
-        this.add.rectangle(0, 0, CELL_SIZE, CELL_SIZE, EMPTY_COLOR).setVisible(false),
-      );
-      this.fallRectangles.push(
-        this.add.rectangle(0, 0, CELL_SIZE, CELL_SIZE, EMPTY_COLOR).setVisible(false),
-      );
+      this.popTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
+      this.fallTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
     }
     // One round white dot, drawn once and thrown away. Tinted per group at emit
     // time, so four colours of debris cost one texture and no art.
@@ -344,16 +343,15 @@ export class BoardScene extends Scene {
       color: '#8ea3b0',
     }).setOrigin(0.5, 0.5);
 
-    this.previewRectangles = [
-      this.add.rectangle(
-        PREVIEW_CENTER_X,
-        PREVIEW_TOP_Y + PREVIEW_CELL + GAP,
-        PREVIEW_CELL,
-        PREVIEW_CELL,
-        EMPTY_COLOR,
-      ),
-      this.add.rectangle(PREVIEW_CENTER_X, PREVIEW_TOP_Y, PREVIEW_CELL, PREVIEW_CELL, EMPTY_COLOR),
+    // Scaled rather than baked a second time at preview size: one set of
+    // textures, and the preview cannot drift out of step with the board.
+    this.previewTiles = [
+      this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
+      this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y, tileTexture(null)),
     ];
+    for (const tile of this.previewTiles) {
+      tile.setScale(PREVIEW_CELL / CELL_SIZE);
+    }
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
@@ -452,10 +450,10 @@ export class BoardScene extends Scene {
     // carries into the new game.
     this.lastPiecesSpawned = -1;
 
-    this.tweens.killTweensOf(this.popRectangles);
-    this.tweens.killTweensOf(this.fallRectangles);
-    for (const rectangle of [...this.popRectangles, ...this.fallRectangles]) {
-      rectangle.setVisible(false);
+    this.tweens.killTweensOf(this.popTiles);
+    this.tweens.killTweensOf(this.fallTiles);
+    for (const tile of [...this.popTiles, ...this.fallTiles]) {
+      tile.setVisible(false);
     }
     this.tweens.killTweensOf(this.scorePopups);
     for (const popup of this.scorePopups) {
@@ -560,10 +558,8 @@ export class BoardScene extends Scene {
       for (let column = 0; column < COLUMNS; column += 1) {
         const index = visibleCellIndex(column, row);
         const pieceType = this.simulation.board.pieceAt(column, row);
-        this.cellRectangles[index].setFillStyle(
-          pieceType === null || this.cellsBeingFilled.has(index)
-            ? EMPTY_COLOR
-            : PIECE_COLORS[pieceType],
+        this.cellTiles[index].setTexture(
+          tileTexture(this.cellsBeingFilled.has(index) ? null : pieceType),
         );
       }
     }
@@ -639,7 +635,7 @@ export class BoardScene extends Scene {
    * carries it, so the hole is empty and legible before the next beat starts.
    */
   private popCells(link: ChainLink, points: number): void {
-    this.tweens.killTweensOf(this.popRectangles);
+    this.tweens.killTweensOf(this.popTiles);
     this.hitStopRemaining = this.tuning.hitStopDuration;
     this.kickCamera();
 
@@ -652,23 +648,23 @@ export class BoardScene extends Scene {
         const x = centerOfColumn(cell.column);
         const y = centerOfRow(cell.row);
 
-        const rectangle = this.popRectangles[borrowed];
+        const tile = this.popTiles[borrowed];
         borrowed += 1;
 
-        rectangle
+        tile
           .setPosition(x, y)
-          .setFillStyle(PIECE_COLORS[group.pieceType])
+          .setTexture(tileTexture(group.pieceType))
           .setScale(1)
           .setAlpha(1)
           .setVisible(true);
 
         this.tweens.add({
-          targets: rectangle,
+          targets: tile,
           scale: 0.15,
           alpha: 0,
           duration: this.tuning.popDuration,
           ease: 'Quad.easeIn',
-          onComplete: () => rectangle.setVisible(false),
+          onComplete: () => tile.setVisible(false),
         });
 
         sumX += x;
@@ -700,11 +696,11 @@ export class BoardScene extends Scene {
         continue;
       }
 
-      const rectangle = this.cellRectangles[visibleCellIndex(cell.column, cell.row)];
-      this.tweens.killTweensOf(rectangle);
-      rectangle.setScale(1.16, 0.8);
+      const tile = this.cellTiles[visibleCellIndex(cell.column, cell.row)];
+      this.tweens.killTweensOf(tile);
+      tile.setScale(1.16, 0.8);
       this.tweens.add({
-        targets: rectangle,
+        targets: tile,
         scaleX: 1,
         scaleY: 1,
         duration: this.tuning.landingBounceDuration,
@@ -767,9 +763,9 @@ export class BoardScene extends Scene {
     // A previous drop still in flight owns pooled rectangles and suppressed
     // cells that this one is about to reuse. Ending it first is what keeps a
     // slow `fallDuration` from stranding a cell as permanently empty.
-    this.tweens.killTweensOf(this.fallRectangles);
-    for (const rectangle of this.fallRectangles) {
-      rectangle.setVisible(false);
+    this.tweens.killTweensOf(this.fallTiles);
+    for (const tile of this.fallTiles) {
+      tile.setVisible(false);
     }
     this.cellsBeingFilled.clear();
 
@@ -783,16 +779,16 @@ export class BoardScene extends Scene {
       const cellIndex = visibleCellIndex(move.column, move.toRow);
       this.cellsBeingFilled.add(cellIndex);
 
-      const rectangle = this.fallRectangles[index];
-      rectangle
+      const tile = this.fallTiles[index];
+      tile
         .setPosition(centerOfColumn(move.column), centerOfRow(move.fromRow))
-        .setFillStyle(PIECE_COLORS[pieceType])
+        .setTexture(tileTexture(pieceType))
         .setScale(1)
         .setAlpha(1)
         .setVisible(true);
 
       this.tweens.add({
-        targets: rectangle,
+        targets: tile,
         y: centerOfRow(move.toRow),
         // Square root of the distance, not the distance: real falls accelerate,
         // so a six-row drop takes about two and a half times as long as a
@@ -800,7 +796,7 @@ export class BoardScene extends Scene {
         duration: this.tuning.fallDuration * Math.sqrt(move.toRow - move.fromRow),
         ease: 'Quad.easeIn',
         onComplete: () => {
-          rectangle.setVisible(false);
+          tile.setVisible(false);
           this.cellsBeingFilled.delete(cellIndex);
         },
       });
@@ -819,8 +815,8 @@ export class BoardScene extends Scene {
     // already part of the board, so drawing it paints a ghost duplicate — and
     // after a top-out it would hang there at its pre-settle position forever.
     if (this.simulation.resolving || this.simulation.toppedOut) {
-      for (const rectangle of this.pairRectangles) {
-        rectangle.setVisible(false);
+      for (const tile of this.pairTiles) {
+        tile.setVisible(false);
       }
       return;
     }
@@ -836,12 +832,11 @@ export class BoardScene extends Scene {
     const cells = this.simulation.pair.cells();
     for (let index = 0; index < cells.length; index += 1) {
       const cell = cells[index];
-      const rectangle = this.pairRectangles[index];
       drawClippedToBoard(
-        rectangle,
+        this.pairTiles[index],
         centerOfColumn(cell.column),
         centerOfRow(cell.row + descent),
-        PIECE_COLORS[cell.pieceType],
+        tileTexture(cell.pieceType),
       );
     }
   }
@@ -861,8 +856,8 @@ export class BoardScene extends Scene {
     this.shownSatelliteType = satelliteType;
     // Index 0 is the lower rectangle (the pivot) and index 1 the upper (the
     // satellite), matching orientation 0 — how the pair will actually appear.
-    this.previewRectangles[0].setFillStyle(PIECE_COLORS[pivotType]);
-    this.previewRectangles[1].setFillStyle(PIECE_COLORS[satelliteType]);
+    this.previewTiles[0].setTexture(tileTexture(pivotType));
+    this.previewTiles[1].setTexture(tileTexture(satelliteType));
   }
 
   /**

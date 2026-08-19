@@ -15,5 +15,21 @@
  */
 export const PIECE_COLORS = [0xe4572e, 0x17bebb, 0xffc914, 0x8a4fff];
 
+/**
+ * The figure stamped into each piece type's tile.
+ *
+ * Colour alone is not enough to tell four tile types apart. Around one man in
+ * twelve cannot reliably separate the red from the teal, and under time
+ * pressure everybody reads a silhouette faster than a hue — which matters in a
+ * game whose whole skill is spotting groups at speed.
+ *
+ * The storyboard drew the board this way from the first panel: panes with
+ * figures in them, not flat swatches. Indexed by piece type, like the colours,
+ * and held to the same one-per-type test for the same reason.
+ */
+export type PieceShape = 'star' | 'circle' | 'square' | 'diamond';
+
+export const PIECE_SHAPES: readonly PieceShape[] = ['star', 'circle', 'square', 'diamond'];
+
 /** An unoccupied cell. Drawn rather than left blank so the grid stays legible. */
 export const EMPTY_COLOR = 0x1c2228;

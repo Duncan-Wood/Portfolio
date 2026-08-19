@@ -22,6 +22,10 @@ publicly under Duncan's name.
   canvas — it clipped on all four sides and read as stray arcs. A flattened ellipse in
   perspective is the shape that fits. Only a weak vignette ships today, and per the rule at
   the top of this file, the rest waits until the loop is proven fun.
+  *Shipped instead:* the panes themselves. Each tile is a jewel-toned pane with its leading
+  drawn dark and a figure — star, circle, square, diamond — set into it in that same lead,
+  baked at boot rather than loaded as art. It carries more of the core image than the
+  platform would have, and it is the half of "stained glass" that the board itself can show.
 - **2 — Cascades.** Chains light the leading between cleared tiles, so a cascade is
   visibly a signal crossing the network. Highest-value idea here: nearly free, and it
   makes chains legible.
@@ -39,3 +43,6 @@ publicly under Duncan's name.
   axis. Defer to Stage 4.
 - How ornate can the glass get before tile readability suffers at speed? Readability beats
   beauty in a game built on fast pattern recognition. Prototype at real speed.
+  *Partly answered:* one solid figure per pane, drawn in the leading colour, is **more**
+  readable than a flat swatch, not less — shape survives at speed where hue alone does not.
+  What is still untested is detail finer than a single silhouette.
