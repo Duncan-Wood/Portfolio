@@ -143,6 +143,16 @@ const BLINK_DURATION = 90;
 const BLINK_INTERVAL = 2300;
 
 const SPARK_TEXTURE = 'spark';
+
+/**
+ * The noise the board dissolves into when the run is lost.
+ *
+ * Baked once like everything else here — a square of random grey pixels, tiled
+ * over the board and jittered per frame. Grain alone reads as film; grain that
+ * MOVES reads as a signal failing, which is the thing being described.
+ */
+const STATIC_TEXTURE = 'static';
+const STATIC_SIZE = 96;
 const SPARK_RADIUS = 6;
 const SPARKS_PER_CELL = 7;
 const SCORE_POPUP_POOL = 4;
@@ -315,9 +325,23 @@ export class BoardScene extends Scene {
   private fpsText: Phaser.GameObjects.Text;
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
+  /**
+   * The interference laid over the board once the run is lost, and how far it
+   * has come up.
+   *
+   * A TileSprite rather than a stretched image so the grain stays the size it
+   * was baked at whatever the board's dimensions are — a scaled noise texture
+   * is blurry, and blurry noise reads as fog rather than as static.
+   */
+  private staticOverlay: Phaser.GameObjects.TileSprite;
+
+  private staticStrength = 0;
+
   private gameOverText: Phaser.GameObjects.Text;
 
   private gameOverLine: Phaser.GameObjects.Text;
+
+  private gameOverHint: Phaser.GameObjects.Text;
   private previewTiles: Phaser.GameObjects.Image[];
   private shownPivotType = -1;
   private shownSatelliteType = -1;
@@ -686,6 +710,18 @@ export class BoardScene extends Scene {
     const sparkTexture = this.add.graphics();
     sparkTexture.fillStyle(0xffffff, 1).fillCircle(SPARK_RADIUS, SPARK_RADIUS, SPARK_RADIUS);
     sparkTexture.generateTexture(SPARK_TEXTURE, SPARK_RADIUS * 2, SPARK_RADIUS * 2);
+
+    // Coarse rather than per-pixel: a 3px grain reads as interference at this
+    // size, where single pixels read as a dirty screen.
+    sparkTexture.clear();
+    for (let y = 0; y < STATIC_SIZE; y += 3) {
+      for (let x = 0; x < STATIC_SIZE; x += 3) {
+        const shade = Math.random();
+        sparkTexture.fillStyle(0xffffff, shade * shade * 0.9);
+        sparkTexture.fillRect(x, y, 3, 3);
+      }
+    }
+    sparkTexture.generateTexture(STATIC_TEXTURE, STATIC_SIZE, STATIC_SIZE);
     sparkTexture.destroy();
 
     this.sparks = this.add.particles(0, 0, SPARK_TEXTURE, {
@@ -830,6 +866,31 @@ export class BoardScene extends Scene {
       wordWrap: { width: MEMORY_PANEL_WIDTH },
       lineSpacing: 3,
     }).setOrigin(0, 0).setVisible(false);
+
+    // The way out, at the moment it is needed. The pause screen has always said
+    // `esc to resume`; losing said nothing at all, so R was a secret.
+    this.gameOverHint = this.add.text(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      CANVAS_HEIGHT / 2 + 78,
+      'r — again',
+      {
+        fontFamily: 'monospace',
+        fontSize: '15px',
+        color: '#8ea3b0',
+        backgroundColor: '#221038',
+        padding: { x: 10, y: 5 },
+      },
+    ).setOrigin(0.5, 0.5).setVisible(false);
+
+    // Over the board and the traces, under the words — the ending should be
+    // read through the interference, not behind it.
+    this.staticOverlay = this.add.tileSprite(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      BOARD_WIDTH + TRACK_MARGIN * 2,
+      BOARD_HEIGHT + TRACK_MARGIN * 2,
+      STATIC_TEXTURE,
+    ).setVisible(false).setBlendMode(BlendModes.ADD);
 
     this.gameOverText = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -1005,8 +1066,28 @@ export class BoardScene extends Scene {
     this.refreshChain();
     this.refreshScore();
     this.refreshAnswerLine(time);
+    this.refreshStatic();
     this.refreshGameOver();
     this.refreshFps(time);
+  }
+
+  /**
+   * Jitter the interference, once the run is lost.
+   *
+   * Scrolled and re-alpha'd every frame rather than tweened, because static is
+   * not an animation with a shape — it is noise that has to be different each
+   * frame or the eye reads it as a texture sitting still on the glass.
+   */
+  private refreshStatic(): void {
+    if (this.staticStrength <= 0) {
+      return;
+    }
+
+    this.staticOverlay.tilePositionX = Math.random() * STATIC_SIZE;
+    this.staticOverlay.tilePositionY = Math.random() * STATIC_SIZE;
+    // Flickers around its level rather than holding it, so the signal reads as
+    // failing rather than as faded.
+    this.staticOverlay.setAlpha(this.staticStrength * (0.1 + Math.random() * 0.14));
   }
 
   /**
@@ -1092,10 +1173,20 @@ export class BoardScene extends Scene {
     // Undo the losing sequence. It dims the panel, fades two texts in and
     // tweens every lit trace to nothing, and R can land in the middle of all
     // three — a new run must not open holding the last one's ending.
-    this.tweens.killTweensOf([this.gameOverText, this.gameOverLine, this.memoryPanel]);
+    this.tweens.killTweensOf([
+      this.gameOverText, this.gameOverLine, this.gameOverHint, this.memoryPanel,
+    ]);
     this.gameOverText.setVisible(false);
     this.gameOverLine.setVisible(false);
+    this.gameOverHint.setVisible(false);
     this.memoryPanel.setAlpha(1);
+    // The interference and the colour drain are the ending, not the game: a
+    // new run must start on a clean signal.
+    this.tweens.killAll();
+    this.staticStrength = 0;
+    this.staticOverlay.setVisible(false);
+    this.cameras.main.filters.external.clear();
+    this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
     for (const slot of this.connections) {
       this.tweens.killTweensOf(slot.trace);
       slot.trace.setAlpha(1);
@@ -2366,6 +2457,7 @@ export class BoardScene extends Scene {
     if (!this.simulation.toppedOut || this.storyHolding) {
       this.gameOverText.setVisible(false);
       this.gameOverLine.setVisible(false);
+      this.gameOverHint.setVisible(false);
     }
   }
 
@@ -2383,6 +2475,28 @@ export class BoardScene extends Scene {
    */
   private loseTheBoard(): void {
     const lit = this.connections.filter((slot) => slot.trace.visible);
+
+    // The signal degrading, which is the half of this the notes asked for and
+    // the connections dying is the other half. Colour drains and the image
+    // coarsens as the interference comes up, so the board is visibly being
+    // lost rather than merely covered over.
+    this.staticOverlay.setVisible(true).setAlpha(0);
+    this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: Math.max(lit.length * 45, 600),
+      onUpdate: (tween) => {
+        this.staticStrength = tween.getValue() ?? 0;
+      },
+    });
+
+    const drained = this.cameras.main.filters.external.addColorMatrix();
+    this.tweens.addCounter({
+      from: 0,
+      to: 0.75,
+      duration: Math.max(lit.length * 45, 600),
+      onUpdate: (tween) => drained.colorMatrix.grayscale(tween.getValue() ?? 0),
+    });
 
     lit.forEach((slot, index) => {
       this.soundBoard.play(connectionLostVoice(index));
@@ -2411,7 +2525,7 @@ export class BoardScene extends Scene {
       if (!this.simulation.toppedOut) {
         return;
       }
-      for (const text of [this.gameOverText, this.gameOverLine]) {
+      for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint]) {
         text.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: text, alpha: 1, duration: 420 });
       }

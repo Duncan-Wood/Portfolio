@@ -69,10 +69,19 @@ export const CONNECTION_LOST = 'CONNECTION LOST';
 
 /**
  * Deliberately not drawn from `SHADOW_LINES`. Those are needling, said while
- * you can still answer them; this is said when you cannot, so it does not
- * taunt. It agrees with you.
+ * you can still answer them; this is said when you cannot.
+ *
+ * The rule this line has to obey, learned by breaking it: it must not give the
+ * player permission to leave. The first version was "You can start again
+ * tomorrow" — perfectly in character, and the worst possible thing to read at
+ * the moment you are deciding whether to press R. The antagonist telling you to
+ * stop is only good writing if stopping is not what you might actually do.
+ *
+ * So it states the shadow's thesis about you and leaves it hanging. The
+ * rebuttal is the restart, which is why the prompt for it sits directly
+ * underneath.
  */
-export const SHADOW_CLOSING_LINE = 'You can start again tomorrow.';
+export const SHADOW_CLOSING_LINE = 'That is usually where it stops.';
 
 /**
  * How many cells it has to hold before it will use the next tier's lines.
