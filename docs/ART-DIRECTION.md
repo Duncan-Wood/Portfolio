@@ -44,6 +44,17 @@ publicly under my own name.
   is lit in the game's own violet, not in a monster's yellow: the thing opposing you is
   the part of this mind that stops without finishing, so it belongs to the same palette
   as the ground it stands on.
+- **4b — The board carries the memory.** Each fragment gets a FIGURE, and while the run
+  is earning that fragment one of the four piece types wears it instead of its circuit
+  shape: a tower for The Build, a filled grid for Bell Work, a hat for The Hat. The
+  memory then stops being a text interruption and becomes the thing the player has been
+  handling for the last minute without knowing what it was.
+  *Constraint that shapes this:* exactly ONE type may carry it. Four memory figures at
+  once would leave colour as the only thing separating the types, which is the
+  accessibility problem `PIECE_SHAPES` exists to solve. Three circuit parts and one
+  figure keeps four distinct silhouettes and makes the odd one out read as special —
+  which is the opening it needs if the memory tile is ever to mean something mechanically
+  as well ("connections from the memories" being distinct from ordinary ones).
 - **5 — Framing.** Difficulty selection is an opening values question, not Easy/Normal/Hard.
 - **Narrative (later).** Each memory gets its own platform and portrait.
 

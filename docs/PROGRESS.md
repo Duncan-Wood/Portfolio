@@ -167,6 +167,16 @@ Two that are recorded here as well as in the code, deliberately:
   Two things about it are unplayed. Whether the *whole* memory at 63 is too long a wait
   for the ending, and what the second memory should cost, since nothing has ever earned
   one.
+- **Answering the question, and what it costs to refuse.** The question currently prints
+  and waits. It is the game's most important moment and the only screen with LESS feedback
+  than the puzzle around it. Decided: the player types one line; the content is never read,
+  never scored and never stored, but the ACT pays out — every shadow on the board is driven
+  off in one escalating wave. Skipping keeps them. The answer stays beside the node it was
+  earned with, on the memory panel, for the rest of the run. That makes the beat mechanical
+  as well as emotional: a connection is what pushes the dark back, stated as a rule the
+  player performs rather than a line the game says.
+- **A figure per fragment, worn by the board.** See ART-DIRECTION under "4b". Needs one
+  drawn figure per node, in the same baked-vector style as the circuit parts.
 - **The watching brain.** ART-DIRECTION lists it under Stage 3 and the storyboard draws it
   beside the board, but the panel it was going to live in now holds the coming memory. It
   needs somewhere else to be, or it replaces the memory panel and the memory moves.
