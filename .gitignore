@@ -26,9 +26,14 @@ yarn-error.log*
 
 # Notes
 notes.txt
+notes.md
 
 # sources
 career-audit-2026
-storyboard
 Resume.docx
 Concept.md
+
+# Personal. Blanket, plus specific lines that survive it ever being narrowed.
+storyboard
+storyboard/memory-*
+storyboard/shadow*

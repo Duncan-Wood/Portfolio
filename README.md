@@ -48,4 +48,4 @@ Software engineer with a background in writing and rhetoric — I turn ambiguous
 
 ---
 
-This repository is a React (Create React App) + Tailwind CSS site. See [`CLAUDE.md`](./CLAUDE.md) and [`docs/`](./docs/) for the build plan and conventions.
+This repository is a React + Vite + Tailwind CSS site. See [`CLAUDE.md`](./CLAUDE.md) and [`docs/`](./docs/) for the build plan and conventions.

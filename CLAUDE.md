@@ -6,9 +6,9 @@ Single-project repository: a personal portfolio single-page app.
 
 ### Stack
 - **Language:** JavaScript (JSX), React 18
-- **Frameworks/libraries:** Create React App (`react-scripts` 5.0.1), Tailwind CSS 3 (with PostCSS + Autoprefixer), `react-router-dom` 6, `react-scroll`, `emailjs-com` (contact form), `react-icons` / `react-bootstrap-icons`
-- **Package manager:** npm (`package-lock.json`)
-- **Testing:** Jest via `react-scripts test`, React Testing Library
+- **Frameworks/libraries:** Vite 8 (`vite.config.mjs`), Tailwind CSS 3 (with PostCSS + Autoprefixer), `react-router-dom` 6, `react-scroll`, `emailjs-com` (contact form)
+- **Package manager:** npm (`package-lock.json`). Node >= 22.12, which Vite 8 requires — see `.nvmrc`
+- **Testing:** Vitest (jsdom), React Testing Library
 
 ### Commands
 - Install: `npm install`
@@ -17,10 +17,11 @@ Single-project repository: a personal portfolio single-page app.
 - Test: `npm test`
 
 ### Layout
-- `src/` — application source; entry `src/index.js`, root `src/App.js`
+- `index.html` — the entry point Vite starts from; it names `src/index.jsx` directly
+- `src/` — application source; entry `src/index.jsx`, root `src/App.jsx`
 - `src/components/` — page sections (`Main`, `About`, `Projects`, `Skills`, `Contact`, `home`, `nav`)
 - `src/assets/` — images
-- `public/` — static shell (`index.html`, `manifest.json`); `_redirects` present for SPA redirect hosting
+- `public/` — files copied to the build root untouched (`manifest.json`, `favicon.ico`, `resume.pdf`); `_redirects` present for SPA redirect hosting
 - `tailwind.config.js`, `postcss.config.js` — styling config
 
 ## Build workflow
