@@ -2,13 +2,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   /**
-   * `base` and `port` are one half of the dev-server seam; the other half is
-   * `src/setupProxy.js` in the portfolio package, which forwards `/game` here.
-   * Changing either value without changing that file breaks the game in
-   * development — assets 404 (base) or the proxy 502s (port).
+   * Half of the dev-server seam. The other half is the root `vite.config.mjs`,
+   * which proxies `/game` here — changing either value without changing that
+   * file breaks the game in development: assets 404 (base) or the proxy has
+   * nothing to reach (port).
    *
-   * `strictPort` makes a taken port fail loudly instead of silently drifting to
-   * 5174, where the proxy would no longer find it.
+   * `strictPort` so a taken port fails loudly rather than drifting to 5174,
+   * where the proxy would no longer find it.
    */
   base: '/game/',
   server: { port: 5173, strictPort: true },

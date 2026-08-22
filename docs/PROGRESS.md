@@ -45,6 +45,10 @@ another person.**
   drives it off. It is lit in the game's own violet on purpose: the thing opposing you
   is part of this mind, not an invader from outside it. `shadowInterval` is 6s now,
   played rather than guessed.
+- **The portfolio is on Vite.** CRA was deprecated and had started blocking installs of
+  anything current. What changed for the game: `src/setupProxy.js` is gone and the `/game`
+  proxy lives in the root `vite.config.mjs`, and the root test runner excludes `game/`.
+  Run the game's suite from `game/`, as before.
 - **Next, and the only thing left in Stage 3** — its benchmark: *playtesters visibly react
   to a big chain.* That needs another person. What it is really testing is the pair of
   things still unproven — whether one pair of lookahead is enough to plan a chain with,
@@ -209,8 +213,5 @@ Two that are recorded here as well as in the code, deliberately:
   resolves before the rewrite. If `/game` ever serves the portfolio, add
   `/game/*  /game/:splat  200` above the catch-all in `public/_redirects`.
 - **A link from the portfolio to the game.** `/game` works but nothing points at it.
-- **Migrating the portfolio from CRA to Vite.** CRA is unmaintained and is why the two
-  toolchains need `concurrently` and `src/setupProxy.js`. Do it at a natural pause, not
-  mid-feature — the failure mode is the live site breaking, not a red test.
 - **The narrative wrapper** — hallway, face, eye, brain intro, memory vignettes. A separate
   workstream once the core matcher is proven fun.
