@@ -1,19 +1,10 @@
-# What CI is here to catch, and what it deliberately is not.
+# The last two steps are the point. Both halves have their own suites, but
+# nothing else exercises the seam between them: the root build script builds
+# each and copies the game's output into build/game. Every test can pass with
+# /game broken on the deployed site.
 #
-# The game's own suite is fast and thorough, and it already runs locally in
-# under a second — CI re-running it is cheap insurance, not the point.
-#
-# The point is the LAST step. This repository joins two toolchains that know
-# nothing about each other: Create React App at the root and Vite in `game/`.
-# They meet in exactly one place, the root `build` script, which builds each
-# half and copies the game's output into `build/game`. Nothing else tests that
-# seam. Every unit test can pass, the typecheck can be clean, and `/game` can
-# still be broken on the deployed site — which is the one failure that reaches
-# a person who is not us.
-#
-# Deployment is Netlify's, on push, and stays there. There is no CD here on
-# purpose: adding a second thing that deploys would mean two answers to "what
-# is live".
+# Deployment stays Netlify's. A second thing that deploys would mean two
+# answers to what is live.
 
 name: CI
 
@@ -29,36 +20,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 24 to match `game/mise.toml`, which is what the game is developed
-      # against. A different major here would test a runtime nobody uses.
+      # 24 to match game/mise.toml, which is what the game is developed
+      # against. It also satisfies the root's engines requirement of >= 22.12.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
 
-      # `ci` rather than `install`: it installs from the lockfile exactly and
-      # fails if the lockfile and package.json disagree, which is the whole
-      # reason to run this on a machine that is not the one that wrote them.
-      - name: Install
-        run: npm ci
+      - run: npm ci
 
-      - name: Install game
-        run: npm --prefix game ci
+      - run: npm --prefix game ci
 
-      - name: Typecheck the game
-        run: npm --prefix game run typecheck
+      - run: npm test
 
-      - name: Test the game
-        run: npm --prefix game test
+      - run: npm --prefix game run typecheck
 
-      # The seam. If this passes, `build/game` exists and holds the game's
-      # built output next to the portfolio's.
-      - name: Build both halves
-        run: npm run build
+      - run: npm --prefix game test
 
-      - name: Check the game actually landed in the build
+      - run: npm run build
+
+      - name: Check both halves landed in the build
         run: |
           test -f build/index.html || { echo "portfolio build is missing its entry point"; exit 1; }
           test -f build/game/index.html || { echo "game did not compose into build/game"; exit 1; }
-          echo "both halves built:"
-          ls -la build/game | head -5
