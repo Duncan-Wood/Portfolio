@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # From .nvmrc, so the version CI builds on cannot drift from the one the
+      # repository declares — which is the version Vite 8 requires.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build
+
+      # The build is what Netlify publishes, so an empty or missing entry point
+      # is the failure that would actually reach a visitor.
+      - name: Check the build produced an entry point
+        run: test -f build/index.html
