@@ -49,6 +49,11 @@ another person.**
   anything current. What changed for the game: `src/setupProxy.js` is gone and the `/game`
   proxy lives in the root `vite.config.mjs`, and the root test runner excludes `game/`.
   Run the game's suite from `game/`, as before.
+- **The question takes an answer, and answering is the strongest move in the game.** It
+  waits on a person rather than a clock. Type anything and every shadow on the board is
+  driven off, deepest first, the pitch climbing a semitone a cell; press enter on an empty
+  line and you decline and keep them. The engine is told THAT an answer happened, never
+  what it said. The answer stays beside its memory on the panel.
 - **Next, and the only thing left in Stage 3** — its benchmark: *playtesters visibly react
   to a big chain.* That needs another person. What it is really testing is the pair of
   things still unproven — whether one pair of lookahead is enough to plan a chain with,
@@ -171,14 +176,6 @@ Two that are recorded here as well as in the code, deliberately:
   Two things about it are unplayed. Whether the *whole* memory at 63 is too long a wait
   for the ending, and what the second memory should cost, since nothing has ever earned
   one.
-- **Answering the question, and what it costs to refuse.** The question currently prints
-  and waits. It is the game's most important moment and the only screen with LESS feedback
-  than the puzzle around it. Decided: the player types one line; the content is never read,
-  never scored and never stored, but the ACT pays out — every shadow on the board is driven
-  off in one escalating wave. Skipping keeps them. The answer stays beside the node it was
-  earned with, on the memory panel, for the rest of the run. That makes the beat mechanical
-  as well as emotional: a connection is what pushes the dark back, stated as a rule the
-  player performs rather than a line the game says.
 - **A figure per fragment, worn by the board.** See ART-DIRECTION under "4b". Needs one
   drawn figure per node, in the same baked-vector style as the circuit parts.
 - **The watching brain.** ART-DIRECTION lists it under Stage 3 and the storyboard draws it
