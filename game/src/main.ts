@@ -44,7 +44,10 @@ const config: Phaser.Types.Core.GameConfig = {
     autoCenter: Scale.CENTER_BOTH,
   },
 
-  /** One scene for now. A list, because later stages add menus and cutscenes. */
+  /**
+   * One scene. Memories surface inside the board rather than cutting away to
+   * their own screen — see `revealNextNode` for why.
+   */
   scene: [BoardScene],
 };
 

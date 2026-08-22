@@ -1,12 +1,29 @@
 import { BlendModes, Input, Scene } from 'phaser';
-import { COLUMNS, FIRST_VISIBLE_ROW, PIECE_TYPE_COUNT, ROWS, VISIBLE_ROWS } from '../engine/grid';
+import {
+  COLUMNS,
+  FIRST_VISIBLE_ROW,
+  PIECE_TYPE_COUNT,
+  ROWS,
+  VISIBLE_ROWS,
+} from '../engine/grid';
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
-import { TRACE_COLORS, TRACK_COLOR, TRACK_LIT_COLOR, PIECE_COLORS } from '../palette';
-import { TRACE_TEXTURE, bakeTileTextures, tileTexture } from './tile-textures';
+import {
+  GROUND_COLOR,
+  TRACE_COLORS,
+  TRACK_COLOR,
+  TRACK_LIT_COLOR,
+  PIECE_COLORS,
+} from '../palette';
+import {
+  TRACE_TEXTURE,
+  bakeTileTextures,
+  tileTexture,
+} from './tile-textures';
 import { TrackPath, mitredRectangle } from '../track-geometry';
+import { MEMORIES, nodeLayout } from '../memories';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 import { SoundBoard } from '../audio/sound-board';
@@ -91,6 +108,32 @@ export const CANVAS_HEIGHT = 900;
 const ORIGIN_X = 40;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE + (VISIBLE_ROWS - 1) * GAP;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
+
+/*
+ * The box beside the board where the memory being earned takes shape.
+ *
+ * This space has been empty since Stage 1 — ART-DIRECTION earmarked it for the
+ * watching brain and nothing ever filled it. What goes there is the SHAPE of
+ * the coming memory, dark, with a node lighting each time the run earns one, so
+ * a player can see what they are working toward filling in rather than being
+ * handed a surprise at the end. The nodes are silhouettes and carry no words:
+ * the point is to know how much is left, not what it says.
+ */
+/**
+ * Every fragment the game has to give. Past it the track still fills and the
+ * chain still pays, but there is nothing left to surface — a run that reaches
+ * here has seen all of it, and asking `locate` for the node after the last one
+ * used to hand back an index off the end of the array.
+ */
+const TOTAL_MEMORY_NODES = MEMORIES.reduce((total, memory) => total + memory.nodes.length, 0);
+
+const MEMORY_PANEL_TOP = 300;
+const MEMORY_PANEL_HEIGHT = 450;
+const MEMORY_PAD = 6;
+
+/** Clear of the progress track's stubs on the left, and the canvas on the right. */
+const MEMORY_PANEL_LEFT = 476;
+const MEMORY_PANEL_WIDTH = 128;
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -226,6 +269,20 @@ export class BoardScene extends Scene {
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
   private hardDropKey: Phaser.Input.Keyboard.Key;
+  private pauseKey: Phaser.Input.Keyboard.Key;
+
+  /**
+   * Held by the player rather than by the game.
+   *
+   * Deliberately a flag of our own instead of Phaser's `scene.pause()`: that
+   * stops the scene's `update` altogether, which is also what reads the
+   * keyboard — so the key that paused it would have no way to start it again.
+   */
+  private paused = false;
+
+  private pauseScrim: Phaser.GameObjects.Rectangle;
+  private pauseText: Phaser.GameObjects.Text;
+  private pauseHint: Phaser.GameObjects.Text;
 
   /**
    * Tiles borrowed for the duration of one cascade beat: `popTiles` shrink
@@ -255,7 +312,38 @@ export class BoardScene extends Scene {
    */
   private progressTrack: Phaser.GameObjects.Graphics;
 
+  /** The coming memory's shape, filling in beside the board as it is earned. */
+  private memoryPanel: Phaser.GameObjects.Graphics;
+
   private litPads = 0;
+
+  /**
+   * Fragments of memory surfaced this run, counted across every memory rather
+   * than per memory. Progress is measured from it rather than by resetting the
+   * engine's counter, so connections earned past a threshold carry into the
+   * next fragment instead of being thrown away at the door.
+   */
+  private nodesRevealed = 0;
+
+  /**
+   * Milliseconds left on a surfaced fragment. While it is positive the
+   * simulation is frozen and input is ignored — the board is held, not torn
+   * down, because a memory here is an interruption to a run rather than a
+   * departure from it.
+   */
+  private revealRemaining = 0;
+
+  /**
+   * A question waiting for the fragment in front of it to finish.
+   *
+   * Completing a memory used to swap the last node's words FOR the question,
+   * which quietly ate a fragment the player had earned. It follows it instead.
+   */
+  private pendingReveal: { title: string; body: string } | null = null;
+
+  private revealScrim: Phaser.GameObjects.Rectangle;
+  private revealTitle: Phaser.GameObjects.Text;
+  private revealBody: Phaser.GameObjects.Text;
 
   /**
    * Sparks of current running the energised part of the track, and how far
@@ -371,6 +459,7 @@ export class BoardScene extends Scene {
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
 
     this.progressTrack = this.add.graphics();
+    this.memoryPanel = this.add.graphics();
 
     // `filters` is null until filters are enabled. Asserting past it with `!` is
     // exactly what hid a black screen during the juice pass, so enable first and
@@ -471,6 +560,12 @@ export class BoardScene extends Scene {
       color: '#8ea3b0',
     }).setOrigin(0.5, 0.5);
 
+    this.add.text(PREVIEW_CENTER_X, MEMORY_PANEL_TOP - 40, 'MEMORY', {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#6b5a80',
+    }).setOrigin(0.5, 0.5);
+
     // Scaled rather than baked a second time at preview size: one set of
     // textures, and the preview cannot drift out of step with the board.
     this.previewTiles = [
@@ -484,6 +579,7 @@ export class BoardScene extends Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
+    this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
 
     // Browsers will not start audio until the player has interacted with the
     // page, so the context is built on the first key rather than here.
@@ -507,6 +603,33 @@ export class BoardScene extends Scene {
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
+    // Over the board, under nothing. A fragment dims the game it interrupts
+    // rather than replacing it, so the run stays visible the whole time.
+    this.revealScrim = this.add.rectangle(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      BOARD_WIDTH + TRACK_MARGIN * 2,
+      BOARD_HEIGHT + TRACK_MARGIN * 2,
+      GROUND_COLOR,
+    ).setVisible(false);
+
+    this.revealTitle = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 - 70, '', {
+      fontFamily: 'monospace',
+      fontSize: '26px',
+      color: '#c98cff',
+      align: 'center',
+      wordWrap: { width: BOARD_WIDTH - 40 },
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
+    this.revealBody = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 10, '', {
+      fontFamily: 'monospace',
+      fontSize: '17px',
+      color: '#e8eef2',
+      align: 'center',
+      wordWrap: { width: BOARD_WIDTH - 56 },
+      lineSpacing: 7,
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
     this.gameOverText = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2,
@@ -520,6 +643,28 @@ export class BoardScene extends Scene {
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
+    // Last, so it covers the board, the readouts and anything mid-reveal.
+    this.pauseScrim = this.add.rectangle(
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      CANVAS_WIDTH,
+      CANVAS_HEIGHT,
+      GROUND_COLOR,
+      0.82,
+    ).setVisible(false);
+
+    this.pauseText = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 'PAUSED', {
+      fontFamily: 'monospace',
+      fontSize: '40px',
+      color: '#c98cff',
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
+    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, 'esc to resume', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#6b5a80',
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
     this.resetShownState();
   }
 
@@ -532,18 +677,51 @@ export class BoardScene extends Scene {
    * there is to win.
    */
   update(time: number, delta: number): void {
+    if (Input.Keyboard.JustDown(this.pauseKey)) {
+      this.setPaused(!this.paused);
+    }
+
     if (Input.Keyboard.JustDown(this.restartKey)) {
       this.restart();
     }
 
     // Nothing to read once the game is over: the simulation refuses input
     // anyway, and polling on would keep writing `softDropping` to a pair that
-    // is already part of the board.
-    if (!this.simulation.toppedOut) {
+    // is already part of the board. Nothing to read while paused either — but
+    // the two keys above are still polled, or there would be no way out.
+    if (!this.paused && !this.simulation.toppedOut && this.revealRemaining <= 0) {
       this.readInput(delta);
     }
 
-    if (this.hitStopRemaining > 0) {
+    if (this.paused) {
+      // Everything below this advances something. Drawing continues, because
+      // Phaser clears the canvas every frame and a held game still has to be
+      // looked at; nothing here consumes `delta`, so no time is banked.
+      this.drawBoard();
+      this.drawConnections();
+      this.drawPair();
+      this.drawPreview();
+      this.refreshChain();
+      this.refreshScore();
+      this.refreshGameOver();
+      this.refreshFps(time);
+      return;
+    }
+
+    if (this.revealRemaining > 0) {
+      // The same trick as hit-stop: the simulation does not advance and the
+      // frozen time is never banked, so nothing lurches when play resumes.
+      this.revealRemaining -= delta;
+      if (this.revealRemaining <= 0) {
+        const pending = this.pendingReveal;
+        this.pendingReveal = null;
+        if (pending === null) {
+          this.hideReveal();
+        } else {
+          this.showReveal(pending.title, pending.body, this.holdFor(pending.body, this.tuning.questionDuration));
+        }
+      }
+    } else if (this.hitStopRemaining > 0) {
       // Deliberately does NOT call `stepsFor`. Asking the accumulator for steps
       // and throwing them away would bank the frozen milliseconds and pay them
       // out in a burst the moment the freeze ended.
@@ -569,11 +747,38 @@ export class BoardScene extends Scene {
   }
 
   /**
+   * Hold or release the game.
+   *
+   * Tweens are paused wholesale alongside the flag: a pop shrinking or a tile
+   * falling would otherwise carry on behind the overlay, and a pause that only
+   * stops some of the motion reads as a bug rather than as a pause.
+   */
+  private setPaused(paused: boolean): void {
+    if (paused === this.paused) {
+      return;
+    }
+
+    this.paused = paused;
+    this.pauseScrim.setVisible(paused);
+    this.pauseText.setVisible(paused);
+    this.pauseHint.setVisible(paused);
+
+    if (paused) {
+      this.tweens.pauseAll();
+    } else {
+      this.tweens.resumeAll();
+    }
+  }
+
+  /**
    * Start a new game without tearing the scene down. `scene.restart()` would
    * also work, but it destroys and rebuilds every game object — including the
    * pools above — to change state the simulation can reset on its own.
    */
   private restart(): void {
+    // A held game that restarts is a running game: leaving the flag set would
+    // start the new run frozen behind an overlay the player just dismissed.
+    this.setPaused(false);
     this.simulation.restart();
 
     // Force `newPiece` on the next frame so the input translator re-latches a
@@ -604,6 +809,17 @@ export class BoardScene extends Scene {
    */
   private resetShownState(): void {
     this.cellsBeingFilled.clear();
+
+    // Cut, not faded. `hideReveal` runs the countdown's 280ms dissolve, and it
+    // is only ever reached BY that countdown — a restart sets `revealRemaining`
+    // to 0 directly, so nothing was left to reach it and a fragment the player
+    // restarted out of stayed on screen over the new run for the rest of the
+    // session.
+    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody]);
+    for (const part of [this.revealScrim, this.revealTitle, this.revealBody]) {
+      part.setVisible(false).setAlpha(1);
+    }
+
     this.shownBeats = this.simulation.beatsPlayed;
     this.soundedPiecesLocked = this.simulation.piecesLocked;
     this.slamDistance = null;
@@ -617,7 +833,13 @@ export class BoardScene extends Scene {
     this.nextScorePopup = 0;
 
     this.litPads = 0;
+    this.nodesRevealed = 0;
+    this.revealRemaining = 0;
+    this.pendingReveal = null;
     this.redrawTrack();
+    // Drawn here as well as on every change: the panel is otherwise blank until
+    // the first pad lights, which is exactly when it has the most to say.
+    this.redrawMemoryPanel(0);
   }
 
   private readInput(delta: number): void {
@@ -744,8 +966,16 @@ export class BoardScene extends Scene {
    * happen rather than as a value drifting upward.
    */
   private drawProgress(): void {
+    // Nothing accrues while a fragment is on screen: the track has just been
+    // spent, and a second fragment landing on top of the first would replace it
+    // mid-sentence.
+    if (this.revealRemaining > 0) {
+      return;
+    }
+
     const pads = this.tuning.progressPads;
-    const progress = Math.min(this.simulation.cellsCleared / this.tuning.cellsPerTrackLoop, 1);
+    const earned = this.simulation.connectionsMade - this.connectionsSpent();
+    const progress = Math.min(earned / this.nodeCost(this.nodesRevealed), 1);
     const lit = Math.floor(progress * pads);
 
     if (lit === this.litPads) {
@@ -755,6 +985,7 @@ export class BoardScene extends Scene {
     const gainedFrom = this.litPads;
     this.litPads = lit;
     this.redrawTrack();
+    this.redrawMemoryPanel(progress);
 
     // One announcement per pad, not one per frame. A big chain can clear enough
     // cells to cross two or three boundaries at once, and collapsing those into
@@ -770,6 +1001,143 @@ export class BoardScene extends Scene {
         delay: (pad - gainedFrom) * 70,
       });
     }
+
+    if (lit === pads && this.nodesRevealed < TOTAL_MEMORY_NODES) {
+      this.revealNextNode();
+    }
+  }
+
+  /**
+   * What the next fragment costs, and what every fragment so far has cost.
+   *
+   * Costs escalate, so progress cannot be a single division. Spending is summed
+   * rather than subtracted from a running balance because the engine's counter
+   * only ever goes up.
+   */
+  private nodeCost(index: number): number {
+    const schedule = this.tuning.connectionsPerNode;
+    return schedule[Math.min(index, schedule.length - 1)];
+  }
+
+  private connectionsSpent(): number {
+    let spent = 0;
+    for (let index = 0; index < this.nodesRevealed; index += 1) {
+      spent += this.nodeCost(index);
+    }
+    return spent;
+  }
+
+  /**
+   * Which memory a fragment index falls in, and where inside it.
+   *
+   * Derived rather than tracked as two counters, so there is one number to
+   * reset and no way for the pair to disagree.
+   */
+  private locate(total: number): { memoryIndex: number; nodeIndex: number } {
+    let remaining = total;
+
+    for (let index = 0; index < MEMORIES.length; index += 1) {
+      const nodes = MEMORIES[index].nodes.length;
+      if (remaining < nodes) {
+        return { memoryIndex: index, nodeIndex: remaining };
+      }
+      remaining -= nodes;
+    }
+
+    const last = MEMORIES.length - 1;
+    return { memoryIndex: last, nodeIndex: MEMORIES[last].nodes.length };
+  }
+
+  /**
+   * Surface the fragment the closed circuit just paid for.
+   *
+   * Deliberately NOT a scene change. Cutting away to read and cutting back is
+   * the shape of every narrative game that feels like homework, and it made a
+   * memory something the player was shown rather than something that happened
+   * to the run they were in. So the board is held for a beat, one fragment
+   * surfaces over it, and play resumes — while the node lights permanently in
+   * the panel, which is the part that lasts.
+   *
+   * Filling the last node of a memory earns its question instead, which is the
+   * only moment anything here speaks to the person at the keyboard.
+   */
+  private revealNextNode(): void {
+    const { memoryIndex, nodeIndex } = this.locate(this.nodesRevealed);
+    const memory = MEMORIES[memoryIndex];
+    const node = memory.nodes[nodeIndex];
+    this.nodesRevealed += 1;
+
+    // The question follows the last fragment rather than replacing it, and it
+    // arrives with NO title over it. It used to carry the memory's name, and
+    // "HIGH SCHOOL" standing over "What have you been putting off?" read as a
+    // question about high school — it is not. It is the one line in the game
+    // addressed to the person holding the keyboard, and a category label above
+    // it makes it part of the exhibit instead.
+    this.pendingReveal = nodeIndex === memory.nodes.length - 1
+      ? { title: '', body: memory.question }
+      : null;
+
+    // Spent. Emptying the track is the feedback that the circuit paid for
+    // something, and it re-arms `drawProgress`, which short-circuits whenever
+    // the lit count is unchanged — leaving it full meant a player who banked
+    // more than one fragment's worth never saw the second.
+    this.litPads = 0;
+    this.redrawTrack();
+    // With the count already incremented, so the node just earned draws as
+    // earned. Without it the panel keeps the half-lit "arriving" styling from
+    // the draw before the increment until the next pad crosses — which, on the
+    // escalating schedule, can be a minute later.
+    this.redrawMemoryPanel(0);
+
+    this.showReveal(node.title, node.body, this.holdFor(node.body, this.tuning.fragmentDuration));
+  }
+
+  /**
+   * How long to hold a line on screen: a floor, plus reading time for its
+   * length.
+   *
+   * Here rather than inside `showReveal` because the floor differs by what is
+   * being shown — a question lingers after it has been read and a fragment does
+   * not — and passing the number in keeps `showReveal` about drawing.
+   */
+  private holdFor(text: string, floor: number): number {
+    return floor + text.length * this.tuning.readingPerCharacter;
+  }
+
+  /** Hold the board and put a line over it. */
+  private showReveal(title: string, body: string, duration: number): void {
+    this.revealRemaining = duration;
+    this.revealTitle.setText(title);
+    // An empty title is hidden rather than drawn blank, so the body keeps its
+    // own spacing instead of sitting under a gap where a heading would be.
+    this.revealTitle.setVisible(title !== '');
+    this.revealBody.setText(body);
+
+    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody]);
+    this.revealScrim.setVisible(true).setAlpha(0);
+    this.tweens.add({ targets: this.revealScrim, alpha: 0.9, duration: 240 });
+
+    for (const text of [this.revealTitle, this.revealBody]) {
+      if (text === this.revealTitle && text.text === '') {
+        continue;
+      }
+      text.setVisible(true).setAlpha(0);
+      this.tweens.add({ targets: text, alpha: 1, duration: 340, delay: 160 });
+    }
+  }
+
+  private hideReveal(): void {
+    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody]);
+    this.tweens.add({
+      targets: [this.revealScrim, this.revealTitle, this.revealBody],
+      alpha: 0,
+      duration: 280,
+      onComplete: () => {
+        this.revealScrim.setVisible(false);
+        this.revealTitle.setVisible(false);
+        this.revealBody.setVisible(false);
+      },
+    });
   }
 
   /**
@@ -812,6 +1180,60 @@ export class BoardScene extends Scene {
       track.fillStyle(color, 1);
       track.fillRect(point.x - size, point.y - size, size * 2, size * 2);
     }
+  }
+
+  /**
+   * Draw the coming memory as an unlit constellation, lighting one node for
+   * each fraction of it the run has earned.
+   *
+   * The same layout the memory itself uses, so what fills in here is what the
+   * player will walk through — an outline completing is only a payoff if the
+   * thing that arrives is the thing they watched.
+   */
+  private redrawMemoryPanel(progress: number): void {
+    const { memoryIndex, nodeIndex } = this.locate(this.nodesRevealed);
+    const memory = MEMORIES[memoryIndex];
+    const count = memory.nodes.length;
+    const panel = this.memoryPanel;
+
+    // Nodes already surfaced stay lit for the rest of the run; the one being
+    // worked toward is the only thing `progress` moves.
+    const lit = nodeIndex;
+
+    panel.clear();
+
+    for (let index = 0; index < count; index += 1) {
+      const point = this.memoryNodePosition(index, count);
+      const earned = index < lit;
+      const arriving = index === lit && progress > 0;
+      const color = earned ? TRACK_LIT_COLOR : TRACK_COLOR;
+
+      if (index > 0) {
+        const previous = this.memoryNodePosition(index - 1, count);
+        const turn = (previous.y + point.y) / 2;
+        panel.lineStyle(2, earned ? TRACK_LIT_COLOR : TRACK_COLOR, earned ? 0.9 : 0.45);
+        panel.beginPath();
+        panel.moveTo(previous.x, previous.y);
+        panel.lineTo(previous.x, turn);
+        panel.lineTo(point.x, turn);
+        panel.lineTo(point.x, point.y);
+        panel.strokePath();
+      }
+
+      // Rects, not circles, for the reason the track's pads are: Phaser walks a
+      // Graphics command buffer every frame and steps an arc at a fixed 1/100
+      // turn, so a round pad costs a hundred vertices a frame however small.
+      panel.fillStyle(arriving ? TRACK_LIT_COLOR : color, earned ? 1 : 0.35 + (arriving ? progress * 0.5 : 0));
+      panel.fillRect(point.x - MEMORY_PAD, point.y - MEMORY_PAD, MEMORY_PAD * 2, MEMORY_PAD * 2);
+    }
+  }
+
+  private memoryNodePosition(index: number, count: number): { x: number; y: number } {
+    const layout = nodeLayout(index, count);
+    return {
+      x: MEMORY_PANEL_LEFT + layout.x * MEMORY_PANEL_WIDTH,
+      y: MEMORY_PANEL_TOP + layout.y * MEMORY_PANEL_HEIGHT,
+    };
   }
 
   /**
@@ -934,7 +1356,7 @@ export class BoardScene extends Scene {
       return;
     }
 
-    this.popCells(lastBeat.link, lastBeat.points);
+    this.popCells(lastBeat.link, lastBeat.connections);
     // `chainLength` has already been incremented past this link, so the first
     // link of a cascade pops at index 0.
     this.soundBoard.play(popVoice(this.simulation.chainLength - 1));
@@ -944,7 +1366,7 @@ export class BoardScene extends Scene {
    * Shrink and fade a tile where one just cleared. Shorter than the beat that
    * carries it, so the hole is empty and legible before the next beat starts.
    */
-  private popCells(link: ChainLink, points: number): void {
+  private popCells(link: ChainLink, connections: number): void {
     this.tweens.killTweensOf(this.popTiles);
     this.hitStopRemaining = this.tuning.hitStopDuration;
     this.kickCamera();
@@ -986,7 +1408,7 @@ export class BoardScene extends Scene {
     }
 
     if (borrowed > 0) {
-      this.showScorePopup(sumX / borrowed, sumY / borrowed, points);
+      this.showConnectionPopup(sumX / borrowed, sumY / borrowed, connections);
     }
   }
 
@@ -1042,17 +1464,22 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * The points this link scored, floating up from the middle of what popped.
+   * What this link earned, floating up from the middle of what popped.
    *
-   * The engine hands the link's own points over, so this is what the player
-   * just earned rather than the running total the corner already displays.
+   * Connections, not points, because connections are what buy a memory — and
+   * the multiplier is spelled out beside them whenever it is above one. The
+   * chain weighting existed for a while with nothing on screen reporting it,
+   * which made deliberately building a chain a strictly invisible reward: the
+   * player got three times the progress and no way to learn that they had.
    */
-  private showScorePopup(x: number, y: number, points: number): void {
+  private showConnectionPopup(x: number, y: number, connections: number): void {
+    const multiplier = this.simulation.chainLength;
+    const label = multiplier > 1 ? `+${connections}  x${multiplier}` : `+${connections}`;
     const popup = this.scorePopups[this.nextScorePopup];
     this.nextScorePopup = (this.nextScorePopup + 1) % this.scorePopups.length;
 
     this.tweens.killTweensOf(popup);
-    popup.setText(`+${points}`).setPosition(x, y).setAlpha(1).setVisible(true);
+    popup.setText(label).setPosition(x, y).setAlpha(1).setVisible(true);
 
     this.tweens.add({
       targets: popup,

@@ -53,12 +53,13 @@ export type PieceTypeSupplier = () => [number, number];
  * broken silently the day `settle` started returning a shared empty array for
  * the no-move case.
  *
- * `points` rides along on a clear because the engine is the only thing that
- * knows what this link alone scored; the running total cannot be differenced
- * without the reader keeping its own copy of the previous value.
+ * `connections` rides along on a clear because the engine is the only thing
+ * that knows what this link alone earned; the running total cannot be
+ * differenced without the reader keeping its own copy of the previous value.
+ * What the link cleared, and what it drove off the board, are on the `link`.
  */
 export type CascadeBeat =
-  | { kind: 'clear'; link: ChainLink; points: number }
+  | { kind: 'clear'; link: ChainLink; connections: number }
   | { kind: 'settle'; moves: readonly TileMove[] };
 
 export class Simulation {
@@ -98,18 +99,23 @@ export class Simulation {
   chainLength = 0;
 
   /**
-   * Every cell this run has cleared, added up.
+   * Connections made this run: cells cleared, each weighted by how deep into a
+   * cascade its link was.
    *
-   * The score cannot serve this purpose. It is exponential in chain length, so
-   * one lucky cascade moves it by an amount the player could not have planned
-   * toward, and a meter driven by it would lurch. Cells cleared is linear and
-   * countable: a chain still pays more because it clears more, and the player
-   * can see every unit of it happen.
+   * The weight is the whole point. Counting raw cells paid a four-link chain
+   * exactly what four separate clears paid, so the cheapest way to fill the
+   * meter was to clear greedily — and deliberately NOT clearing, to stack a
+   * chain, is the entire skill of this genre. A meter that ignores it teaches
+   * players to avoid the good part of the game.
+   *
+   * Linear in depth (x1, x2, x3...) rather than exponential like `score`. The
+   * score can afford to be showy; this drives a meter the player is meant to
+   * predict, and something that doubles every link lurches out of reach.
    *
    * This is what progression is measured in — see PROGRESS.md, "the score is
    * not the progression".
    */
-  cellsCleared = 0;
+  connectionsMade = 0;
 
   /**
    * What the most recent cascade beat did, and a counter that ticks once per
@@ -267,7 +273,7 @@ export class Simulation {
     this.board.reset();
 
     this.score = 0;
-    this.cellsCleared = 0;
+    this.connectionsMade = 0;
     this.chainLength = 0;
     this.resolving = false;
     this.settlePending = false;
@@ -374,12 +380,13 @@ export class Simulation {
 
     // `chainLength` is the 0-based index of this link, so the first link of a
     // cascade scores at 1x and each subsequent one doubles.
-    const points = scoreLink(link, this.chainLength);
-    this.score += points;
-    this.cellsCleared += link.cellsCleared;
+    const connections = link.cellsCleared * (this.chainLength + 1);
+
+    this.score += scoreLink(link, this.chainLength);
+    this.connectionsMade += connections;
     this.chainLength += 1;
     this.settlePending = true;
-    this.recordBeat({ kind: 'clear', link, points });
+    this.recordBeat({ kind: 'clear', link, connections });
   }
 
   private recordBeat(beat: CascadeBeat): void {

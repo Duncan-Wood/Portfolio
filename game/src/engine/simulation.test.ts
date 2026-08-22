@@ -340,26 +340,45 @@ describe('resolving a chain over time', () => {
     expect(afterSecondLink).toBeGreaterThan(afterFirstLink);
   });
 
-  it('counts no cleared cells before anything clears', () => {
-    const game = buildTwoLinkChain();
-    expect(game.cellsCleared).toBe(0);
-  });
-
-  it('adds up every cell the chain clears, across both links', () => {
+  it('reports what each link earned on the beat, weighted by its depth', () => {
     const game = buildTwoLinkChain();
     lockCurrentPair(game);
 
     game.update(DEFAULT_TUNING.chainLinkDelay);
-    const afterFirstLink = game.cellsCleared;
+    const first = game.lastBeat;
+
+    game.update(DEFAULT_TUNING.settleDelay);
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    const second = game.lastBeat;
+
+    // The scene cannot derive this: by the time it reads the beat the running
+    // total has already moved on, and the multiplier is gone.
+    expect(first?.kind === 'clear' && first.connections).toBe(5);
+    expect(second?.kind === 'clear' && second.connections).toBe(10);
+  });
+
+  it('counts no connections before anything clears', () => {
+    const game = buildTwoLinkChain();
+    expect(game.connectionsMade).toBe(0);
+  });
+
+  it('pays a deeper link more, so a chain beats the same cells cleared singly', () => {
+    const game = buildTwoLinkChain();
+    lockCurrentPair(game);
+
+    game.update(DEFAULT_TUNING.chainLinkDelay);
+    const afterFirstLink = game.connectionsMade;
 
     game.update(DEFAULT_TUNING.settleDelay);
     game.update(DEFAULT_TUNING.chainLinkDelay);
 
+    // Five cells at x1, then five more at x2. Cleared as two separate pieces
+    // the same ten cells would have paid ten.
     expect(afterFirstLink).toBe(5);
-    expect(game.cellsCleared).toBe(10);
+    expect(game.connectionsMade).toBe(15);
   });
 
-  it('counts cells rather than tracking the score, which is exponential', () => {
+  it('grows linearly with depth, unlike the score, which doubles', () => {
     const game = buildTwoLinkChain();
     lockCurrentPair(game);
 
@@ -367,8 +386,8 @@ describe('resolving a chain over time', () => {
     game.update(DEFAULT_TUNING.settleDelay);
     game.update(DEFAULT_TUNING.chainLinkDelay);
 
-    // Both links cleared the same number of cells; only the score doubled.
-    expect(game.cellsCleared).toBe(10);
+    // Same two links: the meter went 5 -> 15, the score went 50 -> 150.
+    expect(game.connectionsMade).toBe(15);
     expect(game.score).toBe(50 + 100);
   });
 
@@ -376,11 +395,11 @@ describe('resolving a chain over time', () => {
     const game = buildTwoLinkChain();
     lockCurrentPair(game);
     game.update(DEFAULT_TUNING.chainLinkDelay);
-    expect(game.cellsCleared).toBeGreaterThan(0);
+    expect(game.connectionsMade).toBeGreaterThan(0);
 
     game.restart();
 
-    expect(game.cellsCleared).toBe(0);
+    expect(game.connectionsMade).toBe(0);
   });
 
   it('holds cleared tiles in the air for a beat before settling them', () => {
@@ -722,16 +741,14 @@ describe('reporting each cascade beat to the scene', () => {
   });
 
   /**
-   * The link's own score, not the running total. A reader differencing `score`
-   * would need its own copy of the previous value, which is what the scene used
-   * to do — against a field whose real job was caching rendered text.
+   * The score survives because it is still drawn in the corner, but it no
+   * longer rides on the beat: nothing reads what one link alone scored, and
+   * `connections` — asserted above — is what progression is measured in.
    */
-  it('hands the scene what this link alone scored', () => {
+  it('adds each link\'s score to the running total', () => {
     const game = chainingGame();
     game.update(DEFAULT_TUNING.chainLinkDelay);
 
-    const beat = game.lastBeat!;
-    expect(beat.kind === 'clear' && beat.points).toBe(40);
     expect(game.score).toBe(40);
   });
 

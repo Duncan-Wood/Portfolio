@@ -22,26 +22,66 @@
  */
 export interface Tuning {
   /**
-   * Cells cleared to close the progress track once, and how many pads it is
-   * divided into.
+   * What each fragment of a memory costs, in order, and how many pads the track
+   * is divided into. Closing the track is what surfaces one.
    *
-   * They belong together because the number that actually governs pacing is the
-   * quotient — at 120 over 20 pads, a pad costs 6 cells, about three or four
-   * pieces. Splitting them across two files meant editing one silently changed
-   * the pacing AND falsified the arithmetic written beside the other, and it
-   * broke live tuning in the direction that matters: setting
-   * `window.tuning.cellsPerTrackLoop` tells you nothing about what a pad costs
+   * A schedule rather than one number, and the first entry is deliberately
+   * tiny. A flat cost meant the first payoff was several minutes away, which is
+   * far longer than a stranger will wait to find out whether this game gives
+   * them anything. Dr. Mario opens on four viruses; that miniature first goal
+   * is the tutorial, and it is why nobody bounces off level 0.
+   *
+   * Runs past the end of the list repeat the last entry, so the schedule can be
+   * shorter than the number of fragments without anything special happening.
+   *
+   * The two belong in one object because the number that actually governs
+   * pacing is the quotient. Splitting them across two files meant editing one
+   * silently changed the pacing AND falsified the arithmetic written beside the
+   * other, and it broke live tuning in the direction that matters: setting
+   * `window.tuning.connectionsPerNode` tells you nothing about what a pad costs
    * unless the divisor is in the same object.
    *
-   * Measured, not guessed; the run data behind 120 is in `docs/PROGRESS.md`
-   * under "How much progress a memory costs". The value tried first was 300,
-   * which put one loop at 176 pieces — ten minutes for a single payoff.
+   * Measured, not guessed; the run data is in `docs/PROGRESS.md` under "What
+   * progress costs". The value tried first was a flat 300, which put one loop
+   * at 176 pieces — ten minutes for a single payoff.
    *
-   * When memories arrive this stops being one number: the thresholds escalate,
-   * and the FIRST is deliberately tiny. Dr. Mario opens on four viruses, and
-   * that miniature first goal is what teaches the game without a tutorial.
+   * `progressPads` is the divisor, and it is small on purpose. It was 20, left
+   * over from when a fragment cost 120 cells; against a first fragment of 6
+   * connections that made a pad cost 0.3, so a single ordinary clear lit
+   * THIRTEEN pads at once and the meter jumped rather than built — while firing
+   * thirteen staggered blips and thirteen oscillators on the busiest frame in
+   * the game. A pad has to cost at least one connection for the track to read
+   * as something filling up.
    */
-  cellsPerTrackLoop: number;
+  connectionsPerNode: readonly number[];
+
+  /**
+   * How long a fragment and a question hold the board BEFORE the time it takes
+   * to read them, which `readingPerCharacter` adds on top.
+   *
+   * A floor plus a rate, not a flat hold. A flat 3400ms was set against
+   * fragments of a dozen clipped words; the ones that shipped are my own
+   * sentences and the longest is three times the length of the shortest, so one
+   * number either rushed that one off the screen or left the short ones sitting
+   * there. What a reader needs is a moment to notice the thing at all, and then
+   * time proportional to how much of it there is.
+   *
+   * The question's floor is the longer of the two because it is the only line
+   * in the game addressed to the player, and it should still be there for a
+   * beat after it has been read.
+   */
+  fragmentDuration: number;
+
+  questionDuration: number;
+
+  /**
+   * Reading time, per character of the line being held.
+   *
+   * 48ms is around 210 words a minute — deliberately under the ~250 an adult
+   * reads prose at, because this is read once, in a game, by someone who was
+   * thinking about the board a second ago and has to find the text first.
+   */
+  readingPerCharacter: number;
 
   progressPads: number;
 
@@ -147,8 +187,11 @@ export interface Tuning {
  * DAS/ARR were never swept.
  */
 export const DEFAULT_TUNING: Tuning = {
-  cellsPerTrackLoop: 120,
-  progressPads: 20,
+  connectionsPerNode: [6, 9, 12, 16, 20, 26, 32, 40],
+  fragmentDuration: 1400,
+  questionDuration: 3000,
+  readingPerCharacter: 48,
+  progressPads: 6,
   fallInterval: 400,
   softDropInterval: 50,
   lockDelay: 500,
