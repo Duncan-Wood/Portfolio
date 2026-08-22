@@ -54,6 +54,13 @@ another person.**
   driven off, deepest first, the pitch climbing a semitone a cell; press enter on an empty
   line and you decline and keep them. The engine is told THAT an answer happened, never
   what it said. The answer stays beside its memory on the panel.
+- **Losing is the shadow winning.** It said `TOPPED OUT` — arcade text, in a game whose
+  antagonist by then has a face, a voice and a nine-line script. Now the run ends the way
+  the game is about: every lit connection goes out in turn, falling a semitone a cell,
+  which is `answerVoice` run backwards — the answer beat is the moment this is the
+  opposite of. The memory panel darkens with them, because what a run built is what it
+  loses. Then two lines: the game's, and under it the shadow's, which is the only time it
+  gets the last word. Both are placeholders in `shadow-voice.ts` and neither is mine.
 - **Next, and the only thing left in Stage 3** — its benchmark: *playtesters visibly react
   to a big chain.* That needs another person. What it is really testing is the pair of
   things still unproven — whether one pair of lookahead is enough to plan a chain with,
@@ -132,6 +139,8 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | Every piece type has a distinct shape as well as a distinct colour | `palette.ts` (`PIECE_SHAPES`) |
 | Tile art is baked into textures once at boot, not drawn per frame or loaded | `scenes/tile-textures.ts` |
 | The spawn cells being occupied ends the game; the board is left on screen | `engine/simulation.ts` (`spawnOrTopOut`), `scenes/BoardScene.ts` (`refreshGameOver`) |
+| Losing plays out: the connections die one by one, then the shadow speaks | `scenes/BoardScene.ts` (`loseTheBoard`) |
+| The ending's two lines are placeholders, isolated with no imports | `shadow-voice.ts` (`CONNECTION_LOST`, `SHADOW_CLOSING_LINE`) |
 | Progress is measured in **connections**: cells cleared, weighted by chain depth | `engine/simulation.ts` (`connectionsMade`) |
 | The meter is the board: a circuit ringing it, lit one pad at a time | `scenes/BoardScene.ts` (`drawProgress`), `track-geometry.ts` |
 | Closing the circuit surfaces ONE fragment, over the held board — never a cutscene | `scenes/BoardScene.ts` (`revealNextNode`) |
