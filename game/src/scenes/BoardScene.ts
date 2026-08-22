@@ -29,6 +29,7 @@ import {
 } from './tile-textures';
 import { TrackPath, mitredRectangle } from '../track-geometry';
 import { MEMORIES, nodeLayout } from '../memories';
+import { shadowLine } from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 import { SoundBoard } from '../audio/sound-board';
@@ -367,6 +368,20 @@ export class BoardScene extends Scene {
   private animatedShadowCells = new Set<number>();
 
   private shadowArrival: { cellIndex: number; age: number } | null = null;
+
+  /**
+   * The shadow talking, and what it has already said.
+   *
+   * Deliberately NOT the reveal overlay the memories use. A fragment stops the
+   * game and dims it; this does neither. The shadow gets to needle you while
+   * you are still playing, which is the whole difference between something the
+   * game is showing you and something that is in the room with you.
+   */
+  private shadowSpeech: Phaser.GameObjects.Text;
+
+  private spokenShadowLines: string[] = [];
+
+  private arrivalsSinceShadowSpoke = 0;
 
   /**
    * The clock the idle is computed from. Its own, rather than `time` from the
@@ -742,6 +757,19 @@ export class BoardScene extends Scene {
     ).setOrigin(0.5, 0.5).setVisible(false);
 
     // Last, so it covers the board, the readouts and anything mid-reveal.
+    // Over the board's upper third, which is empty for most of a run — and when
+    // it is not, the stack is high, which is exactly when it has most to say.
+    // Stroked rather than backed with a panel so it stays legible over tiles
+    // without another object to fade in step.
+    this.shadowSpeech = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, ORIGIN_Y + BOARD_HEIGHT * 0.28, '', {
+      fontFamily: 'monospace',
+      fontSize: '17px',
+      color: '#f4eeff',
+      align: 'center',
+      stroke: '#0d0714',
+      strokeThickness: 5,
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
     this.pauseScrim = this.add.rectangle(
       CANVAS_WIDTH / 2,
       CANVAS_HEIGHT / 2,
@@ -938,6 +966,10 @@ export class BoardScene extends Scene {
     }
     this.animatedShadowCells.clear();
     this.shadowArrival = null;
+    this.spokenShadowLines = [];
+    this.arrivalsSinceShadowSpoke = 0;
+    this.tweens.killTweensOf(this.shadowSpeech);
+    this.shadowSpeech.setVisible(false);
     this.shadowClock = 0;
     this.shownShadowTaken = this.simulation.shadowTaken;
 
@@ -1122,6 +1154,40 @@ export class BoardScene extends Scene {
   }
 
   /**
+   * Let the shadow say something, if it has earned the right to.
+   *
+   * The decision is not here — `shadow-voice.ts` owns when it may speak and
+   * what it picks, so the writing and its rules are unit-tested rather than
+   * judged by playing for ten minutes. This only counts arrivals and draws.
+   */
+  private speakForShadow(): void {
+    const line = shadowLine(
+      this.simulation.shadowOnBoard,
+      this.arrivalsSinceShadowSpoke,
+      this.spokenShadowLines,
+    );
+
+    this.arrivalsSinceShadowSpoke += 1;
+    if (line === null) {
+      return;
+    }
+
+    this.arrivalsSinceShadowSpoke = 0;
+    this.spokenShadowLines.push(line);
+
+    this.tweens.killTweensOf(this.shadowSpeech);
+    this.shadowSpeech.setText(line).setAlpha(0).setVisible(true);
+    this.tweens.add({ targets: this.shadowSpeech, alpha: 1, duration: 300 });
+    this.tweens.add({
+      targets: this.shadowSpeech,
+      alpha: 0,
+      duration: 500,
+      delay: this.holdFor(line, 1400),
+      onComplete: () => this.shadowSpeech.setVisible(false),
+    });
+  }
+
+  /**
    * Put a cell back the way an ordinary tile expects to find it.
    *
    * The idle writes position, angle, scale and alpha every frame, so a cell
@@ -1161,6 +1227,7 @@ export class BoardScene extends Scene {
 
     this.shownShadowTaken = shadowTaken;
     this.soundBoard.play(shadowArrivalVoice());
+    this.speakForShadow();
 
     this.shadowArrival = {
       cellIndex: visibleCellIndex(lastShadowCell.column, lastShadowCell.row),
