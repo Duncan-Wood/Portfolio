@@ -1,7 +1,8 @@
 # Art Direction
 
-Nothing here is built yet. Art stays placeholder until the core loop is fun; this is
-recorded early because it answers design questions, not because it gets built early.
+Art stays placeholder until the core loop is fun; this is recorded early because it
+answers design questions, not because it gets built early. Where something here HAS
+shipped ahead of that rule, the entry says so and says why.
 
 ## The core image
 
@@ -12,7 +13,7 @@ signal. One image carrying heart, technology, and the node-brain at once.
 Kingdom Hearts is the touchstone — take the visual language (stained glass, jewel tones, a
 lit platform in darkness, a shadow that opposes you), not the furniture. **Copy nothing:**
 no Disney or Square Enix characters, music, logos, or their proper nouns. This ships
-publicly under Duncan's name.
+publicly under my own name.
 
 ## By stage
 
@@ -23,8 +24,10 @@ publicly under Duncan's name.
   perspective is the shape that fits. Only a weak vignette ships today, and per the rule at
   the top of this file, the rest waits until the loop is proven fun.
   *Shipped instead:* the panes themselves. Each tile is a jewel-toned pane with its leading
-  drawn dark and a figure — star, circle, square, diamond — set into it in that same lead,
-  baked at boot rather than loaded as art. It carries more of the core image than the
+  drawn dark and a figure — a pad, an open via, a chip, a branching trace — set into it in
+  that same lead, baked at boot rather than loaded as art. The figures are drawn from the
+  circuit vocabulary rather than from Bejeweled's: a first pass used a star, a circle, a
+  square and a diamond, which read perfectly well and meant nothing. It carries more of the core image than the
   platform would have, and it is the half of "stained glass" that the board itself can show.
 - **2 — Cascades.** Chains light the leading between cleared tiles, so a cascade is
   visibly a signal crossing the network. Highest-value idea here: nearly free, and it
@@ -34,6 +37,13 @@ publicly under Duncan's name.
 - **4 — Special pieces.** Neurons are the collectible that unlocks memories. Blockers are
   encroaching shadow, removed by *shadow recedes from light* — clearing adjacent tiles
   pushes it back. Pinball is shadow pooling with a visible wind-up.
+  *Shipped early, because Stage 3 needed something to push against:* the shadow takes a
+  cell whenever the player stops connecting, and a clear beside it drives it off. It is
+  drawn as a creature rather than as a dark cell — a hunched body, thin antennae, two lit
+  eyes — because the first pass was a near-black square and read as a rendering fault. It
+  is lit in the game's own violet, not in a monster's yellow: the thing opposing you is
+  the part of this mind that stops without finishing, so it belongs to the same palette
+  as the ground it stands on.
 - **5 — Framing.** Difficulty selection is an opening values question, not Easy/Normal/Hard.
 - **Narrative (later).** Each memory gets its own platform and portrait.
 

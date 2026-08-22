@@ -9,7 +9,8 @@ carries a header explaining what it owns and why.
 
 ## Status
 
-**Stage 3 — Juice. The cascade is visible; the rest of the checklist is open.**
+**Stage 3 — Juice. The checklist is done; the benchmark is not, because it needs
+another person.**
 
 - **Stages 0–2 are closed.** Setup, the engine, the scene, input, tuning, matching,
   cascades and exponential chain scoring are all built and verified in Chrome.
@@ -24,16 +25,30 @@ carries a header explaining what it owns and why.
 - **Stage 3's checklist is now complete.** Hard drop and a 400ms gravity fixed the pacing;
   procedural Web Audio, particles, hit-stop, screen shake, the landing bounce, score popups
   and a vignette fixed the presentation. Comfortably over 60fps with the filter running.
-- **The identity pass has started.** Tiles carry a **figure** as well as a colour — star,
-  circle, square, diamond, straight off the storyboard's first panel — drawn as jewel-toned
-  panes with the leading around them dark. This was the cheapest identity available and it
-  fixes a real accessibility problem: four hues alone are not separable by every player, and
-  everybody reads a silhouette faster than a hue under time pressure.
-- **Next** — the Stage 3 benchmark itself: *playtesters visibly react to a big chain.* That
-  needs another person, and it is the only thing that closes Stage 3 and unblocks Stage 4.
-- **Still unproven** — whether one pair of lookahead is enough to plan chains with, and
-  whether the chain payoff actually feels good. That is a playtest with another person,
-  and it is Stage 3's real benchmark: *playtesters visibly react to a big chain.*
+- **The identity pass has started.** Tiles carry a **figure** as well as a colour — a pad,
+  an open via, a chip, a branching trace — drawn as jewel-toned panes with the leading
+  around them dark. This was the cheapest identity available and it fixes a real
+  accessibility problem: four hues alone are not separable by every player, and everybody
+  reads a silhouette faster than a hue under time pressure. The figures come from the
+  circuit vocabulary because a tile is a node in a network; the first pass used a star, a
+  circle, a square and a diamond, which read fine and meant nothing.
+- **A run has a point now.** Progress is counted in **connections** — cells cleared,
+  weighted by how deep into a cascade they were — and it fills a circuit that rings the
+  board, one pad at a time. Closing that circuit surfaces one fragment of a memory over
+  the held board, and the fragment lights permanently in the panel beside it, so the
+  memory assembles as you play. One memory is written, in five fragments, ending on a
+  question. This is what replaces the score as the progression.
+- **The shadow has a face.** It shipped as a near-black square with a hairline
+  broken outline, which read as a rendering fault rather than as an antagonist. It is
+  now a creature — hunched body, thin antennae, two lit eyes — that breathes, leans and
+  blinks, climbs out of the board when it arrives, and is blown outward when a clear
+  drives it off. It is lit in the game's own violet on purpose: the thing opposing you
+  is part of this mind, not an invader from outside it. `shadowInterval` is 6s now,
+  played rather than guessed.
+- **Next, and the only thing left in Stage 3** — its benchmark: *playtesters visibly react
+  to a big chain.* That needs another person. What it is really testing is the pair of
+  things still unproven — whether one pair of lookahead is enough to plan a chain with,
+  and whether the chain payoff feels like anything — and it is what unblocks Stage 4.
 
 > **Testing in a browser:** Chrome pauses `requestAnimationFrame` entirely for hidden tabs,
 > so a backgrounded window renders **zero** frames and every timing measurement is
@@ -97,6 +112,7 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | The chain resolves over time: clear, then settle, one beat each | `engine/simulation.ts` (`advanceChain`), `engine/matching.ts` (`clearStep`) |
 | Input is refused while a cascade resolves, and after a top-out | `engine/simulation.ts` (`acceptsInput`) |
 | R restarts from any state, without tearing the scene down | `engine/simulation.ts` (`restart`), `scenes/BoardScene.ts` (`restart`) |
+| Escape pauses via our own flag, not `scene.pause()`, which would eat the key | `scenes/BoardScene.ts` (`setPaused`) |
 | `settle` reports which tiles moved, so the scene can animate the drop | `engine/board.ts` (`TileMove`) |
 | The engine leaves each cascade beat's result for the scene to read; no callbacks | `engine/simulation.ts` (`beatsPlayed`, `lastBeat`) |
 | A beat is one tagged `CascadeBeat`, not two fields told apart by object identity | `engine/simulation.ts` (`CascadeBeat`) |
@@ -107,6 +123,22 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | Every piece type has a distinct shape as well as a distinct colour | `palette.ts` (`PIECE_SHAPES`) |
 | Tile art is baked into textures once at boot, not drawn per frame or loaded | `scenes/tile-textures.ts` |
 | The spawn cells being occupied ends the game; the board is left on screen | `engine/simulation.ts` (`spawnOrTopOut`), `scenes/BoardScene.ts` (`refreshGameOver`) |
+| Progress is measured in **connections**: cells cleared, weighted by chain depth | `engine/simulation.ts` (`connectionsMade`) |
+| The meter is the board: a circuit ringing it, lit one pad at a time | `scenes/BoardScene.ts` (`drawProgress`), `track-geometry.ts` |
+| Closing the circuit surfaces ONE fragment, over the held board — never a cutscene | `scenes/BoardScene.ts` (`revealNextNode`) |
+| Fragments light permanently in the panel: the memory assembles as you play | `scenes/BoardScene.ts` (`redrawMemoryPanel`) |
+| A memory's question follows its last fragment rather than replacing it | `scenes/BoardScene.ts` (`pendingReveal`) |
+| Fragment cost escalates on a schedule, and the first one is deliberately tiny | `tuning.ts` (`connectionsPerNode`) |
+| The coming memory's shape fills in beside the board as it is earned | `scenes/BoardScene.ts` (`redrawMemoryPanel`) |
+| One node layout, shared, so the outline you fill is the shape you walk | `memories.ts` (`nodeLayout`) |
+| Each memory ends on a question that is never scored or branched on | `memories.ts` (`Memory.question`) |
+| The shadow is a creature, not a dark cell: hunched body, antennae, lit eyes | `scenes/tile-textures.ts` (`bakeShadow`) |
+| It is lit in the game's own violet — the antagonist is part of this mind | `palette.ts` (`SHADOW_BODY_COLOR`) |
+| Its eyes are baked apart from its body, so they can blink and flare | `scenes/tile-textures.ts` (`SHADOW_EYES_TEXTURE`) |
+| The idle is computed per frame from one clock, never tweened | `scenes/BoardScene.ts` (`animateShadow`) |
+| An arrival is announced by a counter, like a landing, and it climbs out of the board | `engine/simulation.ts` (`shadowTaken`), `scenes/BoardScene.ts` (`playShadowArrival`) |
+| A link reports which shadow it pushed back, and those cells are blown outward | `engine/simulation.ts` (`CascadeBeat.shadowCleared`) |
+| Hesitation feeds the shadow every 6 seconds — played, not guessed | `tuning.ts` (`shadowInterval`) |
 | `Board.place` throws on an off-board **or** occupied write | `engine/board.ts` (`place`) |
 | Nothing is exempt from `isBlocked`; the ceiling blocks like any other edge | `engine/board.ts` (`isBlocked`) |
 
@@ -124,30 +156,20 @@ Two that are recorded here as well as in the code, deliberately:
 
 ## Decided, pending build
 
-- **Next-piece preview — built.** See the locked decisions above.
-- **How much progress a memory costs — measured.** A greedy bot run through the real
+- **What progress costs — measured, then shipped.** A greedy bot run through the real
   engine clears **1.6-1.8 cells per piece**, and a strong run lasts 270-410 pieces, so a
-  whole run is worth roughly **450-700 cells**. Four memories therefore want escalating
-  thresholds that fit inside that, with a deliberately tiny first one:
+  whole run is worth roughly **450-700 cells**. What shipped against that is a schedule
+  costed per FRAGMENT rather than per memory — `connectionsPerNode` is
+  `[6, 9, 12, 16, 20, 26, 32, 40]`, so the first fragment of High School costs 6
+  connections (two or three clears) and all five of them cost 63. The tiny first one is
+  Dr. Mario's trick: its level 0 is four viruses, and that is the tutorial.
 
-  | Memory | Cells | Cumulative | Roughly |
-  |---|---|---|---|
-  | 1 | 30 | 30 | ~18 pieces, under a minute |
-  | 2 | 60 | 90 | ~53 pieces |
-  | 3 | 120 | 210 | ~124 pieces |
-  | 4 | 240 | 450 | a strong run |
-
-  A weak run earns one or two, which is what gives replaying a point. The tiny first one
-  is Dr. Mario's trick — its level 0 is four viruses, and that is the tutorial.
-- **The score is not the progression, and never was.** `scoreLink` has always been marked a
-  placeholder, and a number in the corner is the reason a long session reads as pointless.
-  The storyboard already settled what replaces it: *"Neurons unlock memories & appear after a
-  certain # of box clears. Activated by popping an adjacent block."* So the HUD wants a meter
-  filling toward the next Neuron, and a Neuron that pays out a memory. `DESIGN-PLAN.md` says
-  the same thing — *"Make this the flagship. Tie the count cleared directly to memory unlocks
-  so the puzzle **is** the narrative progression."*
-- **The watching brain**, in the empty panel below NEXT. ART-DIRECTION already lists it under
-  Stage 3, the storyboard draws it beside the board, and the space is sitting there.
+  Two things about it are unplayed. Whether the *whole* memory at 63 is too long a wait
+  for the ending, and what the second memory should cost, since nothing has ever earned
+  one.
+- **The watching brain.** ART-DIRECTION lists it under Stage 3 and the storyboard draws it
+  beside the board, but the panel it was going to live in now holds the coming memory. It
+  needs somewhere else to be, or it replaces the memory panel and the memory moves.
 - Blockers, Pinball, and difficulty framing are settled in
   [ART-DIRECTION.md](ART-DIRECTION.md) under "By stage".
 
