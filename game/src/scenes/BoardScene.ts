@@ -115,6 +115,17 @@ const SHADOW_LEAN_DEGREES = 3.2;
 const SHADOW_BREATH = 0.045;
 const SHADOW_ARRIVAL_DURATION = 340;
 
+/**
+ * How long a fragment is on screen before Space will skip it.
+ *
+ * Not zero, for two reasons. The text is still fading in for the first 500ms,
+ * so before that there is nothing to have read yet. And a fragment surfaces
+ * moments after a clear — which is moments after the player was very possibly
+ * hitting Space to hard-drop — so an instant skip would let the reward for a
+ * whole minute of play be thrown away by a reflex.
+ */
+const REVEAL_SKIP_GRACE = 420;
+
 /** Milliseconds an eye stays shut, and the shortest gap between two blinks. */
 const BLINK_DURATION = 90;
 const BLINK_INTERVAL = 2300;
@@ -442,6 +453,11 @@ export class BoardScene extends Scene {
 
   private revealScrim: Phaser.GameObjects.Rectangle;
   private revealTitle: Phaser.GameObjects.Text;
+
+  /** The "space" prompt, and how long until it means anything. */
+  private revealHint: Phaser.GameObjects.Text;
+
+  private revealSkippableIn = 0;
   private revealBody: Phaser.GameObjects.Text;
 
   /**
@@ -743,6 +759,15 @@ export class BoardScene extends Scene {
       lineSpacing: 7,
     }).setOrigin(0.5, 0.5).setVisible(false);
 
+    // Only shown once the fragment can actually be skipped, so it teaches the
+    // grace period as well as the key. Dim, because a prompt that competes with
+    // the line it is offering to dismiss has its priorities backwards.
+    this.revealHint = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 96, 'space', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#6b5a80',
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
     this.gameOverText = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2,
@@ -838,14 +863,25 @@ export class BoardScene extends Scene {
       // The same trick as hit-stop: the simulation does not advance and the
       // frozen time is never banked, so nothing lurches when play resumes.
       this.revealRemaining -= delta;
-      if (this.revealRemaining <= 0) {
-        const pending = this.pendingReveal;
-        this.pendingReveal = null;
-        if (pending === null) {
-          this.hideReveal();
-        } else {
-          this.showReveal(pending.title, pending.body, this.holdFor(pending.body, this.tuning.questionDuration));
+
+      if (this.revealSkippableIn > 0) {
+        this.revealSkippableIn -= delta;
+        if (this.revealSkippableIn <= 0) {
+          this.revealHint.setVisible(true).setAlpha(0);
+          this.tweens.add({ targets: this.revealHint, alpha: 1, duration: 260 });
         }
+      } else if (Input.Keyboard.JustDown(this.hardDropKey)) {
+        // Space skips. The hold is generous on purpose — long enough for a slow
+        // reader — and somebody who has already finished the line should not be
+        // made to sit out the rest of it. Safe to read the key here: `readInput`
+        // is refused while a fragment is up, so this is the only claim on the
+        // press, and hard drop is edge-triggered, so holding Space through the
+        // skip cannot slam the next pair.
+        this.revealRemaining = 0;
+      }
+
+      if (this.revealRemaining <= 0) {
+        this.advanceReveal();
       }
     } else if (this.hitStopRemaining > 0) {
       // Deliberately does NOT call `stepsFor`. Asking the accumulator for steps
@@ -956,10 +992,11 @@ export class BoardScene extends Scene {
     // to 0 directly, so nothing was left to reach it and a fragment the player
     // restarted out of stayed on screen over the new run for the rest of the
     // session.
-    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody]);
-    for (const part of [this.revealScrim, this.revealTitle, this.revealBody]) {
+    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]);
+    for (const part of [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]) {
       part.setVisible(false).setAlpha(1);
     }
+    this.revealSkippableIn = 0;
 
     for (const index of this.animatedShadowCells) {
       this.restoreCell(index);
@@ -1434,9 +1471,34 @@ export class BoardScene extends Scene {
     return floor + text.length * this.tuning.readingPerCharacter;
   }
 
+  /**
+   * Move past the fragment on screen: to its question if it has one, or off.
+   *
+   * Shared by the countdown running out and by Space, so a skip advances the
+   * same way a wait does — pressing Space through a memory walks its last
+   * fragment to the question rather than throwing the question away with it.
+   */
+  private advanceReveal(): void {
+    const pending = this.pendingReveal;
+    this.pendingReveal = null;
+
+    if (pending === null) {
+      this.hideReveal();
+      return;
+    }
+
+    this.showReveal(
+      pending.title,
+      pending.body,
+      this.holdFor(pending.body, this.tuning.questionDuration),
+    );
+  }
+
   /** Hold the board and put a line over it. */
   private showReveal(title: string, body: string, duration: number): void {
     this.revealRemaining = duration;
+    this.revealSkippableIn = REVEAL_SKIP_GRACE;
+    this.revealHint.setVisible(false);
     this.revealTitle.setText(title);
     // An empty title is hidden rather than drawn blank, so the body keeps its
     // own spacing instead of sitting under a gap where a heading would be.
@@ -1457,15 +1519,16 @@ export class BoardScene extends Scene {
   }
 
   private hideReveal(): void {
-    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody]);
+    const parts = [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint];
+    this.tweens.killTweensOf(parts);
     this.tweens.add({
-      targets: [this.revealScrim, this.revealTitle, this.revealBody],
+      targets: parts,
       alpha: 0,
       duration: 280,
       onComplete: () => {
-        this.revealScrim.setVisible(false);
-        this.revealTitle.setVisible(false);
-        this.revealBody.setVisible(false);
+        for (const part of parts) {
+          part.setVisible(false);
+        }
       },
     });
   }
@@ -2004,7 +2067,11 @@ export class BoardScene extends Scene {
    * explains why. Restarting means reloading the page for now.
    */
   private refreshGameOver(): void {
-    this.gameOverText.setVisible(this.simulation.toppedOut);
+    // Not while a fragment is up. Both can be true in one frame — the clear
+    // that fills the meter can be the same clear that ends the run — and the
+    // reveal was drawn first, so GAME OVER printed straight across the memory
+    // it had just paid for. The run is over either way; the memory goes first.
+    this.gameOverText.setVisible(this.simulation.toppedOut && this.revealRemaining <= 0);
   }
 
   private refreshFps(time: number): void {
