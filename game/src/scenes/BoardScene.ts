@@ -4,7 +4,9 @@ import {
   FIRST_VISIBLE_ROW,
   PIECE_TYPE_COUNT,
   ROWS,
+  SHADOW,
   VISIBLE_ROWS,
+  isColour,
 } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
@@ -16,8 +18,11 @@ import {
   TRACK_COLOR,
   TRACK_LIT_COLOR,
   PIECE_COLORS,
+  SHADOW_EDGE_COLOR,
+  SHADOW_EYE_GLOW,
 } from '../palette';
 import {
+  SHADOW_EYES_TEXTURE,
   TRACE_TEXTURE,
   bakeTileTextures,
   tileTexture,
@@ -33,6 +38,8 @@ import {
   landVoice,
   nodeVoice,
   popVoice,
+  shadowArrivalVoice,
+  shadowRecedeVoice,
   topOutVoice,
 } from '../audio/voices';
 
@@ -87,6 +94,29 @@ const TRACK_STUB = 7;
 const PULSE_PERIOD = 2400;
 
 const TRACK_PULSES = 3;
+
+/*
+ * The shadow's idle: how far it bobs and leans, how long a breath takes, and
+ * how long one takes to climb out of the board when it arrives.
+ *
+ * All of it is computed per frame from one clock rather than tweened. A tween
+ * per shadow cell would fight `drawBoard`, which writes every cell's texture
+ * every frame and would have to learn which cells it is not allowed to touch;
+ * and the shadow moves on the board — it settles, it falls — so the tween would
+ * have to be caught and rebuilt every time a cell changed hands.
+ *
+ * Nothing here is a `tuning.ts` dial. Those are the numbers that change how the
+ * game PLAYS; these only change how it looks, and adding them would make the
+ * live-tuning object something you have to read past.
+ */
+const SHADOW_BOB_PIXELS = 2.4;
+const SHADOW_LEAN_DEGREES = 3.2;
+const SHADOW_BREATH = 0.045;
+const SHADOW_ARRIVAL_DURATION = 340;
+
+/** Milliseconds an eye stays shut, and the shortest gap between two blinks. */
+const BLINK_DURATION = 90;
+const BLINK_INTERVAL = 2300;
 
 const SPARK_TEXTURE = 'spark';
 const SPARK_RADIUS = 6;
@@ -199,6 +229,22 @@ function drawClippedToBoard(
   tile.setCrop(0, hidden, CELL_SIZE, CELL_SIZE - hidden);
 }
 
+/**
+ * Overshoot and settle back. `1.7` is the usual constant for a back ease; it is
+ * what makes something arrive as though it had weight instead of sliding into
+ * position.
+ *
+ * Written out rather than taken from Phaser's easing table because the shadow's
+ * arrival is computed per frame from a clock rather than run as a tween — see
+ * `animateShadow` for why it cannot be one.
+ */
+function easeOutBack(progress: number): number {
+  const overshoot = 1.7;
+  const back = progress - 1;
+
+  return 1 + (overshoot + 1) * back ** 3 + overshoot * back ** 2;
+}
+
 /** Whether a cell is in the part of the board the player can see. */
 function isVisibleRow(row: number): boolean {
   return row >= FIRST_VISIBLE_ROW && row < ROWS;
@@ -294,6 +340,44 @@ export class BoardScene extends Scene {
    */
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
+
+  /**
+   * The lit eyes laid over every shadow on the board, one slot per visible cell
+   * and indexed exactly like `cellTiles`.
+   *
+   * Separate objects rather than part of the tile texture because they are the
+   * half that has to move independently: they blink, they flare as a shadow
+   * arrives, and they are drawn additively so they read as light rather than as
+   * paint. A slot per cell rather than a pool sized to some guess at how many
+   * shadows there can be — the board is 72 cells and every one of them can end
+   * up holding one.
+   */
+  private shadowEyes: Phaser.GameObjects.Image[];
+
+  /**
+   * Which cells are currently being drawn as a live shadow, and the one that is
+   * still climbing out of the board.
+   *
+   * The set exists to put a cell BACK when it stops holding a shadow: the idle
+   * writes position, angle, scale and alpha every frame, and a cell that is
+   * cleared while leaning would otherwise stay leaning for the rest of the run.
+   * Resetting every cell unconditionally instead is not an option — it would
+   * flatten the landing bounce, which is a tween on those same tiles.
+   */
+  private animatedShadowCells = new Set<number>();
+
+  private shadowArrival: { cellIndex: number; age: number } | null = null;
+
+  /**
+   * The clock the idle is computed from. Its own, rather than `time` from the
+   * frame, because it must stop when the game does: a paused board whose
+   * shadows keep breathing does not read as paused, and a hit-stop that
+   * everything on screen ignores does not read as impact.
+   */
+  private shadowClock = 0;
+
+  /** The engine's arrival count as of the one this scene last announced. */
+  private shownShadowTaken = 0;
 
   /**
    * The traces between matching neighbours — the board wiring itself up as it
@@ -484,6 +568,20 @@ export class BoardScene extends Scene {
       for (let column = 0; column < COLUMNS; column += 1) {
         this.cellTiles.push(
           this.add.image(centerOfColumn(column), centerOfRow(row), tileTexture(null)),
+        );
+      }
+    }
+
+    // Straight after the cells, so a pair falling past a shadow still passes in
+    // front of its eyes.
+    this.shadowEyes = [];
+    for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        this.shadowEyes.push(
+          this.add
+            .image(centerOfColumn(column), centerOfRow(row), SHADOW_EYES_TEXTURE)
+            .setBlendMode(BlendModes.ADD)
+            .setVisible(false),
         );
       }
     }
@@ -732,6 +830,21 @@ export class BoardScene extends Scene {
       }
     }
 
+    // The shadows are frozen by hit-stop and by a reveal along with everything
+    // else: a board that holds still except for the creatures on it breathing
+    // does not read as held.
+    if (this.hitStopRemaining <= 0 && this.revealRemaining <= 0) {
+      this.shadowClock += delta;
+
+      if (this.shadowArrival !== null) {
+        this.shadowArrival.age += delta;
+        if (this.shadowArrival.age >= SHADOW_ARRIVAL_DURATION) {
+          this.shadowArrival = null;
+        }
+      }
+    }
+
+    this.playShadowArrival();
     this.playCascadeBeat();
     this.playSounds();
     this.drawBoard();
@@ -819,6 +932,14 @@ export class BoardScene extends Scene {
     for (const part of [this.revealScrim, this.revealTitle, this.revealBody]) {
       part.setVisible(false).setAlpha(1);
     }
+
+    for (const index of this.animatedShadowCells) {
+      this.restoreCell(index);
+    }
+    this.animatedShadowCells.clear();
+    this.shadowArrival = null;
+    this.shadowClock = 0;
+    this.shownShadowTaken = this.simulation.shadowTaken;
 
     this.shownBeats = this.simulation.beatsPlayed;
     this.soundedPiecesLocked = this.simulation.piecesLocked;
@@ -912,11 +1033,146 @@ export class BoardScene extends Scene {
   private drawBoard(): void {
     for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
-        this.cellTiles[visibleCellIndex(column, row)].setTexture(
-          tileTexture(this.settledPieceAt(column, row)),
-        );
+        const pieceType = this.settledPieceAt(column, row);
+        const index = visibleCellIndex(column, row);
+
+        this.cellTiles[index].setTexture(tileTexture(pieceType));
+
+        if (pieceType === SHADOW) {
+          this.animateShadow(index, column, row);
+        } else if (this.animatedShadowCells.delete(index)) {
+          this.restoreCell(index);
+        }
       }
     }
+  }
+
+  /**
+   * One shadow, alive: bobbing, leaning, breathing, blinking — and still
+   * climbing out of the board if it has only just arrived.
+   *
+   * Every part of it is a function of the clock and the cell's own coordinates,
+   * so no shadow holds any state of its own and no two of them move in step.
+   * Two creatures breathing in unison read as one animation played twice, which
+   * is the thing that makes a screen full of them look like wallpaper.
+   *
+   * Written per frame rather than as tweens because the tiles it moves are the
+   * board's own cells: `drawBoard` rewrites every one of them every frame, a
+   * shadow changes which cell it lives in whenever the stack settles, and a
+   * landing bounce is already tweening those same objects. A tween here would
+   * have to be found, killed and rebuilt on every one of those events.
+   */
+  private animateShadow(index: number, column: number, row: number): void {
+    this.animatedShadowCells.add(index);
+
+    const phase = column * 2.1 + row * 1.7;
+    const clock = this.shadowClock;
+    const bob = Math.sin(clock / 520 + phase) * SHADOW_BOB_PIXELS;
+    const lean = Math.sin(clock / 830 + phase) * SHADOW_LEAN_DEGREES;
+    const breath = 1 + Math.sin(clock / 470 + phase) * SHADOW_BREATH;
+
+    const arriving = this.shadowArrival?.cellIndex === index
+      ? Math.min(this.shadowArrival.age / SHADOW_ARRIVAL_DURATION, 1)
+      : 1;
+    const risen = arriving >= 1 ? 1 : easeOutBack(arriving);
+
+    const x = centerOfColumn(column);
+    const y = centerOfRow(row) + bob + (1 - risen) * CELL_SIZE * 0.55;
+    const opening = Math.min(arriving * 2.5, 1);
+
+    this.cellTiles[index]
+      .setPosition(x, y)
+      .setAngle(lean)
+      .setScale(breath * (0.5 + 0.5 * risen))
+      .setAlpha(opening);
+
+    // Eyes wide as it lands, settling to their idle glow: the flare is what
+    // makes an arrival read as something noticing you, and it is the part that
+    // catches the eye of a player looking somewhere else on the board.
+    const flare = 1 - arriving;
+    const glow = 0.8 + 0.2 * Math.sin(clock / 610 + phase);
+
+    this.shadowEyes[index]
+      .setVisible(true)
+      .setPosition(x, y)
+      .setAngle(lean)
+      .setScale(
+        breath * (1 + flare * 0.6),
+        breath * (1 + flare * 0.6) * this.blinkAt(clock, phase),
+      )
+      .setAlpha(Math.min(glow + flare, 1) * opening);
+  }
+
+  /**
+   * How open a shadow's eyes are, 0 to 1.
+   *
+   * Read off the clock rather than scheduled, so a blink costs no timer, no
+   * stored state and no allocation — and a shadow that ends up in a different
+   * cell simply picks up that cell's rhythm.
+   */
+  private blinkAt(clock: number, phase: number): number {
+    const into = (clock + phase * 700) % (BLINK_INTERVAL + phase * 210);
+    if (into > BLINK_DURATION) {
+      return 1;
+    }
+
+    // Shut and open again across the window, so the lid travels rather than the
+    // eye disappearing for a frame.
+    return Math.abs(into / (BLINK_DURATION / 2) - 1);
+  }
+
+  /**
+   * Put a cell back the way an ordinary tile expects to find it.
+   *
+   * The idle writes position, angle, scale and alpha every frame, so a cell
+   * that stops holding a shadow — cleared, or settled into from above — would
+   * otherwise keep the lean and the half-second of breath it was in the middle
+   * of for the rest of the run. Resetting every cell unconditionally instead
+   * would flatten the landing bounce, which is a tween on these same objects.
+   */
+  private restoreCell(index: number): void {
+    const column = index % COLUMNS;
+    const row = FIRST_VISIBLE_ROW + Math.floor(index / COLUMNS);
+
+    this.cellTiles[index]
+      .setPosition(centerOfColumn(column), centerOfRow(row))
+      .setAngle(0)
+      .setScale(1)
+      .setAlpha(1);
+    this.shadowEyes[index].setVisible(false);
+  }
+
+  /**
+   * Announce a cell the shadow has just taken.
+   *
+   * Counted off the engine's own counter rather than noticed by watching the
+   * board, for the same reason a landing is: by the time the scene looks, the
+   * shadow is simply there, and being there is not an event.
+   *
+   * Every arrival is in a visible row, so there is no hidden-row case to
+   * handle: `encroach` ends the run rather than taking a cell the player cannot
+   * see.
+   */
+  private playShadowArrival(): void {
+    const { shadowTaken, lastShadowCell } = this.simulation;
+    if (shadowTaken === this.shownShadowTaken || lastShadowCell === null) {
+      return;
+    }
+
+    this.shownShadowTaken = shadowTaken;
+    this.soundBoard.play(shadowArrivalVoice());
+
+    this.shadowArrival = {
+      cellIndex: visibleCellIndex(lastShadowCell.column, lastShadowCell.row),
+      age: 0,
+    };
+
+    this.sparks.setParticleTint(SHADOW_EDGE_COLOR);
+    this.sparks.emitParticleAt(
+      centerOfColumn(lastShadowCell.column),
+      centerOfRow(lastShadowCell.row),
+      SPARKS_PER_CELL,
+    );
   }
 
   /**
@@ -948,8 +1204,15 @@ export class BoardScene extends Scene {
    */
   private drawConnections(): void {
     for (const slot of this.connections) {
+      // Colourless occupants are excluded rather than falling out naturally:
+      // two shadow cells side by side hold the same value, so without this they
+      // would "connect" — lighting a trace between the two things in the game
+      // that are least connected, tinted from a palette entry that does not
+      // exist. `isColour` is the same question `findGroups` asks, so the two
+      // layers cannot come to different conclusions about what connects.
       const pieceType = this.settledPieceAt(slot.column, slot.row);
-      const linked = pieceType !== null && pieceType === this.settledPieceAt(slot.toColumn, slot.toRow);
+      const linked = isColour(pieceType)
+        && pieceType === this.settledPieceAt(slot.toColumn, slot.toRow);
 
       slot.trace.setVisible(linked);
       if (linked) {
@@ -1367,6 +1630,7 @@ export class BoardScene extends Scene {
    * carries it, so the hole is empty and legible before the next beat starts.
    */
   private popCells(link: ChainLink, connections: number): void {
+    const shadowPushed = link.shadowCleared;
     this.tweens.killTweensOf(this.popTiles);
     this.hitStopRemaining = this.tuning.hitStopDuration;
     this.kickCamera();
@@ -1407,8 +1671,53 @@ export class BoardScene extends Scene {
       }
     }
 
-    if (borrowed > 0) {
-      this.showConnectionPopup(sumX / borrowed, sumY / borrowed, connections);
+    // Fixed before the shadow borrows from the same pool, because the popup
+    // belongs over what the player cleared — averaging the shadow cells in
+    // would drag it off toward whatever happened to be standing beside it.
+    const poppedCells = borrowed;
+
+    for (const cell of shadowPushed) {
+      if (!isVisibleRow(cell.row)) {
+        continue;
+      }
+
+      const x = centerOfColumn(cell.column);
+      const y = centerOfRow(cell.row);
+
+      const tile = this.popTiles[borrowed];
+      borrowed += 1;
+
+      tile
+        .setPosition(x, y)
+        .setTexture(tileTexture(SHADOW))
+        .setScale(1)
+        .setAngle(0)
+        .setAlpha(1)
+        .setVisible(true);
+
+      // Blown outward, where a cleared tile collapses inward. A piece falls
+      // into the hole it leaves; this is the one thing on the board that is
+      // being driven off it, and the two should not read as the same event.
+      this.tweens.add({
+        targets: tile,
+        scale: 1.45,
+        alpha: 0,
+        duration: this.tuning.popDuration * 1.6,
+        ease: 'Quad.easeOut',
+        onComplete: () => tile.setVisible(false),
+      });
+
+      this.restoreCell(visibleCellIndex(cell.column, cell.row));
+      this.sparks.setParticleTint(SHADOW_EYE_GLOW);
+      this.sparks.emitParticleAt(x, y, SPARKS_PER_CELL);
+    }
+
+    if (shadowPushed.length > 0) {
+      this.soundBoard.play(shadowRecedeVoice(shadowPushed.length));
+    }
+
+    if (poppedCells > 0) {
+      this.showConnectionPopup(sumX / poppedCells, sumY / poppedCells, connections);
     }
   }
 

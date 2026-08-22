@@ -56,6 +56,23 @@ export interface Tuning {
   connectionsPerNode: readonly number[];
 
   /**
+   * How long the player may go without connecting anything before the shadow
+   * takes a cell.
+   *
+   * The antagonist is the one who stops without finishing, so what feeds it is
+   * HESITATION rather than time. Gravity is not the pressure in this game;
+   * dithering is. Every clear resets it, which makes the counter-play the same
+   * verb the whole game is about.
+   *
+   * 6 seconds, played rather than reasoned about. It shipped at a guessed 12,
+   * and at 12 the shadow was something you noticed afterwards rather than
+   * something you played around; 20 was dead air. This is the dial that decides
+   * whether the game is tense or nagging, so it is the one most worth replaying
+   * whenever the rest of the pacing moves.
+   */
+  shadowInterval: number;
+
+  /**
    * How long a fragment and a question hold the board BEFORE the time it takes
    * to read them, which `readingPerCharacter` adds on top.
    *
@@ -188,6 +205,7 @@ export interface Tuning {
  */
 export const DEFAULT_TUNING: Tuning = {
   connectionsPerNode: [6, 9, 12, 16, 20, 26, 32, 40],
+  shadowInterval: 6000,
   fragmentDuration: 1400,
   questionDuration: 3000,
   readingPerCharacter: 48,

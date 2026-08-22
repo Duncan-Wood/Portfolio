@@ -1,13 +1,17 @@
-import { COLUMNS, FIRST_VISIBLE_ROW } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, SHADOW } from './grid';
 import { Board, type TileMove } from './board';
 import { FallingPair, type PairCell } from './falling-pair';
-import { clearStep, findGroups, scoreLink, type ChainLink } from './matching';
+import { clearStep, findGroups, scoreLink, type ChainLink, type GroupCell } from './matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
 /*
  * The game's clock and state machine. It owns the board and the falling pair,
  * and drives everything that happens over time: gravity, the lock delay, and
  * the cascade.
+ *
+ * It also owns the shadow: how long the player may hesitate before it takes a
+ * cell, and where it takes one. What drives it OFF the board is not here — that
+ * is what clearing does, and `matching.ts` owns that.
  *
  * It has NO notion of frames, rendering, or keyboards. It is advanced by
  * `update(delta)` where delta is milliseconds, and the caller decides where
@@ -97,6 +101,55 @@ export class Simulation {
   toppedOut = false;
 
   chainLength = 0;
+
+  /**
+   * The antagonist, stated as a rule: it arrives when the player stops
+   * connecting things, it matches nothing, and it only leaves when something
+   * clears beside it. The part of you that stops without finishing takes more
+   * of the board the longer you hesitate, and light is what pushes it back.
+   *
+   * How many cells the shadow has taken this run, and the last one it took.
+   *
+   * The counter is what the scene watches, for the reason `piecesSpawned`
+   * exists: the engine promises the number ticks, not that anything is
+   * reallocated. Without it an arrival is invisible — the shadow simply is
+   * where it was not, with no moment to react to and nothing to sound.
+   *
+   * Only a landed arrival counts. When there is nowhere left to put one the run
+   * is over instead, and announcing an arrival there would have the scene
+   * animating a creature into a cell it never reached.
+   */
+  shadowTaken = 0;
+
+  lastShadowCell: GroupCell | null = null;
+
+  /**
+   * Cells the shadow currently holds.
+   *
+   * COUNTED from the board rather than tracked alongside it. A running tally
+   * was one line shorter and immediately went wrong: anything that put shadow
+   * on the board by another route left the two disagreeing, and a test passed
+   * because a shadow tile had merely fallen rather than been pushed back.
+   */
+  get shadowOnBoard(): number {
+    let held = 0;
+
+    for (let row = 0; row < ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        if (this.board.pieceAt(column, row) === SHADOW) {
+          held += 1;
+        }
+      }
+    }
+
+    return held;
+  }
+
+  /**
+   * Milliseconds since anything last cleared. Not since the last input — a
+   * player can shuffle a piece back and forth all day and still be stalling.
+   */
+  private stallTimer = 0;
 
   /**
    * Connections made this run: cells cleared, each weighted by how deep into a
@@ -210,6 +263,9 @@ export class Simulation {
    *   2. the pair has landed  — count down the lock delay
    *   3. the pair is falling  — apply gravity
    *
+   * The shadow's patience runs alongside 2 and 3, but never during 1: time
+   * spent watching a cascade is not time spent hesitating.
+   *
    * The engine deliberately does NOT clamp `delta`; it trusts its caller. The
    * caller's job is to bound it, which `FixedTimestep` does.
    */
@@ -219,8 +275,27 @@ export class Simulation {
     }
 
     if (this.resolving) {
+      // Time spent watching a cascade is not time spent hesitating, so the
+      // shadow's patience does not run while the board is still resolving.
       this.advanceChain(delta);
       return;
+    }
+
+    this.stallTimer += delta;
+    if (this.stallTimer >= this.tuning.shadowInterval) {
+      this.stallTimer = 0;
+      this.encroach();
+
+      // `encroach` can end the run — the shadow had nowhere left to take. The
+      // rest of this frame belongs to a game that is still being played, and
+      // without this the pair that was falling commits ANYWAY: its halves are
+      // written to a board the player has already lost, a landing is sounded
+      // after GAME OVER, and a group completed by that phantom lock starts a
+      // cascade that can never resolve, because every later update returns at
+      // the top on `toppedOut`.
+      if (this.toppedOut) {
+        return;
+      }
     }
 
     if (!this.pair.canFall(this.board)) {
@@ -275,6 +350,7 @@ export class Simulation {
     this.score = 0;
     this.connectionsMade = 0;
     this.chainLength = 0;
+    this.stallTimer = 0;
     this.resolving = false;
     this.settlePending = false;
     this.resolveTimer = 0;
@@ -285,6 +361,8 @@ export class Simulation {
     this.lastBeat = null;
     this.piecesLocked = 0;
     this.lastLanded = [];
+    this.shadowTaken = 0;
+    this.lastShadowCell = null;
 
     this.piecesSpawned = 0;
     // Seed the preview before the first spawn consumes it.
@@ -380,6 +458,10 @@ export class Simulation {
 
     // `chainLength` is the 0-based index of this link, so the first link of a
     // cascade scores at 1x and each subsequent one doubles.
+    // `clearStep` has already driven back whatever shadow was touching this
+    // link — the rule lives with the clearing, in `matching.ts`.
+    this.stallTimer = 0;
+
     const connections = link.cellsCleared * (this.chainLength + 1);
 
     this.score += scoreLink(link, this.chainLength);
@@ -387,6 +469,47 @@ export class Simulation {
     this.chainLength += 1;
     this.settlePending = true;
     this.recordBeat({ kind: 'clear', link, connections });
+  }
+
+  /**
+   * Take the emptiest column's next free cell.
+   *
+   * The emptiest rather than the fullest: the cruel choice would be to pile on
+   * where the player is already in trouble, but the shadow is not trying to
+   * kill them, it is trying to make the board less connected. Spreading it
+   * evenly costs them reach everywhere instead of ending the run in one place.
+   */
+  private encroach(): void {
+    // The falling pair is NOT on the board — it is a separate object until it
+    // locks — so a column scan looks straight through it. Skipping the columns
+    // it is standing in is the fix at the root: without it the shadow could be
+    // dropped into the very cell the pair occupied, and locking then wrote a
+    // tile over a tile and threw.
+    const busy = this.pair.cells().map((cell) => cell.column);
+
+    let chosenColumn = -1;
+    let deepest = -1;
+
+    for (let column = 0; column < COLUMNS; column += 1) {
+      if (busy.includes(column)) {
+        continue;
+      }
+
+      const row = this.board.landingRow(column);
+      if (row > deepest) {
+        deepest = row;
+        chosenColumn = column;
+      }
+    }
+
+    if (chosenColumn === -1 || deepest < FIRST_VISIBLE_ROW) {
+      this.toppedOut = true;
+      return;
+    }
+
+    this.board.place(chosenColumn, deepest, SHADOW);
+    this.lastShadowCell = { column: chosenColumn, row: deepest };
+    this.shadowTaken += 1;
   }
 
   private recordBeat(beat: CascadeBeat): void {

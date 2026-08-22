@@ -80,3 +80,39 @@ export const TRACK_LIT_COLOR = 0xc98cff;
 
 /** An unoccupied cell. Drawn rather than left blank so the grid stays legible. */
 export const EMPTY_COLOR = 0x241038;
+
+/**
+ * A cell the shadow holds — the pit it is crouching in. Darker than an empty
+ * one on purpose: an empty cell is room to work in, and this is the absence of
+ * room.
+ */
+export const SHADOW_COLOR = 0x0d0714;
+
+/**
+ * The creature itself, and the light along its edge.
+ *
+ * Its body is a shade LIGHTER than the pit behind it, which is the whole reason
+ * it is visible at all: black on black is a shape nobody can see, and the first
+ * version of the shadow — a near-black square with a hairline outline — read as
+ * a rendering fault rather than as a thing on the board.
+ *
+ * Both are violet, and that is the point rather than convenience. The
+ * antagonist is not an invader from outside; it is the part of this mind that
+ * stops without finishing, so it is lit in the same purple as the ground it
+ * stands on and the track that rings the board. Yellow eyes would have made it
+ * someone else's monster.
+ */
+export const SHADOW_BODY_COLOR = 0x1a0e2e;
+
+export const SHADOW_EDGE_COLOR = 0x7d54b8;
+
+/**
+ * Its eyes: a near-white core in a violet halo.
+ *
+ * The one bright thing in the cell, and the only part of the design doing the
+ * work at a glance — a player scanning the board for somewhere to build reads
+ * two lit dots long before they read a silhouette.
+ */
+export const SHADOW_EYE_COLOR = 0xf4eeff;
+
+export const SHADOW_EYE_GLOW = 0xb07dff;

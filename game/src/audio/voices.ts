@@ -116,6 +116,48 @@ export function nodeVoice(padIndex: number, padCount: number): Voice {
 }
 
 /**
+ * The shadow taking a cell.
+ *
+ * The lowest, longest thing in the game and the only voice that falls into the
+ * bass — every other sound here is an event the player caused, and this is the
+ * one that happens TO them. Sawtooth because it has to sound wrong beside four
+ * clean waveforms, and quiet because it arrives unprompted: a loud sting for
+ * something you cannot answer immediately reads as nagging.
+ */
+export function shadowArrivalVoice(): Voice {
+  return {
+    waveform: 'sawtooth',
+    startFrequency: 150,
+    endFrequency: 62,
+    duration: 320,
+    gain: 0.12,
+    delay: 0,
+  };
+}
+
+/**
+ * Light pushing the shadow back off a cell.
+ *
+ * The inverse of the arrival — short, high and rising where that one is long,
+ * low and falling — so the counter-play is audible as the answer to it. It
+ * plays once per link rather than once per cell, with a little more weight
+ * behind a clear that pushed back several, because one voice per cell would
+ * stack into a chord on top of the pop that caused it.
+ */
+export function shadowRecedeVoice(cellsPushed: number): Voice {
+  const weight = Math.min(cellsPushed, 4) / 4;
+
+  return {
+    waveform: 'triangle',
+    startFrequency: 880,
+    endFrequency: 1320 + 220 * weight,
+    duration: 90,
+    gain: 0.05 + 0.05 * weight,
+    delay: 0,
+  };
+}
+
+/**
  * The flourish after a real chain resolves: an ascending arpeggio, one note per
  * link, played over the top of the pops that already happened.
  *

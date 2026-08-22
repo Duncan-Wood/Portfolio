@@ -1,0 +1,359 @@
+import { describe, expect, it } from 'vitest';
+import { COLUMNS, ROWS, SHADOW } from './grid';
+import { Board } from './board';
+import { findGroups } from './matching';
+import { type CascadeBeat, Simulation } from './simulation';
+import { DEFAULT_TUNING } from '../tuning';
+
+const RED = 0;
+const BLUE = 1;
+const simulation = () => new Simulation(() => [RED, BLUE], { ...DEFAULT_TUNING });
+
+/** Lock whatever is falling and run the cascade it starts to the end. */
+const settle = (game: Simulation) => {
+  while (game.pair.canFall(game.board)) {
+    game.update(DEFAULT_TUNING.fallInterval);
+  }
+  game.update(DEFAULT_TUNING.lockDelay);
+
+  for (let beat = 0; beat < 200 && game.resolving; beat += 1) {
+    game.update(Math.max(DEFAULT_TUNING.chainLinkDelay, DEFAULT_TUNING.settleDelay));
+  }
+};
+
+/** Lock what is falling and keep every beat of the cascade that follows. */
+const settleCollectingBeats = (game: Simulation): CascadeBeat[] => {
+  const beats: CascadeBeat[] = [];
+  let seen = game.beatsPlayed;
+
+  while (game.pair.canFall(game.board)) {
+    game.update(DEFAULT_TUNING.fallInterval);
+  }
+  game.update(DEFAULT_TUNING.lockDelay);
+
+  for (let beat = 0; beat < 200 && game.resolving; beat += 1) {
+    game.update(Math.max(DEFAULT_TUNING.chainLinkDelay, DEFAULT_TUNING.settleDelay));
+    if (game.beatsPlayed !== seen && game.lastBeat !== null) {
+      seen = game.beatsPlayed;
+      beats.push(game.lastBeat);
+    }
+  }
+
+  return beats;
+};
+
+describe('shadow as an obstacle', () => {
+  it('never forms a group, however many of it are touching', () => {
+    const board = new Board();
+    for (let column = 0; column < COLUMNS; column += 1) {
+      board.place(column, ROWS - 1, SHADOW);
+    }
+
+    expect(findGroups(board)).toHaveLength(0);
+  });
+
+  it('does not join a colour group it is adjacent to', () => {
+    const board = new Board();
+    board.place(0, ROWS - 1, RED);
+    board.place(1, ROWS - 1, RED);
+    board.place(2, ROWS - 1, RED);
+    board.place(3, ROWS - 1, SHADOW);
+
+    // Three reds and a shadow is three reds. Without this the shadow would be
+    // the fourth member and would clear itself.
+    expect(findGroups(board)).toHaveLength(0);
+  });
+
+  it('lets a colour group form around it without being consumed', () => {
+    const board = new Board();
+    board.place(0, ROWS - 1, RED);
+    board.place(1, ROWS - 1, RED);
+    board.place(2, ROWS - 1, RED);
+    board.place(3, ROWS - 1, RED);
+    board.place(2, ROWS - 2, SHADOW);
+
+    const groups = findGroups(board);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].cells).toHaveLength(4);
+  });
+});
+
+describe('shadow encroaching while the player stalls', () => {
+  it('holds off while the player keeps clearing', () => {
+    const game = simulation();
+    expect(game.shadowOnBoard).toBe(0);
+
+    game.update(DEFAULT_TUNING.shadowInterval - 1);
+
+    expect(game.shadowOnBoard).toBe(0);
+  });
+
+  it('takes a cell once the player has stalled long enough', () => {
+    const game = simulation();
+
+    game.update(DEFAULT_TUNING.shadowInterval);
+
+    expect(game.shadowOnBoard).toBe(1);
+  });
+
+  it('keeps taking cells the longer nothing connects', () => {
+    const game = simulation();
+
+    game.update(DEFAULT_TUNING.shadowInterval);
+    game.update(DEFAULT_TUNING.shadowInterval);
+
+    expect(game.shadowOnBoard).toBe(2);
+  });
+
+  it('is held off by clearing, which is the whole point of it', () => {
+    const game = simulation();
+    game.update(DEFAULT_TUNING.shadowInterval * 0.9);
+
+    // A clear resets the patience: connecting is what keeps it back.
+    for (let offset = 0; offset < 3; offset += 1) {
+      game.board.place(0, ROWS - 1 - offset, RED);
+    }
+    game.board.place(1, ROWS - 1, RED);
+    settle(game);
+
+    game.update(DEFAULT_TUNING.shadowInterval * 0.9);
+
+    expect(game.shadowOnBoard).toBe(0);
+  });
+
+  it('never takes the cell the falling pair is standing in', () => {
+    const game = simulation();
+
+    // One tile in every column but the spawn column, so the column the pair is
+    // falling down is the emptiest — which is the one the shadow reaches for.
+    game.board.place(0, ROWS - 1, RED);
+    game.board.place(1, ROWS - 1, BLUE);
+    game.board.place(3, ROWS - 1, BLUE);
+    game.board.place(4, ROWS - 1, RED);
+    game.board.place(5, ROWS - 1, RED);
+
+    while (game.pair.canFall(game.board)) {
+      game.update(DEFAULT_TUNING.fallInterval);
+    }
+    const standing = game.pair.cells();
+
+    // The pair is not ON the board, so nothing stopped the shadow being placed
+    // straight into it — and then locking wrote a tile over a tile and threw.
+    expect(() => game.update(DEFAULT_TUNING.shadowInterval)).not.toThrow();
+
+    for (const cell of standing) {
+      expect(game.board.pieceAt(cell.column, cell.row)).not.toBe(SHADOW);
+    }
+  });
+
+  it('says where it took a cell, so the scene can show it arriving', () => {
+    const game = simulation();
+    expect(game.shadowTaken).toBe(0);
+    expect(game.lastShadowCell).toBeNull();
+
+    game.update(DEFAULT_TUNING.shadowInterval);
+
+    // Counted, not compared by identity, for the same reason `piecesSpawned`
+    // is: the engine promises the count ticks, not a fresh allocation.
+    expect(game.shadowTaken).toBe(1);
+    const taken = game.lastShadowCell;
+    expect(taken).not.toBeNull();
+    expect(game.board.pieceAt(taken!.column, taken!.row)).toBe(SHADOW);
+  });
+
+  it('does not tick the arrival counter when it had nowhere to go', () => {
+    const game = simulation();
+    // Every cell the falling pair is not standing in, full to the top: the
+    // shadow has nowhere to go, and that ends the run rather than counting an
+    // arrival that never landed.
+    const standing = game.pair.cells();
+    for (let column = 0; column < COLUMNS; column += 1) {
+      for (let row = 0; row < ROWS; row += 1) {
+        const occupied = standing.some((cell) => cell.column === column && cell.row === row);
+        if (!occupied && game.board.isEmpty(column, row)) {
+          game.board.place(column, row, column % 2 === 0 ? RED : BLUE);
+        }
+      }
+    }
+
+    game.update(DEFAULT_TUNING.shadowInterval);
+
+    expect(game.toppedOut).toBe(true);
+    expect(game.shadowTaken).toBe(0);
+  });
+
+  it('does not commit the falling pair on the frame it ends the run', () => {
+    const game = simulation();
+    const standing = game.pair.cells();
+    for (let column = 0; column < COLUMNS; column += 1) {
+      for (let row = 0; row < ROWS; row += 1) {
+        const occupied = standing.some((cell) => cell.column === column && cell.row === row);
+        if (!occupied && game.board.isEmpty(column, row)) {
+          game.board.place(column, row, column % 2 === 0 ? RED : BLUE);
+        }
+      }
+    }
+    while (game.pair.canFall(game.board)) {
+      game.update(DEFAULT_TUNING.fallInterval);
+    }
+
+    // Long enough to trip the shadow AND to run out the lock delay, which is
+    // the frame where the two used to happen in that order.
+    game.update(DEFAULT_TUNING.shadowInterval + DEFAULT_TUNING.lockDelay);
+
+    expect(game.toppedOut).toBe(true);
+    // The run ended before the pair could land, so nothing landed: a lock here
+    // sounds a landing after GAME OVER and can start a cascade that the
+    // top-out guard then stops anything from ever resolving.
+    expect(game.piecesLocked).toBe(0);
+    expect(game.resolving).toBe(false);
+  });
+
+  it('does not creep in while a cascade is still resolving', () => {
+    const game = simulation();
+    for (let offset = 0; offset < 3; offset += 1) {
+      game.board.place(0, ROWS - 1 - offset, RED);
+    }
+    game.board.place(1, ROWS - 1, RED);
+    while (game.pair.canFall(game.board)) game.update(DEFAULT_TUNING.fallInterval);
+    game.update(DEFAULT_TUNING.lockDelay);
+    expect(game.resolving).toBe(true);
+
+    game.update(DEFAULT_TUNING.shadowInterval);
+
+    expect(game.shadowOnBoard).toBe(0);
+  });
+});
+
+describe('pushing the shadow back', () => {
+  it('recedes from a group cleared beside it', () => {
+    const game = simulation();
+    for (let column = 0; column < 4; column += 1) {
+      game.board.place(column, ROWS - 1, RED);
+    }
+    game.board.place(3, ROWS - 2, SHADOW);
+
+    settle(game);
+
+    expect(game.board.pieceAt(3, ROWS - 2)).not.toBe(SHADOW);
+    expect(game.shadowOnBoard).toBe(0);
+  });
+
+  it('leaves shadow that nothing cleared beside it alone', () => {
+    const game = simulation();
+    for (let column = 0; column < 4; column += 1) {
+      game.board.place(column, ROWS - 1, RED);
+    }
+    game.board.place(5, ROWS - 1, SHADOW);
+
+    settle(game);
+
+    expect(game.board.pieceAt(5, ROWS - 1)).toBe(SHADOW);
+    expect(game.shadowOnBoard).toBe(1);
+  });
+
+  it('names the cells a link pushed it out of', () => {
+    const game = simulation();
+    for (let column = 0; column < 4; column += 1) {
+      game.board.place(column, ROWS - 1, RED);
+    }
+    game.board.place(3, ROWS - 2, SHADOW);
+
+    const beats = settleCollectingBeats(game);
+    const cleared = beats.flatMap((beat) => (beat.kind === 'clear' ? beat.link.shadowCleared : []));
+
+    // The board is already in its post-beat state when the scene reads it, so
+    // "a shadow was here and now is not" is not recoverable by looking.
+    expect(cleared).toEqual([{ column: 3, row: ROWS - 2 }]);
+  });
+
+  it('reports nothing for a link that cleared nowhere near it', () => {
+    const game = simulation();
+    for (let column = 0; column < 4; column += 1) {
+      game.board.place(column, ROWS - 1, RED);
+    }
+    game.board.place(5, ROWS - 1, SHADOW);
+
+    const beats = settleCollectingBeats(game);
+    const cleared = beats.flatMap((beat) => (beat.kind === 'clear' ? beat.link.shadowCleared : []));
+
+    expect(cleared).toEqual([]);
+  });
+
+  it('forgets the shadow on restart', () => {
+    const game = simulation();
+    game.update(DEFAULT_TUNING.shadowInterval);
+    expect(game.shadowOnBoard).toBe(1);
+
+    game.restart();
+
+    expect(game.shadowOnBoard).toBe(0);
+    expect(game.shadowTaken).toBe(0);
+    expect(game.lastShadowCell).toBeNull();
+  });
+});
+
+describe('a long run with the shadow in it', () => {
+  /*
+   * A soak, not a unit test. `Board.place` throws on an occupied write by
+   * design, so any state the engine can reach where two things want the same
+   * cell is a crash in front of a player rather than a wrong number — and the
+   * shadow arrives on a timer, which means it interleaves with falling,
+   * locking, cascading and spawning in orders no hand-written case covers.
+   *
+   * Seeded, so a failure is reproducible rather than a story about a crash
+   * someone saw once.
+   */
+  const playSeeded = (seed: number) => {
+    let state = seed;
+    const random = () => {
+      state = (state * 1103515245 + 12345) % 2147483648;
+      return state / 2147483648;
+    };
+
+    // A far shorter fuse than the real dial, so the shadow lands repeatedly
+    // inside a run this length. At the shipping 6s a random player tops out
+    // before it ever arrives, and the soak would exercise everything except the
+    // thing it was written for.
+    const game = new Simulation(
+      () => [Math.floor(random() * 4), Math.floor(random() * 4)],
+      { ...DEFAULT_TUNING, shadowInterval: 500 },
+    );
+
+    for (let step = 0; step < 6000 && !game.toppedOut; step += 1) {
+      const roll = random();
+      if (roll < 0.22) game.moveLeft();
+      else if (roll < 0.44) game.moveRight();
+      else if (roll < 0.6) game.rotate();
+      else if (roll < 0.66) game.hardDrop();
+
+      game.softDropping = random() < 0.3;
+      game.update(16.67);
+    }
+
+    return game;
+  };
+
+  it('survives thousands of steps without two things claiming one cell', () => {
+    for (const seed of [1, 2, 3, 17, 101, 9001]) {
+      expect(() => playSeeded(seed)).not.toThrow();
+    }
+  });
+
+  it('actually reaches the states it is meant to be exercising', () => {
+    let sawShadow = false;
+    let sawLocks = 0;
+
+    for (const seed of [1, 2, 3, 17, 101, 9001]) {
+      const game = playSeeded(seed);
+      sawLocks += game.piecesLocked;
+      if (game.shadowOnBoard > 0) {
+        sawShadow = true;
+      }
+    }
+
+    // A soak that never sees a shadow proved nothing about the shadow.
+    expect(sawShadow).toBe(true);
+    expect(sawLocks).toBeGreaterThan(30);
+  });
+});

@@ -122,6 +122,25 @@ export class Board {
     return moves;
   }
 
+  /**
+   * The row a tile dropped down this column would come to rest in, or `-1` if
+   * the column is full to the ceiling.
+   *
+   * Here rather than in whatever wants it because it is gravity's inverse, and
+   * it is only correct because `settle` guarantees a column has no floating
+   * gaps — the deepest empty cell is reachable from above precisely because
+   * this module keeps that invariant.
+   */
+  landingRow(column: number): number {
+    for (let row = ROWS - 1; row >= 0; row -= 1) {
+      if (this.isEmpty(column, row)) {
+        return row;
+      }
+    }
+
+    return -1;
+  }
+
   /** Empty every cell, for a restart. */
   reset(): void {
     this.cells.fill(EMPTY);

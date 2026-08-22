@@ -34,3 +34,9 @@ notes.md
 # The storyboard's mechanical panels are tracked; the memory panels are not.
 # They hold personal biography and this repository is public.
 storyboard/memory-*
+# Character studies. Unlike the mechanical panels above, these are sketchbook
+# working-out rather than design record: nothing reads them, nothing builds
+# from them, and what they settled is written down in the comment on
+# `bakeShadow` and in ART-DIRECTION. Committing them would grow the repository
+# by megabytes every time a page gets drawn.
+storyboard/shadow*

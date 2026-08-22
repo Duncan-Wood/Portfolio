@@ -7,6 +7,8 @@ import {
   hardDropVoice,
   landVoice,
   popVoice,
+  shadowArrivalVoice,
+  shadowRecedeVoice,
   topOutVoice,
 } from './voices';
 
@@ -17,6 +19,9 @@ const everyVoice = [
   hardDropVoice(0),
   hardDropVoice(11),
   topOutVoice(),
+  shadowArrivalVoice(),
+  shadowRecedeVoice(1),
+  shadowRecedeVoice(6),
   ...chainVoices(3),
 ];
 
@@ -120,5 +125,34 @@ describe('the progress-track voice', () => {
 
     const rising = pitches.every((pitch, index) => index === 0 || pitch > pitches[index - 1]);
     expect(rising).toBe(true);
+  });
+});
+
+describe('the shadow', () => {
+  it('arrives below everything else the game plays', () => {
+    const arrival = shadowArrivalVoice();
+    const others = [popVoice(0), landVoice(), nodeVoice(0, 20), ...chainVoices(3)];
+
+    // It is the only voice the player did not cause, so it has to be tellable
+    // apart from all of them without looking at the board.
+    for (const voice of others) {
+      expect(arrival.endFrequency).toBeLessThan(voice.startFrequency);
+    }
+  });
+
+  it('falls as it arrives and rises as it is pushed back', () => {
+    const arrival = shadowArrivalVoice();
+    const recede = shadowRecedeVoice(1);
+
+    expect(arrival.endFrequency).toBeLessThan(arrival.startFrequency);
+    expect(recede.endFrequency).toBeGreaterThan(recede.startFrequency);
+  });
+
+  it('never drowns out the pop that pushed it back', () => {
+    expect(shadowRecedeVoice(6).gain).toBeLessThan(popVoice(0).gain);
+  });
+
+  it('answers a bigger push with more of an answer', () => {
+    expect(shadowRecedeVoice(3).gain).toBeGreaterThan(shadowRecedeVoice(1).gain);
   });
 });

@@ -1,5 +1,5 @@
 import { Board } from './board';
-import { COLUMNS, FIRST_VISIBLE_ROW, ROWS } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, SHADOW, isColour } from './grid';
 
 /*
  * The match rule and the cascade: what counts as a group, what clearing does,
@@ -52,10 +52,16 @@ export interface Group {
  * `groups` (with per-cell coordinates) exists so the scene can eventually
  * animate each link separately — which tiles popped, and where. `cellsCleared`
  * is the total, used for scoring.
+ *
+ * `shadowCleared` is what this link drove off the board, which is not
+ * recoverable afterwards: the cells are empty by the time anything reads them,
+ * and a shadow that was pushed back looks exactly like a shadow that was never
+ * there.
  */
 export interface ChainLink {
   groups: Group[];
   cellsCleared: number;
+  shadowCleared: GroupCell[];
 }
 
 export function findGroups(board: Board): Group[] {
@@ -69,7 +75,10 @@ export function findGroups(board: Board): Group[] {
     for (let column = 0; column < COLUMNS; column += 1) {
       const pieceType = board.pieceAt(column, row);
 
-      if (pieceType === null || visited.has(keyOf(column, row))) {
+      // A colourless occupant can never be part of a group, which is precisely
+      // why the shadow has to be cleared by something happening NEXT to it
+      // rather than by being matched.
+      if (!isColour(pieceType) || visited.has(keyOf(column, row))) {
         continue;
       }
 
@@ -109,7 +118,42 @@ export function clearStep(board: Board): ChainLink | null {
     }
   }
 
-  return { groups, cellsCleared };
+  return { groups, cellsCleared, shadowCleared: pushBackShadow(board, groups) };
+}
+
+/**
+ * Clear any shadow touching what just cleared.
+ *
+ * Shadow cannot be matched, so this is the only way it ever leaves — the rule
+ * ART-DIRECTION asked for, *shadow recedes from light*, and the reason a board
+ * full of it is one you have to play out of rather than one you have already
+ * lost.
+ *
+ * Here, inside the clearing step, rather than one layer up in `Simulation`.
+ * This file's header says it owns what clearing DOES, and it owns the only
+ * definition of what "touching" means. With the rule sitting above `clearStep`
+ * instead, every other path into it — `resolveStep`, `resolveChain`, and the
+ * tests built on them — cleared groups without the shadow ever receding, and
+ * reported a board the real game would never produce.
+ */
+function pushBackShadow(board: Board, groups: Group[]): GroupCell[] {
+  const pushed: GroupCell[] = [];
+
+  for (const group of groups) {
+    for (const cell of group.cells) {
+      for (const step of NEIGHBOURS) {
+        const column = cell.column + step.column;
+        const row = cell.row + step.row;
+
+        if (board.isInside(column, row) && board.pieceAt(column, row) === SHADOW) {
+          board.clear(column, row);
+          pushed.push({ column, row });
+        }
+      }
+    }
+  }
+
+  return pushed;
 }
 
 /**

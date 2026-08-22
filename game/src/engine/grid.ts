@@ -45,3 +45,34 @@ export const FIRST_VISIBLE_ROW = HIDDEN_ROWS;
  * filled before anything could clear.
  */
 export const PIECE_TYPE_COUNT = 4;
+
+/**
+ * The shadow: a cell that is occupied but belongs to no colour.
+ *
+ * Numbered past the real types rather than given a type of its own, so every
+ * board cell stays one `number | null` and nothing that reads the board has to
+ * learn a second shape. What makes it the antagonist is what it CANNOT do — it
+ * never joins a group, so it never clears itself, and it severs the connection
+ * between whatever it sits between.
+ *
+ * See `docs/ART-DIRECTION.md` under "By stage": the shadow is the part of this
+ * mind that stops without finishing, and the more of the board it holds, the
+ * less of it is connected.
+ */
+export const SHADOW = PIECE_TYPE_COUNT;
+
+/**
+ * Whether a cell holds one of the playable colours, as opposed to nothing or
+ * one of the occupants that has no colour.
+ *
+ * A predicate rather than `!== SHADOW` written at each site, because `SHADOW`
+ * deliberately shares the number space that `PIECE_COLORS` and `TRACE_COLORS`
+ * are indexed by. `PIECE_COLORS[SHADOW]` is `undefined`, and Phaser's
+ * `setTint(undefined)` does not throw — it silently mis-renders, which is the
+ * exact failure `palette.ts` was written to prevent. ART-DIRECTION's Stage 4
+ * names two more colourless occupants to come, so every one of those sites
+ * should be asking this question rather than naming today's only answer.
+ */
+export function isColour(pieceType: number | null): pieceType is number {
+  return pieceType !== null && pieceType < PIECE_TYPE_COUNT;
+}
