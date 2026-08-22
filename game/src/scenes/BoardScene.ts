@@ -29,7 +29,7 @@ import {
 } from './tile-textures';
 import { TrackPath, mitredRectangle } from '../track-geometry';
 import { MEMORIES, nodeLayout } from '../memories';
-import { shadowLine } from '../shadow-voice';
+import { CONNECTION_LOST, SHADOW_CLOSING_LINE, shadowLine } from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 import { SoundBoard } from '../audio/sound-board';
@@ -38,6 +38,7 @@ import {
   hardDropVoice,
   landVoice,
   answerVoice,
+  connectionLostVoice,
   nodeVoice,
   popVoice,
   shadowArrivalVoice,
@@ -315,6 +316,8 @@ export class BoardScene extends Scene {
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
   private gameOverText: Phaser.GameObjects.Text;
+
+  private gameOverLine: Phaser.GameObjects.Text;
   private previewTiles: Phaser.GameObjects.Image[];
   private shownPivotType = -1;
   private shownSatelliteType = -1;
@@ -830,14 +833,30 @@ export class BoardScene extends Scene {
 
     this.gameOverText = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2,
-      'TOPPED OUT',
+      CANVAS_HEIGHT / 2 - 18,
+      CONNECTION_LOST,
       {
         fontFamily: 'monospace',
-        fontSize: '48px',
+        fontSize: '40px',
         color: '#e8eef2',
         backgroundColor: '#221038',
         padding: { x: 16, y: 10 },
+      },
+    ).setOrigin(0.5, 0.5).setVisible(false);
+
+    // The shadow's last word, under the game's. It speaks here through its own
+    // object rather than the needling one, because this line is said when
+    // nothing can be answered.
+    this.gameOverLine = this.add.text(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      CANVAS_HEIGHT / 2 + 34,
+      SHADOW_CLOSING_LINE,
+      {
+        fontFamily: 'monospace',
+        fontSize: '17px',
+        color: '#b07dff',
+        backgroundColor: '#221038',
+        padding: { x: 12, y: 6 },
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
@@ -1069,6 +1088,18 @@ export class BoardScene extends Scene {
    */
   private resetShownState(): void {
     this.cellsBeingFilled.clear();
+
+    // Undo the losing sequence. It dims the panel, fades two texts in and
+    // tweens every lit trace to nothing, and R can land in the middle of all
+    // three — a new run must not open holding the last one's ending.
+    this.tweens.killTweensOf([this.gameOverText, this.gameOverLine, this.memoryPanel]);
+    this.gameOverText.setVisible(false);
+    this.gameOverLine.setVisible(false);
+    this.memoryPanel.setAlpha(1);
+    for (const slot of this.connections) {
+      this.tweens.killTweensOf(slot.trace);
+      slot.trace.setAlpha(1);
+    }
 
     // Cut, not faded. `hideReveal` runs the countdown's 280ms dissolve, and it
     // is only ever reached BY that countdown — a restart sets `revealRemaining`
@@ -1396,6 +1427,13 @@ export class BoardScene extends Scene {
    * in `drawBoard`, or a trace would connect to a tile that has not landed.
    */
   private drawConnections(): void {
+    // Once the run is lost the traces are no longer a picture of the board —
+    // they are being put out one at a time by `loseTheBoard`. Recomputing them
+    // from board state here would re-light each one the frame after it died.
+    if (this.simulation.toppedOut) {
+      return;
+    }
+
     for (const slot of this.connections) {
       // Colourless occupants are excluded rather than falling out naturally:
       // two shadow cells side by side hold the same value, so without this they
@@ -1966,6 +2004,7 @@ export class BoardScene extends Scene {
       this.shownToppedOut = toppedOut;
       if (toppedOut) {
         this.soundBoard.play(topOutVoice());
+        this.loseTheBoard();
       }
     }
 
@@ -2321,7 +2360,62 @@ export class BoardScene extends Scene {
     // that fills the meter can be the same clear that ends the run — and the
     // reveal was drawn first, so GAME OVER printed straight across the memory
     // it had just paid for. The run is over either way; the memory goes first.
-    this.gameOverText.setVisible(this.simulation.toppedOut && !this.storyHolding);
+    // Shown by `loseTheBoard` once the connections have finished dying, rather
+    // than the instant the run ends — otherwise the words arrive over an ending
+    // that has not happened yet. This only ever hides them.
+    if (!this.simulation.toppedOut || this.storyHolding) {
+      this.gameOverText.setVisible(false);
+      this.gameOverLine.setVisible(false);
+    }
+  }
+
+  /**
+   * The shadow winning, which until now was the words TOPPED OUT.
+   *
+   * This board is about connections, so losing it is watching them go: every
+   * lit trace dies in turn, falling a semitone a cell — `answerVoice` run
+   * backwards, because answering the question is the moment this is the
+   * opposite of. The memory panel dims with them, since what a run built is
+   * what it loses.
+   *
+   * Nothing here touches the simulation. The run is already over; this is the
+   * scene taking a beat to say so.
+   */
+  private loseTheBoard(): void {
+    const lit = this.connections.filter((slot) => slot.trace.visible);
+
+    lit.forEach((slot, index) => {
+      this.soundBoard.play(connectionLostVoice(index));
+      this.tweens.add({
+        targets: slot.trace,
+        alpha: 0,
+        duration: 220,
+        delay: index * 45,
+        onComplete: () => slot.trace.setAlpha(1).setVisible(false),
+      });
+    });
+
+    // Long enough for the last trace to have gone, plus a beat of silence.
+    const settled = lit.length * 45 + 320;
+
+    this.tweens.add({
+      targets: this.memoryPanel,
+      alpha: 0.15,
+      duration: 700,
+      delay: settled * 0.4,
+    });
+
+    this.time.delayedCall(settled, () => {
+      // A restart during the sequence cancels it; the next run must not open
+      // with the last one's ending printed over it.
+      if (!this.simulation.toppedOut) {
+        return;
+      }
+      for (const text of [this.gameOverText, this.gameOverLine]) {
+        text.setVisible(true).setAlpha(0);
+        this.tweens.add({ targets: text, alpha: 1, duration: 420 });
+      }
+    });
   }
 
   private refreshFps(time: number): void {

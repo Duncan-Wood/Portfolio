@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ARRIVALS_BETWEEN_LINES, SHADOW_LINES, shadowLine } from './shadow-voice';
+import {
+  ARRIVALS_BETWEEN_LINES,
+  CONNECTION_LOST,
+  SHADOW_CLOSING_LINE,
+  SHADOW_LINES,
+  shadowLine,
+} from './shadow-voice';
 
 const NEVER_SPOKEN: string[] = [];
 const ENOUGH = ARRIVALS_BETWEEN_LINES;
@@ -80,5 +86,18 @@ describe('the writing itself', () => {
 
   it('never repeats a line between tiers', () => {
     expect(new Set(everyLine).size).toBe(everyLine.length);
+  });
+});
+
+describe('what is left when the shadow has won', () => {
+  it('does not reuse a line the player has already been needled with', () => {
+    // The closing line is said when nothing can be answered. Recycling a taunt
+    // there would make the ending feel like the game ran out of script.
+    expect(everyLine).not.toContain(SHADOW_CLOSING_LINE);
+  });
+
+  it('keeps both short enough to land', () => {
+    expect(CONNECTION_LOST.length).toBeLessThanOrEqual(24);
+    expect(SHADOW_CLOSING_LINE.length).toBeLessThanOrEqual(56);
   });
 });

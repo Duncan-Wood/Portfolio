@@ -186,6 +186,27 @@ export function answerVoice(index: number): Voice {
 }
 
 /**
+ * One connection going dark as the board is lost.
+ *
+ * The exact inverse of `answerVoice`, which is what makes the ending read as
+ * the answer beat run backwards: that one climbs a semitone a cell as the
+ * shadow is driven off, and this one FALLS a semitone a cell as the traces die.
+ * Same interval, same stagger, opposite direction.
+ */
+export function connectionLostVoice(index: number): Voice {
+  const frequency = 330 * 2 ** (-Math.min(index, 24) / 12);
+
+  return {
+    waveform: 'triangle',
+    startFrequency: frequency,
+    endFrequency: frequency / 2,
+    duration: 200,
+    gain: 0.13,
+    delay: index * 45,
+  };
+}
+
+/**
  * The flourish after a real chain resolves: an ascending arpeggio, one note per
  * link, played over the top of the pops that already happened.
  *

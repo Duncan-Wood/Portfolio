@@ -52,6 +52,29 @@ export const SHADOW_LINES: readonly (readonly string[])[] = [
 ];
 
 /**
+ * What the game says when the shadow has taken the whole board, and what the
+ * shadow says under it.
+ *
+ * Two lines rather than one, doing different jobs. The first is the GAME
+ * reporting what happened, in the register the rest of the interface uses —
+ * "TOPPED OUT" said nothing about this game in particular, and this is the last
+ * thing a run leaves anyone with. The second is the shadow, and it is the only
+ * time it gets the last word.
+ *
+ * PLACEHOLDER, both of them, in the way `memories.ts` was: they are the most
+ * important sentences here and they are not mine to settle. Isolated in this
+ * file with no imports so rewriting them touches nothing else.
+ */
+export const CONNECTION_LOST = 'CONNECTION LOST';
+
+/**
+ * Deliberately not drawn from `SHADOW_LINES`. Those are needling, said while
+ * you can still answer them; this is said when you cannot, so it does not
+ * taunt. It agrees with you.
+ */
+export const SHADOW_CLOSING_LINE = 'You can start again tomorrow.';
+
+/**
  * How many cells it has to hold before it will use the next tier's lines.
  *
  * Indexed to match `SHADOW_LINES`, so tier 0 needs nothing and the last tier

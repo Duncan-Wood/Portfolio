@@ -7,6 +7,7 @@ import {
   hardDropVoice,
   landVoice,
   answerVoice,
+  connectionLostVoice,
   popVoice,
   shadowArrivalVoice,
   shadowRecedeVoice,
@@ -25,6 +26,8 @@ const everyVoice = [
   shadowRecedeVoice(6),
   answerVoice(0),
   answerVoice(30),
+  connectionLostVoice(0),
+  connectionLostVoice(30),
   ...chainVoices(3),
 ];
 
@@ -178,5 +181,21 @@ describe('answering the question', () => {
 
   it('is louder than an ordinary clear, because it happens twice a session', () => {
     expect(answerVoice(0).gain).toBeGreaterThan(popVoice(0).gain);
+  });
+});
+
+describe('losing the board', () => {
+  it('falls where answering climbs — the same beat run backwards', () => {
+    expect(connectionLostVoice(4).startFrequency).toBeLessThan(connectionLostVoice(0).startFrequency);
+    expect(answerVoice(4).startFrequency).toBeGreaterThan(answerVoice(0).startFrequency);
+  });
+
+  it('starts where answering starts, so the two are heard as one pair', () => {
+    expect(connectionLostVoice(0).startFrequency).toBe(answerVoice(0).startFrequency);
+  });
+
+  it('stops falling before it drops out of hearing', () => {
+    expect(connectionLostVoice(72).startFrequency).toBe(connectionLostVoice(24).startFrequency);
+    expect(connectionLostVoice(72).endFrequency).toBeGreaterThan(20);
   });
 });
