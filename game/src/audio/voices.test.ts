@@ -6,6 +6,7 @@ import {
   chainVoices,
   hardDropVoice,
   landVoice,
+  answerVoice,
   popVoice,
   shadowArrivalVoice,
   shadowRecedeVoice,
@@ -22,6 +23,8 @@ const everyVoice = [
   shadowArrivalVoice(),
   shadowRecedeVoice(1),
   shadowRecedeVoice(6),
+  answerVoice(0),
+  answerVoice(30),
   ...chainVoices(3),
 ];
 
@@ -154,5 +157,26 @@ describe('the shadow', () => {
 
   it('answers a bigger push with more of an answer', () => {
     expect(shadowRecedeVoice(3).gain).toBeGreaterThan(shadowRecedeVoice(1).gain);
+  });
+});
+
+describe('answering the question', () => {
+  it('climbs with every cell it drives off', () => {
+    expect(answerVoice(4).startFrequency).toBeGreaterThan(answerVoice(0).startFrequency);
+  });
+
+  it('stops climbing before it walks out of the hearing range', () => {
+    // A board can hold 72 shadows. Uncapped, the last of them would be
+    // inaudible — quietest exactly where the player earned the most.
+    expect(answerVoice(72).startFrequency).toBe(answerVoice(24).startFrequency);
+  });
+
+  it('walks up rather than landing as one chord', () => {
+    expect(answerVoice(3).delay).toBeGreaterThan(answerVoice(0).delay);
+    expect(answerVoice(0).delay).toBe(0);
+  });
+
+  it('is louder than an ordinary clear, because it happens twice a session', () => {
+    expect(answerVoice(0).gain).toBeGreaterThan(popVoice(0).gain);
   });
 });

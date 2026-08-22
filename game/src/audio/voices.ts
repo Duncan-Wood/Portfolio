@@ -158,6 +158,34 @@ export function shadowRecedeVoice(cellsPushed: number): Voice {
 }
 
 /**
+ * One cell of the wave that answering the question sends across the board.
+ *
+ * Climbs a semitone per cell and is staggered, so a board full of shadow walks
+ * up out of the stack rather than landing as one chord — the rarest moment in
+ * the game gets the longest sound in it.
+ *
+ * Louder than a pop on purpose. This happens perhaps twice in a session, and
+ * the whole design of the beat is that it is the biggest thing that happens;
+ * a payout the same volume as an ordinary clear would say the opposite.
+ *
+ * The climb caps two octaves up for the same reason `popVoice` does: a long
+ * enough wave would otherwise walk out of the hearing range and go quiet
+ * exactly when the player earned the most.
+ */
+export function answerVoice(index: number): Voice {
+  const frequency = 330 * 2 ** (Math.min(index, 24) / 12);
+
+  return {
+    waveform: 'triangle',
+    startFrequency: frequency,
+    endFrequency: frequency * 2,
+    duration: 170,
+    gain: 0.19,
+    delay: index * 55,
+  };
+}
+
+/**
  * The flourish after a real chain resolves: an ascending arpeggio, one note per
  * link, played over the top of the pops that already happened.
  *

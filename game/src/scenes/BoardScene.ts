@@ -37,6 +37,7 @@ import {
   chainVoices,
   hardDropVoice,
   landVoice,
+  answerVoice,
   nodeVoice,
   popVoice,
   shadowArrivalVoice,
@@ -125,6 +126,16 @@ const SHADOW_ARRIVAL_DURATION = 340;
  * whole minute of play be thrown away by a reflex.
  */
 const REVEAL_SKIP_GRACE = 420;
+
+/**
+ * The most an answer may be, and how fast its caret blinks.
+ *
+ * Capped because the answer lives on the memory panel for the rest of the run
+ * and the panel is 128 pixels wide. It is not a diary — it is the length of a
+ * thing you would say out loud.
+ */
+const ANSWER_LIMIT = 48;
+const CARET_PERIOD = 1060;
 
 /** Milliseconds an eye stays shut, and the shortest gap between two blinks. */
 const BLINK_DURATION = 90;
@@ -441,7 +452,7 @@ export class BoardScene extends Scene {
    * Completing a memory used to swap the last node's words FOR the question,
    * which quietly ate a fragment the player had earned. It follows it instead.
    */
-  private pendingReveal: { title: string; body: string } | null = null;
+  private pendingReveal: { title: string; body: string; memoryIndex: number } | null = null;
 
   private revealScrim: Phaser.GameObjects.Rectangle;
   private revealTitle: Phaser.GameObjects.Text;
@@ -450,6 +461,37 @@ export class BoardScene extends Scene {
   private revealHint: Phaser.GameObjects.Text;
 
   private revealSkippableIn = 0;
+
+  /**
+   * The question waiting on an answer, what has been typed into it, and where
+   * the answers already given are kept.
+   *
+   * `awaitingAnswer` holds the game exactly as a fragment does, but it has no
+   * clock: it ends when the player presses Enter and not before. This is the
+   * only screen in the game that waits on a person rather than on a timer, and
+   * it should — everything else here is a thing the game does TO you.
+   *
+   * What was typed is kept only so the panel can show it back. It is never
+   * scored, never branched on and never handed to the engine; `answerQuestion`
+   * is told THAT an answer happened, never what it said.
+   */
+  private awaitingAnswer = false;
+
+  private answerText = '';
+
+  /**
+   * Which memory the question on screen belongs to, carried from the fragment
+   * that earned it rather than re-derived. `nodesRevealed` has already moved
+   * past that memory by the time the answer arrives, so deriving it here would
+   * be asking a counter about a moment it has left behind.
+   */
+  private answeringMemory = 0;
+
+  private memoryAnswers: string[] = [];
+
+  private answerLine: Phaser.GameObjects.Text;
+
+  private answerEcho: Phaser.GameObjects.Text;
   private revealBody: Phaser.GameObjects.Text;
 
   /**
@@ -702,6 +744,12 @@ export class BoardScene extends Scene {
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
 
+    // Typing is the one input that cannot be polled. Every other key in this
+    // game is a state the frame asks about; text is a stream of events, and a
+    // frame that samples it drops characters typed fast enough to fall between
+    // two frames — which is most of them.
+    this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.typeIntoAnswer(event));
+
     // Browsers will not start audio until the player has interacted with the
     // page, so the context is built on the first key rather than here.
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
@@ -759,6 +807,26 @@ export class BoardScene extends Scene {
       fontSize: '13px',
       color: '#6b5a80',
     }).setOrigin(0.5, 0.5).setVisible(false);
+
+    // What they are typing, under the question. Its own object rather than more
+    // lines on `revealBody`, so the question stays still while the answer grows
+    // underneath it.
+    this.answerLine = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 74, '', {
+      fontFamily: 'monospace',
+      fontSize: '19px',
+      color: '#c98cff',
+      align: 'center',
+      wordWrap: { width: BOARD_WIDTH - 80 },
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
+    // The answer, kept beside the memory it belongs to for the rest of the run.
+    this.answerEcho = this.add.text(MEMORY_PANEL_LEFT, MEMORY_PANEL_TOP + MEMORY_PANEL_HEIGHT + 16, '', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#8a6fb0',
+      wordWrap: { width: MEMORY_PANEL_WIDTH },
+      lineSpacing: 3,
+    }).setOrigin(0, 0).setVisible(false);
 
     this.gameOverText = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -820,7 +888,9 @@ export class BoardScene extends Scene {
    * there is to win.
    */
   update(time: number, delta: number): void {
-    if (Input.Keyboard.JustDown(this.pauseKey)) {
+    // Escape is not a pause while a question is waiting: the game is already
+    // held, and the only key that ends it is the one that answers it.
+    if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.pauseKey)) {
       this.setPaused(!this.paused);
     }
 
@@ -832,7 +902,7 @@ export class BoardScene extends Scene {
     // anyway, and polling on would keep writing `softDropping` to a pair that
     // is already part of the board. Nothing to read while paused either — but
     // the two keys above are still polled, or there would be no way out.
-    if (!this.paused && !this.simulation.toppedOut && this.revealRemaining <= 0) {
+    if (!this.paused && !this.simulation.toppedOut && !this.storyHolding) {
       this.readInput(delta);
     }
 
@@ -846,12 +916,16 @@ export class BoardScene extends Scene {
       this.drawPreview();
       this.refreshChain();
       this.refreshScore();
+      this.refreshAnswerLine(time);
       this.refreshGameOver();
       this.refreshFps(time);
       return;
     }
 
-    if (this.revealRemaining > 0) {
+    if (this.awaitingAnswer) {
+      // Held, with no clock running it down. The caret is the only thing
+      // moving, which is what says the game is waiting on a person.
+    } else if (this.revealRemaining > 0) {
       // The same trick as hit-stop: the simulation does not advance and the
       // frozen time is never banked, so nothing lurches when play resumes.
       this.revealRemaining -= delta;
@@ -889,7 +963,7 @@ export class BoardScene extends Scene {
     // The shadows are frozen by hit-stop and by a reveal along with everything
     // else: a board that holds still except for the creatures on it breathing
     // does not read as held.
-    if (this.hitStopRemaining <= 0 && this.revealRemaining <= 0) {
+    if (this.hitStopRemaining <= 0 && !this.storyHolding) {
       this.shadowClock += delta;
 
       if (this.shadowArrival !== null) {
@@ -911,8 +985,25 @@ export class BoardScene extends Scene {
     this.drawPreview();
     this.refreshChain();
     this.refreshScore();
+    this.refreshAnswerLine(time);
     this.refreshGameOver();
     this.refreshFps(time);
+  }
+
+  /**
+   * The answer as it is typed, with a caret.
+   *
+   * Blinks off wall-clock time rather than off anything the simulation owns,
+   * because the simulation is stopped — a still caret on a still board would
+   * read as a hung game rather than as one waiting for you.
+   */
+  private refreshAnswerLine(time: number): void {
+    if (!this.awaitingAnswer) {
+      return;
+    }
+
+    const caret = time % CARET_PERIOD < CARET_PERIOD / 2 ? '_' : ' ';
+    this.answerLine.setText(this.answerText + caret);
   }
 
   /**
@@ -989,6 +1080,12 @@ export class BoardScene extends Scene {
       part.setVisible(false).setAlpha(1);
     }
     this.revealSkippableIn = 0;
+    this.awaitingAnswer = false;
+    this.answerText = '';
+    this.memoryAnswers = [];
+    this.tweens.killTweensOf([this.answerLine, this.answerEcho]);
+    this.answerLine.setVisible(false);
+    this.answerEcho.setVisible(false);
 
     for (const index of this.animatedShadowCells) {
       this.restoreCell(index);
@@ -1328,7 +1425,7 @@ export class BoardScene extends Scene {
     // Nothing accrues while a fragment is on screen: the track has just been
     // spent, and a second fragment landing on top of the first would replace it
     // mid-sentence.
-    if (this.revealRemaining > 0) {
+    if (this.storyHolding) {
       return;
     }
 
@@ -1445,7 +1542,7 @@ export class BoardScene extends Scene {
     // addressed to the person holding the keyboard, and a category label above
     // it makes it part of the exhibit instead.
     this.pendingReveal = nodeIndex === memory.nodes.length - 1
-      ? { title: '', body: memory.question }
+      ? { title: '', body: memory.question, memoryIndex }
       : null;
 
     // Spent. Emptying the track is the feedback that the circuit paid for
@@ -1476,6 +1573,15 @@ export class BoardScene extends Scene {
   }
 
   /**
+   * Whether the story has the game held — a fragment on screen, or a question
+   * waiting on an answer. Both freeze the simulation and refuse input; only one
+   * of them ends on its own.
+   */
+  private get storyHolding(): boolean {
+    return this.revealRemaining > 0 || this.awaitingAnswer;
+  }
+
+  /**
    * Move past the fragment on screen: to its question if it has one, or off.
    *
    * Shared by the countdown running out and by Space, so a skip advances the
@@ -1491,11 +1597,148 @@ export class BoardScene extends Scene {
       return;
     }
 
-    this.showReveal(
-      pending.title,
-      pending.body,
-      this.holdFor(pending.body, this.tuning.questionDuration),
-    );
+    this.askQuestion(pending.body, pending.memoryIndex);
+  }
+
+  /**
+   * Put the question up and wait for an answer. No countdown: this is the only
+   * screen in the game that ends when the player decides it does.
+   */
+  private askQuestion(question: string, memoryIndex: number): void {
+    this.awaitingAnswer = true;
+    this.answerText = '';
+    this.answeringMemory = memoryIndex;
+
+    this.revealTitle.setVisible(false);
+    this.revealBody.setText(question);
+    this.revealHint.setText('type an answer   ·   enter');
+
+    this.tweens.killTweensOf([this.revealScrim, this.revealBody, this.revealHint, this.answerLine]);
+    this.revealScrim.setVisible(true).setAlpha(0.9);
+    this.answerLine.setText('').setVisible(true).setAlpha(1);
+
+    for (const part of [this.revealBody, this.revealHint]) {
+      part.setVisible(true).setAlpha(0);
+      this.tweens.add({ targets: part, alpha: 1, duration: 340, delay: 120 });
+    }
+  }
+
+  /**
+   * One keystroke into the answer.
+   *
+   * Enter submits, and an empty answer is how you decline — no second key to
+   * learn, and refusing is a real choice rather than a missing one. Printable
+   * characters only: everything else on a keyboard is a control this screen
+   * does not have.
+   */
+  private typeIntoAnswer(event: KeyboardEvent): void {
+    if (!this.awaitingAnswer) {
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      this.submitAnswer();
+      return;
+    }
+
+    if (event.key === 'Backspace') {
+      this.answerText = this.answerText.slice(0, -1);
+      return;
+    }
+
+    if (event.key.length === 1 && this.answerText.length < ANSWER_LIMIT) {
+      this.answerText += event.key;
+    }
+  }
+
+  /**
+   * Take the answer, and pay it out.
+   *
+   * The engine is handed the FACT of an answer and nothing else — see
+   * `Simulation.answerQuestion`. What was typed only ever comes back to the
+   * panel, where the person who wrote it can see it; nothing reads it.
+   *
+   * Declining is silent on purpose. There is no penalty sting, no "are you
+   * sure": you simply keep every cell the shadow took, which is penalty enough
+   * and does not scold.
+   */
+  private submitAnswer(): void {
+    const answer = this.answerText.trim();
+    this.awaitingAnswer = false;
+    this.answerLine.setVisible(false);
+    this.hideReveal();
+
+    if (answer === '') {
+      return;
+    }
+
+    this.memoryAnswers[this.answeringMemory] = answer;
+    this.showAnswerEcho();
+    this.driveOffShadow();
+  }
+
+  /** The answer, beside the memory it belongs to, for the rest of the run. */
+  private showAnswerEcho(): void {
+    const answer = this.memoryAnswers[this.answeringMemory];
+
+    if (answer === undefined) {
+      this.answerEcho.setVisible(false);
+      return;
+    }
+
+    this.answerEcho.setText(`"${answer}"`).setVisible(true).setAlpha(0);
+    this.tweens.add({ targets: this.answerEcho, alpha: 1, duration: 600, delay: 400 });
+  }
+
+  /**
+   * The wave: every shadow on the board driven off, deepest first.
+   *
+   * Staggered rather than simultaneous, and the stagger is the whole effect —
+   * a board that empties in one frame is a state change, and one that empties
+   * over a second and a half is something happening. The camera kick scales
+   * with how much was taken back, so answering on a board you were losing hits
+   * hardest, which is when it should.
+   */
+  private driveOffShadow(): void {
+    const driven = this.simulation.answerQuestion();
+    if (driven.length === 0) {
+      return;
+    }
+
+    this.tweens.killTweensOf(this.popTiles);
+    this.cameras.main.shake(220 + 18 * Math.min(driven.length, 12), this.tuning.shakeIntensity * 3);
+
+    for (let index = 0; index < driven.length; index += 1) {
+      const cell = driven[index];
+      const x = centerOfColumn(cell.column);
+      const y = centerOfRow(cell.row);
+      const delay = index * 55;
+
+      const tile = this.popTiles[index];
+      tile
+        .setPosition(x, y)
+        .setTexture(tileTexture(SHADOW))
+        .setScale(1)
+        .setAngle(0)
+        .setAlpha(1)
+        .setVisible(true);
+
+      this.tweens.add({
+        targets: tile,
+        scale: 1.7,
+        alpha: 0,
+        duration: 340,
+        delay,
+        ease: 'Quad.easeOut',
+        onComplete: () => tile.setVisible(false),
+      });
+
+      this.soundBoard.play(answerVoice(index));
+      this.time.delayedCall(delay, () => {
+        this.sparks.setParticleTint(TRACK_LIT_COLOR);
+        this.sparks.emitParticleAt(x, y, SPARKS_PER_CELL * 2);
+      });
+    }
   }
 
   /** Hold the board and put a line over it. */
@@ -2078,7 +2321,7 @@ export class BoardScene extends Scene {
     // that fills the meter can be the same clear that ends the run — and the
     // reveal was drawn first, so GAME OVER printed straight across the memory
     // it had just paid for. The run is over either way; the memory goes first.
-    this.gameOverText.setVisible(this.simulation.toppedOut && this.revealRemaining <= 0);
+    this.gameOverText.setVisible(this.simulation.toppedOut && !this.storyHolding);
   }
 
   private refreshFps(time: number): void {

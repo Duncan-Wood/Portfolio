@@ -472,6 +472,40 @@ export class Simulation {
   }
 
   /**
+   * The player answered the question: drive every shadow off the board at once.
+   *
+   * The single most powerful thing in the game, and the only one the player
+   * spends rather than earns — a question can be declined, and declining keeps
+   * every cell the shadow took. That is the thesis stated as a rule instead of
+   * as a line of narration: a connection is what pushes the dark back, so
+   * making one has to be what pushes it back.
+   *
+   * WHAT was typed never reaches here, and must not. The engine is told that an
+   * answer happened, never what it said; nothing scores it, branches on it or
+   * stores it. The act is the mechanic, and the words belong to whoever typed
+   * them.
+   *
+   * Returns the cells it took, deepest first, so the scene can play the wave
+   * rising out of the stack. Ordered here rather than scene-side because the
+   * board is empty by the time anything renders — the same reason a link
+   * reports its own push-back.
+   */
+  answerQuestion(): readonly GroupCell[] {
+    const driven: GroupCell[] = [];
+
+    for (let row = ROWS - 1; row >= 0; row -= 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        if (this.board.pieceAt(column, row) === SHADOW) {
+          this.board.clear(column, row);
+          driven.push({ column, row });
+        }
+      }
+    }
+
+    return driven;
+  }
+
+  /**
    * Take the emptiest column's next free cell.
    *
    * The emptiest rather than the fullest: the cruel choice would be to pile on
