@@ -161,14 +161,6 @@ const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
  * handed a surprise at the end. The nodes are silhouettes and carry no words:
  * the point is to know how much is left, not what it says.
  */
-/**
- * Every fragment the game has to give. Past it the track still fills and the
- * chain still pays, but there is nothing left to surface — a run that reaches
- * here has seen all of it, and asking `locate` for the node after the last one
- * used to hand back an index off the end of the array.
- */
-const TOTAL_MEMORY_NODES = MEMORIES.reduce((total, memory) => total + memory.nodes.length, 0);
-
 const MEMORY_PANEL_TOP = 300;
 const MEMORY_PANEL_HEIGHT = 450;
 const MEMORY_PAD = 6;
@@ -1369,7 +1361,7 @@ export class BoardScene extends Scene {
       });
     }
 
-    if (lit === pads && this.nodesRevealed < TOTAL_MEMORY_NODES) {
+    if (lit === pads) {
       this.revealNextNode();
     }
   }
@@ -1400,7 +1392,7 @@ export class BoardScene extends Scene {
    * Derived rather than tracked as two counters, so there is one number to
    * reset and no way for the pair to disagree.
    */
-  private locate(total: number): { memoryIndex: number; nodeIndex: number } {
+  private locate(total: number): { memoryIndex: number; nodeIndex: number } | null {
     let remaining = total;
 
     for (let index = 0; index < MEMORIES.length; index += 1) {
@@ -1411,8 +1403,13 @@ export class BoardScene extends Scene {
       remaining -= nodes;
     }
 
-    const last = MEMORIES.length - 1;
-    return { memoryIndex: last, nodeIndex: MEMORIES[last].nodes.length };
+    // Every fragment the game has has been surfaced. This used to hand back an
+    // index one past the end instead, which `revealNextNode` then read straight
+    // off the array — and a frame that throws stops the render loop for the
+    // rest of the session, so the only thing between that and a dead game was a
+    // caller remembering to check a constant first. `null` makes both callers
+    // say what they do when there is nothing left.
+    return null;
   }
 
   /**
@@ -1429,7 +1426,14 @@ export class BoardScene extends Scene {
    * only moment anything here speaks to the person at the keyboard.
    */
   private revealNextNode(): void {
-    const { memoryIndex, nodeIndex } = this.locate(this.nodesRevealed);
+    const at = this.locate(this.nodesRevealed);
+    if (at === null) {
+      // Nothing left to surface. The track stays full, which is the honest
+      // picture: the run has seen everything this game has.
+      return;
+    }
+
+    const { memoryIndex, nodeIndex } = at;
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
@@ -1584,14 +1588,17 @@ export class BoardScene extends Scene {
    * thing that arrives is the thing they watched.
    */
   private redrawMemoryPanel(progress: number): void {
-    const { memoryIndex, nodeIndex } = this.locate(this.nodesRevealed);
+    // Past the last fragment there is no next memory to draw, so the panel
+    // holds the one just finished, every node of it lit.
+    const at = this.locate(this.nodesRevealed);
+    const memoryIndex = at === null ? MEMORIES.length - 1 : at.memoryIndex;
     const memory = MEMORIES[memoryIndex];
     const count = memory.nodes.length;
     const panel = this.memoryPanel;
 
     // Nodes already surfaced stay lit for the rest of the run; the one being
     // worked toward is the only thing `progress` moves.
-    const lit = nodeIndex;
+    const lit = at === null ? count : at.nodeIndex;
 
     panel.clear();
 
