@@ -48,4 +48,4 @@ Software engineer with a background in writing and rhetoric — I turn ambiguous
 
 ---
 
-This repository is a React (Create React App) + Tailwind CSS site, plus a Phaser 4 + TypeScript puzzle game served at `/game`. See [`docs/PROGRESS.md`](./docs/PROGRESS.md) for current state and [`CLAUDE.md`](./CLAUDE.md) for the architecture and conventions.
+This repository is a React + Vite + Tailwind CSS site, plus a Phaser 4 + TypeScript puzzle game served at `/game`. See [`docs/PROGRESS.md`](./docs/PROGRESS.md) for current state and [`CLAUDE.md`](./CLAUDE.md) for the architecture and conventions.

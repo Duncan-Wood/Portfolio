@@ -12,8 +12,11 @@ Visual + thematic direction: @docs/ART-DIRECTION.md
 ## Stack
 - `game/` is a self-contained Vite package: Phaser 4 + TypeScript. Browser only.
 - Hard requirement: 60fps, low input latency.
-- The portfolio is Create React App. The two toolchains are joined only by the root
-  `build` and `start` scripts and `src/setupProxy.js`.
+- The portfolio at `/` is Vite + React, configured in the root `vite.config.mjs`. Two
+  Vite projects, not one: the game has its own base path, tsconfig and suite, and
+  folding them together would mean one build whose halves need different answers to
+  nearly every question. They are joined only by the root `build` and `start` scripts
+  and the dev-server proxy.
 
 ## Commands
 From the repo root:
@@ -24,8 +27,9 @@ From the repo root:
 
 From `game/` — Node 24 activates on `cd` via `mise`:
 - `npm test`, `npm run typecheck`, `npm run dev`.
-- Run these from `game/`, not the root. Root `npm test` is CRA's Jest in watch mode and
-  will hang a non-interactive shell.
+- Run these from `game/`, not the root. Root `npm test` runs the portfolio's own two
+  tests and deliberately excludes `game/`, so it will not tell you anything about the
+  game.
 
 ## Architecture (non-negotiable)
 - `game/src/engine/` — pure game logic. No Phaser imports. Grid, pieces, matching,
