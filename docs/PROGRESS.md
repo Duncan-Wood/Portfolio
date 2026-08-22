@@ -60,7 +60,15 @@ another person.**
   which is `answerVoice` run backwards — the answer beat is the moment this is the
   opposite of. The memory panel darkens with them, because what a run built is what it
   loses. Then two lines: the game's, and under it the shadow's, which is the only time it
-  gets the last word. Both are placeholders in `shadow-voice.ts` and neither is mine.
+  gets the last word, over static: a noise texture scrolled and re-alpha'd every frame,
+  with the colour draining under it. Both lines are placeholders in `shadow-voice.ts`.
+
+  One rule the closing line has to obey, learned by breaking it: **it must not give the
+  player permission to leave.** The first version was "You can start again tomorrow" —
+  exactly in character, and the worst thing to read while deciding whether to press R.
+  The antagonist telling you to stop only works if stopping is not a thing you might
+  actually do. The restart prompt sits under it now, which losing never had: the pause
+  screen said `esc to resume` and the ending said nothing, so R was a secret.
 - **Next, and the only thing left in Stage 3** — its benchmark: *playtesters visibly react
   to a big chain.* That needs another person. What it is really testing is the pair of
   things still unproven — whether one pair of lookahead is enough to plan a chain with,
