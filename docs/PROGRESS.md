@@ -134,6 +134,7 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | The vignette is deliberately weak: readability beats atmosphere | `scenes/BoardScene.ts` |
 | **No** lit platform — built, judged wrong, and cut. Revisit after the playtest | `scenes/BoardScene.ts` (comment above the vignette) |
 | The chain resolves over time: clear, then settle, one beat each | `engine/simulation.ts` (`advanceChain`), `engine/matching.ts` (`clearStep`) |
+| Single-key bindings are gated while the question is taking an answer | `scenes/BoardScene.ts` (`update`, `awaitingAnswer`) |
 | Input is refused while a cascade resolves, and after a top-out | `engine/simulation.ts` (`acceptsInput`) |
 | R restarts from any state, without tearing the scene down | `engine/simulation.ts` (`restart`), `scenes/BoardScene.ts` (`restart`) |
 | Escape pauses via our own flag, not `scene.pause()`, which would eat the key | `scenes/BoardScene.ts` (`setPaused`) |

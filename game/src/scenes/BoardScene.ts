@@ -974,7 +974,10 @@ export class BoardScene extends Scene {
       this.setPaused(!this.paused);
     }
 
-    if (Input.Keyboard.JustDown(this.restartKey)) {
+    // R is a LETTER while a question is waiting for one. Ungated, typing any
+    // answer containing an "r" — remember, work, start — restarted the run
+    // mid-sentence, which looked like the game refusing to let you finish.
+    if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.restartKey)) {
       this.restart();
     }
 
