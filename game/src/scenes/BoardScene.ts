@@ -980,7 +980,7 @@ export class BoardScene extends Scene {
       color: '#c98cff',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, 'esc to resume', {
+    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, 'esc or space to resume', {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#6b5a80',
@@ -1002,6 +1002,16 @@ export class BoardScene extends Scene {
     // held, and the only key that ends it is the one that answers it.
     if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.pauseKey)) {
       this.setPaused(!this.paused);
+    }
+
+    // Space resumes as well, because that is the reflex — and it is safe for a
+    // reason worth stating: `JustDown` returns true once per press, so reading
+    // it here CONSUMES it. The same press cannot also reach `readInput` and
+    // hard-drop the piece the player just came back to. The `paused` test has
+    // to come first for that to hold; short-circuiting is what leaves the key
+    // unread, and therefore still available, during normal play.
+    if (this.paused && Input.Keyboard.JustDown(this.hardDropKey)) {
+      this.setPaused(false);
     }
 
     // R is a LETTER while a question is waiting for one. Ungated, typing any

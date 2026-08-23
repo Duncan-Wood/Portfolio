@@ -137,6 +137,7 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | Single-key bindings are gated while the question is taking an answer | `scenes/BoardScene.ts` (`update`, `awaitingAnswer`) |
 | Input is refused while a cascade resolves, and after a top-out | `engine/simulation.ts` (`acceptsInput`) |
 | R restarts from any state, without tearing the scene down | `engine/simulation.ts` (`restart`), `scenes/BoardScene.ts` (`restart`) |
+| Space resumes as well as Escape; `JustDown` consumes the press, so it cannot also hard-drop | `scenes/BoardScene.ts` (`update`) |
 | Escape pauses via our own flag, not `scene.pause()`, which would eat the key | `scenes/BoardScene.ts` (`setPaused`) |
 | `settle` reports which tiles moved, so the scene can animate the drop | `engine/board.ts` (`TileMove`) |
 | The engine leaves each cascade beat's result for the scene to read; no callbacks | `engine/simulation.ts` (`beatsPlayed`, `lastBeat`) |
