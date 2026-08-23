@@ -136,6 +136,15 @@ const REVEAL_SKIP_GRACE = 420;
  * thing you would say out loud.
  */
 const ANSWER_LIMIT = 48;
+
+/**
+ * The two prompts a held board can show. Named because they share one text
+ * object: `askQuestion` used to set its own and nothing set it back, so every
+ * fragment after the first question told the player to type an answer at a
+ * screen that was not listening.
+ */
+const SKIP_PROMPT = 'space';
+const ANSWER_PROMPT = 'type an answer   ·   enter';
 const CARET_PERIOD = 1060;
 
 /** Milliseconds an eye stays shut, and the shortest gap between two blinks. */
@@ -189,6 +198,13 @@ const MEMORY_PAD = 6;
 
 /** Clear of the progress track's stubs on the left, and the canvas on the right. */
 const MEMORY_PANEL_LEFT = 476;
+
+/**
+ * Where the kept answer starts. Further left than the memory panel on purpose:
+ * it is the only prose in the right-hand column, and it gets the whole width of
+ * it rather than the narrow strip the nodes are drawn in.
+ */
+const ANSWER_ECHO_LEFT = 432;
 const MEMORY_PANEL_WIDTH = 128;
 
 const PREVIEW_CELL = 48;
@@ -841,7 +857,7 @@ export class BoardScene extends Scene {
     // Only shown once the fragment can actually be skipped, so it teaches the
     // grace period as well as the key. Dim, because a prompt that competes with
     // the line it is offering to dismiss has its priorities backwards.
-    this.revealHint = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 96, 'space', {
+    this.revealHint = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 96, SKIP_PROMPT, {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: '#6b5a80',
@@ -856,16 +872,30 @@ export class BoardScene extends Scene {
       color: '#c98cff',
       align: 'center',
       wordWrap: { width: BOARD_WIDTH - 80 },
+      // Stroked because it outlives the scrim: the answer is held over the
+      // board while the wave clears it, by which point the dimming has gone
+      // and it is sitting on bare tiles.
+      stroke: '#150a24',
+      strokeThickness: 5,
     }).setOrigin(0.5, 0.5).setVisible(false);
 
     // The answer, kept beside the memory it belongs to for the rest of the run.
-    this.answerEcho = this.add.text(MEMORY_PANEL_LEFT, MEMORY_PANEL_TOP + MEMORY_PANEL_HEIGHT + 16, '', {
-      fontFamily: 'monospace',
-      fontSize: '11px',
-      color: '#8a6fb0',
-      wordWrap: { width: MEMORY_PANEL_WIDTH },
-      lineSpacing: 3,
-    }).setOrigin(0, 0).setVisible(false);
+    // Left of the panel and wider than it, because the panel's 128px is a
+    // column for nodes, not for prose. At 11px inside it this read as fine
+    // print — which is the wrong thing for the one line in the game the player
+    // wrote themselves.
+    this.answerEcho = this.add.text(
+      ANSWER_ECHO_LEFT,
+      MEMORY_PANEL_TOP + MEMORY_PANEL_HEIGHT + 20,
+      '',
+      {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#c9b3e8',
+        wordWrap: { width: CANVAS_WIDTH - ANSWER_ECHO_LEFT - 14 },
+        lineSpacing: 5,
+      },
+    ).setOrigin(0, 0).setVisible(false);
 
     // The way out, at the moment it is needed. The pause screen has always said
     // `esc to resume`; losing said nothing at all, so R was a secret.
@@ -1743,7 +1773,7 @@ export class BoardScene extends Scene {
 
     this.revealTitle.setVisible(false);
     this.revealBody.setText(question);
-    this.revealHint.setText('type an answer   ·   enter');
+    this.revealHint.setText(ANSWER_PROMPT);
 
     this.tweens.killTweensOf([this.revealScrim, this.revealBody, this.revealHint, this.answerLine]);
     this.revealScrim.setVisible(true).setAlpha(0.9);
@@ -1797,12 +1827,26 @@ export class BoardScene extends Scene {
   private submitAnswer(): void {
     const answer = this.answerText.trim();
     this.awaitingAnswer = false;
-    this.answerLine.setVisible(false);
     this.hideReveal();
 
     if (answer === '') {
+      this.answerLine.setVisible(false);
       return;
     }
+
+    // Held over the board while the wave clears it, rather than vanishing the
+    // instant it is submitted. What the player typed is the thing that paid
+    // for the payout, so it should still be on screen while the payout happens
+    // — and at the size they typed it, not shrunk into the margin.
+    this.answerLine.setText(answer);
+    this.tweens.killTweensOf(this.answerLine);
+    this.tweens.add({
+      targets: this.answerLine,
+      alpha: 0,
+      duration: 700,
+      delay: this.holdFor(answer, 900),
+      onComplete: () => this.answerLine.setVisible(false).setAlpha(1),
+    });
 
     this.memoryAnswers[this.answeringMemory] = answer;
     this.showAnswerEcho();
@@ -1877,7 +1921,7 @@ export class BoardScene extends Scene {
   private showReveal(title: string, body: string, duration: number): void {
     this.revealRemaining = duration;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
-    this.revealHint.setVisible(false);
+    this.revealHint.setText(SKIP_PROMPT).setVisible(false);
     this.revealTitle.setText(title);
     // An empty title is hidden rather than drawn blank, so the body keeps its
     // own spacing instead of sitting under a gap where a heading would be.
