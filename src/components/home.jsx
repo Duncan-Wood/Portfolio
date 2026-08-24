@@ -84,6 +84,26 @@ const Home = () => {
           <h3 className="text-xl font-medium mt-4 text-center p-4">
             I'm a software engineer based in the Washington, D.C. area
           </h3>
+          {/*
+            The other way through this portfolio. It sits in the hero because
+            the game is not a side project listed under Projects — it is the
+            same story told the other way, and a visitor has to be offered it
+            before they start scrolling past it.
+
+            A plain anchor, not a router link: `/game` has no React route, so
+            the SPA catch-all would redirect it home.
+          */}
+          <a
+            href="/game/"
+            className="mt-2 inline-flex flex-col items-center rounded-lg border border-purple-400 px-6 py-3 text-center transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400"
+          >
+            <span className="text-lg font-semibold">
+              Or play Still Connected
+            </span>
+            <span className="mt-1 text-sm opacity-80">
+              the same story, as a game
+            </span>
+          </a>
         </div>
       </div>
     </div>

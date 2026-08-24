@@ -86,6 +86,19 @@ const NavLinks = ({ variant, onNavigate }) => {
       >
         Resume
       </a>
+      {/*
+        Also a real link, and deliberately NOT `target="_blank"`: the game is
+        the other way through this same portfolio, not an attachment to it, so
+        it replaces the page and offers its own way back.
+
+        `href` rather than a router route on purpose. There is no React route
+        for `/game` — in development the dev server proxies it and in production
+        it is a real directory on disk, so a router link would be intercepted by
+        the SPA and land on the catch-all redirect instead.
+      */}
+      <a href="/game/" onClick={onNavigate} className={className()}>
+        Play
+      </a>
     </>
   );
 };

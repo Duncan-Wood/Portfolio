@@ -3,24 +3,84 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Mind Matcher</title>
+    <title>Still Connected</title>
     <style>
+      /*
+       * The page behind the canvas.
+       *
+       * `background` matches GROUND_COLOR in `src/palette.ts`. Phaser letterboxes
+       * the fixed 620x900 canvas to fit the window, so on most screens a good
+       * deal of what the visitor sees is this page rather than the game. It was
+       * #12161a — a cold slate left over from before the palette went violet —
+       * which put the bars in a different colour family from the board and made
+       * the whole thing look like a game embedded in someone else's page.
+       */
       html,
       body {
         margin: 0;
         height: 100%;
-        background: #12161a;
+        background: #221038;
         overflow: hidden;
       }
 
+      /*
+       * A column, so the way-back link gets its own strip instead of floating
+       * over the canvas. Phaser's Scale.FIT measures the container, so giving
+       * the footer real height simply letterboxes the board a few pixels
+       * further — where overlaying it meant the link sat on the bottom row of
+       * the board in any window taller than it is wide.
+       */
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
       #game-container {
+        flex: 1;
+        /* Without this a flex child refuses to shrink below its content and
+           the footer is pushed off the bottom of the viewport. */
+        min-height: 0;
         width: 100%;
-        height: 100%;
+      }
+
+      /*
+       * The way back to the standard portfolio.
+       *
+       * Plain HTML over the canvas rather than something drawn inside Phaser,
+       * because it has to work before the game has loaded, while a memory is
+       * holding the board, and after a top-out — none of which the scene's own
+       * input is listening during.
+       *
+       * The wording is from the storyboard, where this button was drawn into
+       * the cutscene frame from the start: the visitor who came to read a CV
+       * and found a puzzle game must always be one click from what they came
+       * for. Quiet until hovered, so it never competes with the board.
+       */
+      #to-standard {
+        flex: none;
+        align-self: center;
+        font-family: monospace;
+        font-size: 12px;
+        line-height: 1;
+        white-space: nowrap;
+        color: #6b5a80;
+        text-decoration: none;
+        padding: 9px 12px 11px;
+        border-radius: 6px;
+        transition: color 120ms ease, background-color 120ms ease;
+      }
+
+      #to-standard:hover,
+      #to-standard:focus-visible {
+        color: #c98cff;
+        background: #2b1644;
+        outline: none;
       }
     </style>
   </head>
   <body>
     <div id="game-container"></div>
+    <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
