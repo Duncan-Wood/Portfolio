@@ -19,6 +19,18 @@
  * these lines threaten. It is patient, it is reasonable, and it is not in a
  * hurry — which is the only version of this character that is frightening. A
  * shadow that snarls is a monster, and a monster is not what quits on you.
+ *
+ * The register is RECOGNITION, and that is a correction. The opening tier used
+ * to be "Take your time." and "There is no hurry." — patient, in character, and
+ * wrong, because permission is indistinguishable from kindness when the player
+ * has no idea who is speaking. Those read as the game reassuring you. They also
+ * said the same thing twice, spending a third of the script on one idea.
+ *
+ * What actually frightens is being KNOWN. "You were doing well" survived that
+ * cut and is the model: the menace is entirely in the past tense. Every line
+ * here now recognises something rather than permitting it — which is also what
+ * makes them reactions to the moment they fire in rather than theses that would
+ * be equally true at any other time.
  */
 
 /**
@@ -31,11 +43,11 @@
  * not a random draw from a bag.
  */
 export const SHADOW_LINES: readonly (readonly string[])[] = [
-  // Barely a foothold. Almost polite.
+  // Barely a foothold. It has not threatened anything; it has just noticed.
   [
-    'Take your time.',
-    'There is no hurry.',
     'You were doing well.',
+    'There it is.',
+    'I know this part.',
   ],
   // It has ground now.
   [
@@ -43,10 +55,14 @@ export const SHADOW_LINES: readonly (readonly string[])[] = [
     'You always do.',
     'This is usually where you find something else to do.',
   ],
-  // It holds most of what you built.
+  // It holds most of what you built, and it gets more intimate rather than
+  // louder. The middle line here used to be "You could stop now. No one would
+  // know." — the same permission bug as the opening tier, and the exact thing
+  // this file's closing-line rule forbids, sitting unnoticed in the tier that
+  // does the most damage.
   [
     'It was never the game that was hard.',
-    'You could stop now. No one would know.',
+    'This is the part you do not tell anyone about.',
     'I am not the thing stopping you.',
   ],
 ];
