@@ -569,7 +569,19 @@ export class Simulation {
    * and the antagonist of "you stopped before you finished" has no business
    * winning there. Topping out is `spawnOrTopOut`'s job alone now.
    */
-  private encroach(): void {
+  /**
+   * The tile the shadow would take if it arrived right now, or `null`.
+   *
+   * Split out of `encroach` and made public so the scene can point at it
+   * BEFORE it happens. The six seconds of hesitation this game runs on were
+   * completely invisible — nothing on screen represented the clock, and a
+   * creature simply appeared on a tile with no warning and no way to read what
+   * was coming. A threat you cannot see coming is not pressure, it is an
+   * interruption.
+   *
+   * Pure: it reads the board and chooses, and changes nothing.
+   */
+  get threatenedCell(): GroupCell | null {
     let chosenColumn = -1;
     let chosenRow = -1;
     let fewest = Number.POSITIVE_INFINITY;
@@ -596,9 +608,27 @@ export class Simulation {
       }
     }
 
-    if (chosenColumn === -1) {
+    return chosenColumn === -1 ? null : { column: chosenColumn, row: chosenRow };
+  }
+
+  /**
+   * How close the next arrival is, 0 to 1.
+   *
+   * The counter-play is the same verb the whole game is about, so this has to
+   * be watchable: it fills while nothing connects and drops to nothing the
+   * moment something does.
+   */
+  get stallProgress(): number {
+    return Math.min(this.stallTimer / this.tuning.shadowInterval, 1);
+  }
+
+  private encroach(): void {
+    const target = this.threatenedCell;
+    if (target === null) {
       return;
     }
+
+    const { column: chosenColumn, row: chosenRow } = target;
 
     // Strength escalates with how many arrivals this run has already had, so
     // the first few are freed by an ordinary clear and the late ones are not.

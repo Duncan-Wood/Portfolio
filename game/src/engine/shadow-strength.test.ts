@@ -36,6 +36,17 @@ const boardWithShadowBeside = (shadow: number): Board => {
 /** A shadow of `strength` standing on a teal tile. */
 const shadowOnTeal = (strength: number) => shadowCell(strength, BLUE);
 
+/** Lock whatever is falling and run the cascade it starts to the end. */
+const settleAll = (game: Simulation) => {
+  while (game.pair.canFall(game.board)) {
+    game.update(DEFAULT_TUNING.fallInterval);
+  }
+  game.update(DEFAULT_TUNING.lockDelay);
+  for (let beat = 0; beat < 200 && game.resolving; beat += 1) {
+    game.update(Math.max(DEFAULT_TUNING.chainLinkDelay, DEFAULT_TUNING.settleDelay));
+  }
+};
+
 describe('the shadow number space', () => {
   it('round-trips both strength and the colour underneath', () => {
     for (let strength = 1; strength <= MAX_SHADOW_STRENGTH; strength += 1) {
@@ -400,5 +411,72 @@ describe('light gives back what the shadow took', () => {
 
     expect(game.board.isEmpty(0, ROWS - 1)).toBe(true);
     expect(game.board.isEmpty(1, ROWS - 1)).toBe(true);
+  });
+});
+
+describe('the shadow tells you where it is reaching', () => {
+  const stalling = () => new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+
+  const seedBottomRow = (game: Simulation) => {
+    for (let column = 0; column < COLUMNS; column += 1) {
+      if (game.board.isEmpty(column, ROWS - 1)) {
+        game.board.place(column, ROWS - 1, column % PIECE_TYPE_COUNT);
+      }
+    }
+  };
+
+  it('names the cell it would take next', () => {
+    const game = stalling();
+    seedBottomRow(game);
+
+    const threatened = game.threatenedCell;
+
+    expect(threatened).not.toBeNull();
+    // The board has to be able to point at it before it happens, or the six
+    // seconds of pressure this game runs on are invisible.
+    expect(isColour(game.board.pieceAt(threatened!.column, threatened!.row))).toBe(true);
+  });
+
+  it('names the cell it actually goes on to take', () => {
+    const game = stalling();
+    seedBottomRow(game);
+    const threatened = game.threatenedCell!;
+
+    game.update(DEFAULT_TUNING.shadowInterval);
+
+    expect(game.lastShadowCell).toEqual(threatened);
+  });
+
+  it('reaches for nothing when there is nothing to take', () => {
+    const game = stalling();
+    game.board.reset();
+
+    expect(game.threatenedCell).toBeNull();
+  });
+
+  it('reports how close the next arrival is, from nothing to one', () => {
+    const game = stalling();
+    seedBottomRow(game);
+    expect(game.stallProgress).toBe(0);
+
+    game.update(DEFAULT_TUNING.shadowInterval / 2);
+
+    expect(game.stallProgress).toBeGreaterThan(0.4);
+    expect(game.stallProgress).toBeLessThan(0.6);
+  });
+
+  it('drops back to nothing when something clears', () => {
+    const game = stalling();
+    for (let column = 0; column < 3; column += 1) {
+      game.board.place(column, ROWS - 1, RED);
+    }
+    game.update(DEFAULT_TUNING.shadowInterval * 0.8);
+    expect(game.stallProgress).toBeGreaterThan(0.5);
+
+    game.board.place(3, ROWS - 1, RED);
+    settleAll(game);
+
+    // Connecting is the counter-play, so the warning has to visibly reset.
+    expect(game.stallProgress).toBeLessThan(0.2);
   });
 });

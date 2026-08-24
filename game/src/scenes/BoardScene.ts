@@ -20,6 +20,7 @@ import {
   TRACK_COLOR,
   TRACK_LIT_COLOR,
   PIECE_COLORS,
+  SHADOW_COLOR,
   mix,
   SHADOW_EDGE_COLOR,
   SHADOW_EYE_GLOW,
@@ -336,6 +337,15 @@ function visibleCellIndex(column: number, row: number): number {
  * and then only ever shown or hidden. A connection has nowhere else to be, so
  * there is nothing to move and nothing to allocate mid-cascade.
  */
+/**
+ * How far into the wait before the shadow's next target starts to show.
+ *
+ * Not from zero: a warning that is always on is wallpaper, and the player
+ * should get a stretch of quiet to place pieces in. Late enough to be a
+ * warning, early enough that a clear can still answer it.
+ */
+const THREAT_VISIBLE_FROM = 0.45;
+
 /** How long a trace takes to light, and the longer tail it dims over. */
 const TRACE_FADE_IN = 90;
 const TRACE_FADE_OUT = 220;
@@ -400,6 +410,12 @@ export class BoardScene extends Scene {
   private fpsText: Phaser.GameObjects.Text;
   private showFps = false;
   private nextAmbientRefresh = 0;
+
+  /**
+   * The visible cell the shadow is currently reaching for, so the warning on
+   * it can be taken off again when it moves or the timer resets.
+   */
+  private threatenedIndex: number | null = null;
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
   /**
@@ -1231,6 +1247,7 @@ export class BoardScene extends Scene {
     this.playCascadeBeat();
     this.playSounds();
     this.drawBoard();
+    this.drawThreat();
     this.drawConnections(delta);
     this.surfaceBankedFragment();
     this.drawProgress();
@@ -1352,6 +1369,7 @@ export class BoardScene extends Scene {
    */
   private resetShownState(): void {
     this.cellsBeingFilled.clear();
+    this.threatenedIndex = null;
 
     // A restart opens on a dark network. Without this the traces keep whatever
     // charge and lit level the last run left them holding, and the new board
@@ -1529,6 +1547,72 @@ export class BoardScene extends Scene {
         }
       }
     }
+  }
+
+  /**
+   * Show where the shadow is about to reach, before it gets there.
+   *
+   * The six seconds of hesitation are the only real pressure in this game and
+   * nothing on screen represented them: a creature simply appeared on a tile,
+   * with no warning, no way to read what was coming and no way to learn what
+   * caused it. That is an interruption, not tension.
+   *
+   * The eyes arrive before the body — the same baked pair the real creature
+   * uses, fading up on the tile it wants while it dims under them. It reads as
+   * something reaching out of the board, it teaches the rule by showing the
+   * consequence building, and it costs one texture that was already there.
+   *
+   * Reusing `shadowEyes[index]` is safe because a threatened cell is by
+   * definition a colour the shadow has not taken yet, and `animateShadow` only
+   * ever touches cells it already holds.
+   */
+  private drawThreat(): void {
+    const clearPrevious = () => {
+      if (this.threatenedIndex !== null) {
+        this.cellTiles[this.threatenedIndex].clearTint();
+        this.shadowEyes[this.threatenedIndex].setVisible(false);
+        this.threatenedIndex = null;
+      }
+    };
+
+    if (this.simulation.toppedOut || this.paused || this.storyHolding) {
+      clearPrevious();
+      return;
+    }
+
+    const progress = this.simulation.stallProgress;
+    if (progress < THREAT_VISIBLE_FROM) {
+      clearPrevious();
+      return;
+    }
+
+    const target = this.simulation.threatenedCell;
+    if (target === null || !isVisibleRow(target.row)) {
+      clearPrevious();
+      return;
+    }
+
+    const index = visibleCellIndex(target.column, target.row);
+    if (index !== this.threatenedIndex) {
+      clearPrevious();
+      this.threatenedIndex = index;
+    }
+
+    // Rises from nothing at the threshold to full just as it lands, so the
+    // last second before an arrival is unmistakable.
+    const closeness = (progress - THREAT_VISIBLE_FROM) / (1 - THREAT_VISIBLE_FROM);
+
+    // A quickening flicker rather than a smooth fade. Something steady reads as
+    // a UI element; something unsteady reads as alive and impatient.
+    const flicker = 0.75 + 0.25 * Math.sin(this.shadowClock / (70 - closeness * 40));
+
+    this.cellTiles[index].setTint(mix(0xffffff, SHADOW_COLOR, closeness * 0.75));
+    this.shadowEyes[index]
+      .setVisible(true)
+      .setPosition(centerOfColumn(target.column), centerOfRow(target.row))
+      .setAngle(0)
+      .setScale(0.55 + closeness * 0.45)
+      .setAlpha(closeness * flicker * 0.85);
   }
 
   /**
