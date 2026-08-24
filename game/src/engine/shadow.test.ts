@@ -300,7 +300,7 @@ describe('pushing the shadow back', () => {
     game.board.place(5, ROWS - 4, SHADOW);
     game.board.place(2, ROWS - 1, RED);
 
-    const driven = game.answerQuestion();
+    const { driven } = game.answerQuestion();
 
     expect(game.shadowOnBoard).toBe(0);
     // Reported so the scene can light each one in turn — the board is empty by
@@ -326,7 +326,7 @@ describe('pushing the shadow back', () => {
   it('reports nothing when the question is answered on a clean board', () => {
     const game = simulation();
 
-    expect(game.answerQuestion()).toEqual([]);
+    expect(game.answerQuestion().driven).toEqual([]);
   });
 
   it('forgets the shadow on restart', () => {

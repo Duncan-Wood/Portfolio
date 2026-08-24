@@ -2246,13 +2246,19 @@ export class BoardScene extends Scene {
    * hardest, which is when it should.
    */
   private driveOffShadow(): void {
-    const driven = this.simulation.answerQuestion();
+    const { driven, settled } = this.simulation.answerQuestion();
     if (driven.length === 0) {
       return;
     }
 
     this.tweens.killTweensOf(this.popTiles);
     this.cameras.main.shake(220 + 18 * Math.min(driven.length, 12), this.tuning.shakeIntensity * 3);
+
+    // The stack falls into the holes the wave just opened. Delayed past the
+    // end of the wave rather than run underneath it, so the two read as cause
+    // and effect: the shadow is driven off, and THEN what it was holding up
+    // comes down. Running together looked like the board collapsing.
+    this.time.delayedCall(driven.length * 55 + 180, () => this.dropTiles(settled));
 
     for (let index = 0; index < driven.length; index += 1) {
       const cell = driven[index];

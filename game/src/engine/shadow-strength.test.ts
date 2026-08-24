@@ -338,7 +338,7 @@ describe('arrivals get stronger the longer a run hesitates', () => {
     }
     expect(game.shadowOnBoard).toBeGreaterThan(0);
 
-    const driven = game.answerQuestion();
+    const { driven } = game.answerQuestion();
 
     expect(game.shadowOnBoard).toBe(0);
     expect(driven.length).toBeGreaterThan(0);
@@ -478,5 +478,42 @@ describe('the shadow tells you where it is reaching', () => {
 
     // Connecting is the counter-play, so the warning has to visibly reset.
     expect(game.stallProgress).toBeLessThan(0.2);
+  });
+});
+
+describe('answering leaves the board standing up', () => {
+  it('drops the tiles that were resting on what it drove off', () => {
+    const game = new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+    // A shadow on the floor with an ordinary tile stacked on top of it.
+    game.board.place(0, ROWS - 1, shadowCell(1, RED));
+    game.board.place(0, ROWS - 2, BLUE);
+
+    game.answerQuestion();
+
+    // Without a settle the blue hangs in mid-air until the next lock snaps it
+    // down with no animation, which is what the player sees as a glitch.
+    expect(game.board.pieceAt(0, ROWS - 1)).toBe(BLUE);
+    expect(game.board.isEmpty(0, ROWS - 2)).toBe(true);
+  });
+
+  it('reports the drop so the scene can animate it', () => {
+    const game = new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+    game.board.place(0, ROWS - 1, shadowCell(1, RED));
+    game.board.place(0, ROWS - 2, BLUE);
+
+    const { settled } = game.answerQuestion();
+
+    expect(settled).toEqual([{ column: 0, fromRow: ROWS - 2, toRow: ROWS - 1 }]);
+  });
+
+  it('still names every shadow it drove off', () => {
+    const game = new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+    game.board.place(0, ROWS - 1, shadowCell(1, RED));
+    game.board.place(1, ROWS - 1, shadowCell(2, BLUE));
+
+    const { driven } = game.answerQuestion();
+
+    expect(driven).toHaveLength(2);
+    expect(game.shadowOnBoard).toBe(0);
   });
 });

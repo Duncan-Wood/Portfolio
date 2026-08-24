@@ -511,7 +511,7 @@ export class Simulation {
    * board is empty by the time anything renders — the same reason a link
    * reports its own push-back.
    */
-  answerQuestion(): readonly ShadowHit[] {
+  answerQuestion(): { driven: readonly ShadowHit[]; settled: readonly TileMove[] } {
     const driven: ShadowHit[] = [];
 
     for (let row = ROWS - 1; row >= 0; row -= 1) {
@@ -527,7 +527,15 @@ export class Simulation {
       }
     }
 
-    return driven;
+    // SETTLE. Driving the shadow off empties cells in the middle of the stack,
+    // and without this every tile that was resting on one hung in mid-air until
+    // the next lock snapped it down with no animation — the strongest moment in
+    // the game followed immediately by the board glitching.
+    //
+    // The moves are handed back for the same reason a cascade's are: by the
+    // time anything renders, the board is already settled, so where a tile fell
+    // FROM is not recoverable by looking at it.
+    return { driven, settled: this.board.settle() };
   }
 
   /**
