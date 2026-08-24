@@ -9,6 +9,7 @@ import {
   SHADOW_EDGE_COLOR,
   SHADOW_EYE_COLOR,
   SHADOW_EYE_GLOW,
+  TRACK_LIT_COLOR,
   mix,
   type PieceShape,
 } from '../palette';
@@ -105,6 +106,56 @@ function tileCornerRadius(size: number): number {
 /** The texture key for a piece type. Bake before any of these are used. */
 export function tileTexture(pieceType: number | null): string {
   return pieceType === null ? EMPTY_TILE_TEXTURE : `tile-${pieceType}`;
+}
+
+/**
+ * An empty cell: bare substrate with dormant routing printed on it.
+ *
+ * The board used to be flat rectangles until something landed on it, which
+ * meant the network only existed at the moment of a match — tiles that briefly
+ * sprouted connectors rather than a circuit that was already there. Unlit runs
+ * to all four edges and a via at the centre make the wiring visibly present
+ * before any of it carries anything.
+ *
+ * The runs REACH THE EDGE deliberately. Two neighbouring empty cells line their
+ * stubs up across the gap and read as one continuous route, so the dormant
+ * network crosses the whole board instead of stopping at every cell boundary.
+ *
+ * Everything here sits a hair above the ground colour. It has to survive being
+ * looked past: a substrate that competes with the tiles is worse than none,
+ * because the tiles are what gets read under time pressure.
+ */
+function bakeEmpty(graphics: Phaser.GameObjects.Graphics, size: number): void {
+  const inset = TILE_INSET;
+  const middle = size / 2;
+  const corner = tileCornerRadius(size);
+  const printed = mix(EMPTY_COLOR, TRACK_LIT_COLOR, 0.16);
+  const run = Math.max(2, Math.round(size * 0.035));
+
+  graphics.clear();
+
+  graphics.fillStyle(EMPTY_COLOR, 1);
+  graphics.fillRoundedRect(inset, inset, size - inset * 2, size - inset * 2, corner);
+
+  graphics.fillStyle(printed, 1);
+  graphics.fillRect(0, middle - run / 2, size, run);
+  graphics.fillRect(middle - run / 2, 0, run, size);
+
+  // Drilled, so the substrate shows through the middle — the same figure the
+  // 'via' piece gets, which is what ties an empty cell to the tiles' vocabulary.
+  const ring = size * 0.12;
+  graphics.lineStyle(run * 1.6, printed, 1);
+  graphics.strokeCircle(middle, middle, ring);
+  graphics.fillStyle(EMPTY_COLOR, 1);
+  graphics.fillCircle(middle, middle, ring * 0.45);
+
+  // Two pads, off-centre. A board where every cell is identical reads as graph
+  // paper rather than as something that was routed.
+  graphics.fillStyle(printed, 1);
+  graphics.fillCircle(size * 0.16, middle, run * 1.3);
+  graphics.fillCircle(middle, size * 0.84, run * 1.3);
+
+  graphics.generateTexture(EMPTY_TILE_TEXTURE, size, size);
 }
 
 /**
@@ -209,7 +260,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
 
   // The empty cell gets a texture too, so every cell on the board is one image
   // whose only per-frame change is which key it points at.
-  bakeOne(graphics, EMPTY_TILE_TEXTURE, size, EMPTY_COLOR, null);
+  bakeEmpty(graphics, size);
 
   // One overlay per shadow strength. The creature is the same at every tier —
   // what grows is its crown and the light on it, because the crown is already

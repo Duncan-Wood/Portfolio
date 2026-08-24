@@ -20,6 +20,7 @@ import {
   TRACK_COLOR,
   TRACK_LIT_COLOR,
   PIECE_COLORS,
+  mix,
   SHADOW_EDGE_COLOR,
   SHADOW_EYE_GLOW,
 } from '../palette';
@@ -74,6 +75,9 @@ const GAP = 4;
  * short-circuits on an unchanged one), and `Math.round(actualFps)` changes
  * often enough to be worth throttling — it also stops the readout flickering.
  */
+/** How often the hum is re-levelled. Per frame is pointless; it moves slowly. */
+const AMBIENT_REFRESH_INTERVAL = 200;
+
 const FPS_REFRESH_INTERVAL = 250;
 
 /*
@@ -226,6 +230,18 @@ const trackPath = new TrackPath(
   ),
 );
 
+/**
+ * A canvas x turned into a stereo position, -1 to 1.
+ *
+ * Deliberately narrower than the full field: hard-panning a puzzle board is
+ * disorienting on headphones, and the point is only to say WHERE, not to throw
+ * the sound across the room.
+ */
+function panForX(x: number): number {
+  const across = (x - ORIGIN_X) / BOARD_WIDTH;
+  return Math.max(-1, Math.min(1, (across - 0.5) * 1.4));
+}
+
 function centerOfColumn(column: number): number {
   return ORIGIN_X + column * (CELL_SIZE + GAP) + CELL_SIZE / 2;
 }
@@ -311,12 +327,42 @@ function visibleCellIndex(column: number, row: number): number {
  * and then only ever shown or hidden. A connection has nowhere else to be, so
  * there is nothing to move and nothing to allocate mid-cascade.
  */
+/** How long a trace takes to light, and the longer tail it dims over. */
+const TRACE_FADE_IN = 90;
+const TRACE_FADE_OUT = 220;
+
+/** How long a signal takes to cross one trace and die away behind it. */
+const TRACE_CHARGE_DECAY = 260;
+
+/**
+ * The delay on a trace with one foot outside the group that just cleared.
+ *
+ * This is the whole "a cascade is a signal crossing the network" idea in one
+ * number: the traces inside the group fire together, and the ones leading out
+ * of it fire a beat later, so the charge visibly leaves where it started.
+ */
+const TRACE_SIGNAL_STEP = 70;
+
 interface ConnectionSlot {
   trace: Phaser.GameObjects.Image;
   column: number;
   row: number;
   toColumn: number;
   toRow: number;
+  /**
+   * How lit this trace is, 0..1, eased toward whether its two cells match.
+   *
+   * A number rather than the `setVisible` this replaced. Traces that snap on
+   * and off make the board read as tiles that briefly sprout connectors; a
+   * network that fades up and lingers on the way out reads as wiring.
+   */
+  lit: number;
+  /** Signal brightness, 0..1, set by a clear and decaying to nothing. */
+  charge: number;
+  /** Milliseconds before this trace's charge fires, so a signal travels. */
+  chargeDelay: number;
+  /** The colour to carry while charged, kept because the tiles are gone by then. */
+  chargeColor: number;
 }
 
 /**
@@ -343,6 +389,7 @@ export class BoardScene extends Scene {
   private pairTiles: Phaser.GameObjects.Image[];
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
+  private nextAmbientRefresh = 0;
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
   /**
@@ -1070,7 +1117,7 @@ export class BoardScene extends Scene {
       // Phaser clears the canvas every frame and a held game still has to be
       // looked at; nothing here consumes `delta`, so no time is banked.
       this.drawBoard();
-      this.drawConnections();
+      this.drawConnections(0);
       this.drawPair();
       this.drawPreview();
       this.refreshChain();
@@ -1078,6 +1125,7 @@ export class BoardScene extends Scene {
       this.refreshAnswerLine(time);
       this.refreshGameOver();
       this.refreshFps(time);
+      this.refreshAmbient(time);
       return;
     }
 
@@ -1137,7 +1185,7 @@ export class BoardScene extends Scene {
     this.playCascadeBeat();
     this.playSounds();
     this.drawBoard();
-    this.drawConnections();
+    this.drawConnections(delta);
     this.drawProgress();
     this.advanceTrackPulses(delta);
     this.drawPair();
@@ -1148,6 +1196,7 @@ export class BoardScene extends Scene {
     this.refreshStatic();
     this.refreshGameOver();
     this.refreshFps(time);
+    this.refreshAmbient(time);
   }
 
   /**
@@ -1248,6 +1297,16 @@ export class BoardScene extends Scene {
    */
   private resetShownState(): void {
     this.cellsBeingFilled.clear();
+
+    // A restart opens on a dark network. Without this the traces keep whatever
+    // charge and lit level the last run left them holding, and the new board
+    // lights up before anything has been placed on it.
+    for (const slot of this.connections) {
+      slot.lit = 0;
+      slot.charge = 0;
+      slot.chargeDelay = 0;
+      slot.trace.setVisible(false);
+    }
 
     // Undo the losing sequence. It dims the panel, fades two texts in and
     // tweens every lit trace to nothing, and R can land in the middle of all
@@ -1600,7 +1659,10 @@ export class BoardScene extends Scene {
       trace.setAngle(90);
     }
 
-    return { trace, column, row, toColumn, toRow };
+    return {
+      trace, column, row, toColumn, toRow,
+      lit: 0, charge: 0, chargeDelay: 0, chargeColor: TRACE_COLORS[0],
+    };
   }
 
   /**
@@ -1609,7 +1671,7 @@ export class BoardScene extends Scene {
    * A cell still being animated into counts as empty here, exactly as it does
    * in `drawBoard`, or a trace would connect to a tile that has not landed.
    */
-  private drawConnections(): void {
+  private drawConnections(delta: number): void {
     // Once the run is lost the traces are no longer a picture of the board —
     // they are being put out one at a time by `loseTheBoard`. Recomputing them
     // from board state here would re-light each one the frame after it died.
@@ -1628,10 +1690,82 @@ export class BoardScene extends Scene {
       const linked = isColour(pieceType)
         && pieceType === this.settledPieceAt(slot.toColumn, slot.toRow);
 
-      slot.trace.setVisible(linked);
-      if (linked) {
-        slot.trace.setTint(TRACE_COLORS[pieceType]);
+      if (isColour(pieceType)) {
+        slot.chargeColor = TRACE_COLORS[pieceType];
       }
+
+      // Eased rather than switched, and asymmetrically: quick to light, slow
+      // to let go. The long tail is what stops a settling board from flickering
+      // as tiles pass each other.
+      const target = linked ? 1 : 0;
+      const step = delta / (linked ? TRACE_FADE_IN : TRACE_FADE_OUT);
+      const gap = target - slot.lit;
+      slot.lit += Math.sign(gap) * Math.min(Math.abs(gap), step);
+
+      if (slot.chargeDelay > 0) {
+        slot.chargeDelay -= delta;
+      } else if (slot.charge > 0) {
+        slot.charge = Math.max(0, slot.charge - delta / TRACE_CHARGE_DECAY);
+      }
+      const signal = slot.chargeDelay > 0 ? 0 : slot.charge;
+
+      // The signal shows even on a trace whose tiles have gone — which is most
+      // of them, a frame after a clear. That is the point: the charge outlives
+      // the group, so the cascade is something crossing the board rather than
+      // a set of tiles disappearing.
+      const strength = Math.max(slot.lit, signal);
+      if (strength <= 0.002) {
+        slot.trace.setVisible(false);
+        continue;
+      }
+
+      // A slow breath along a settled network, phase-shifted per cell so it
+      // never pulses in unison. A circuit at rest should still look powered.
+      const breath = 0.87 + 0.13 * Math.sin(
+        this.shadowClock / 380 + slot.column * 1.7 + slot.row * 0.9,
+      );
+
+      slot.trace
+        .setVisible(true)
+        .setAlpha(Math.min(1, strength * breath + signal * 0.55))
+        .setScale(1 + signal * 0.5)
+        .setTint(signal > 0 ? mix(slot.chargeColor, 0xffffff, signal * 0.85) : slot.chargeColor);
+    }
+  }
+
+  /**
+   * Send a charge through every trace the link just cleared, and one step
+   * further out.
+   *
+   * ART-DIRECTION's Stage 2, finally built: "chains light the leading between
+   * cleared tiles, so a cascade is visibly a signal crossing the network." It
+   * is also the only thing on screen that makes chain DEPTH legible — the
+   * mechanic the game most wants understood and the one it never showed.
+   *
+   * The colour is captured here rather than read at draw time because the
+   * cells are empty by the next frame; a charge has to remember what cleared
+   * it.
+   */
+  private chargeNetwork(link: ChainLink): void {
+    const cleared = new Map<number, number>();
+    for (const group of link.groups) {
+      for (const cell of group.cells) {
+        cleared.set(cell.row * COLUMNS + cell.column, group.pieceType);
+      }
+    }
+
+    for (const slot of this.connections) {
+      const from = cleared.get(slot.row * COLUMNS + slot.column);
+      const to = cleared.get(slot.toRow * COLUMNS + slot.toColumn);
+      if (from === undefined && to === undefined) {
+        continue;
+      }
+
+      // Both feet inside the group: fire now. One foot outside: fire a beat
+      // later, which is what makes the charge visibly leave where it started.
+      slot.charge = 1;
+      slot.chargeDelay = from !== undefined && to !== undefined ? 0 : TRACE_SIGNAL_STEP;
+      slot.chargeColor = TRACE_COLORS[from ?? to ?? 0];
     }
   }
 
@@ -2235,10 +2369,16 @@ export class BoardScene extends Scene {
       return;
     }
 
-    this.popCells(lastBeat.link, lastBeat.connections);
+    const poppedAt = this.popCells(lastBeat.link, lastBeat.connections);
+
     // `chainLength` has already been incremented past this link, so the first
-    // link of a cascade pops at index 0.
-    this.soundBoard.play(popVoice(this.simulation.chainLength - 1));
+    // link of a cascade pops at index 0. The pop is placed where the clear
+    // actually happened, which is what stops a six-wide board sounding like a
+    // single point.
+    this.soundBoard.play({
+      ...popVoice(this.simulation.chainLength - 1),
+      pan: poppedAt === null ? 0 : panForX(poppedAt),
+    });
   }
 
   /**
@@ -2250,6 +2390,7 @@ export class BoardScene extends Scene {
     this.tweens.killTweensOf(this.popTiles);
     this.hitStopRemaining = this.tuning.hitStopDuration;
     this.kickCamera();
+    this.chargeNetwork(link);
 
     let borrowed = 0;
     let sumX = 0;
@@ -2756,6 +2897,41 @@ export class BoardScene extends Scene {
         this.tweens.add({ targets: text, alpha: 1, duration: 420 });
       }
     });
+  }
+
+  /**
+   * Level the hum against how full the board is.
+   *
+   * On a timer rather than per frame because it moves slowly and
+   * `setTargetAtTime` glides between values anyway — re-levelling 120 times a
+   * second would schedule 120 automation events for a number that changes
+   * once a placement.
+   */
+  private refreshAmbient(time: number): void {
+    if (time < this.nextAmbientRefresh) {
+      return;
+    }
+    this.nextAmbientRefresh = time + AMBIENT_REFRESH_INTERVAL;
+
+    // The run is over, or held. The hum goes with the colour, not after it.
+    if (this.simulation.toppedOut || this.paused) {
+      this.soundBoard.setAmbient(0);
+      return;
+    }
+
+    let highest = ROWS;
+    for (let row = FIRST_VISIBLE_ROW; row < ROWS && highest === ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        if (!this.simulation.board.isEmpty(column, row)) {
+          highest = row;
+          break;
+        }
+      }
+    }
+
+    // Never silent while a run is live — an empty board still has current in it.
+    const filled = (ROWS - highest) / VISIBLE_ROWS;
+    this.soundBoard.setAmbient(0.3 + filled * 0.7);
   }
 
   private refreshFps(time: number): void {

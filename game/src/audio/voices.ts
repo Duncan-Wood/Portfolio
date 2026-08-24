@@ -20,6 +20,17 @@ export interface Voice {
   gain: number;
   /** Milliseconds to wait before this voice starts, for arpeggios. */
   delay: number;
+  /**
+   * Where in the stereo field, -1 hard left to 1 hard right. Omitted is centred.
+   *
+   * Every sound in this game was dead centre, which is why a board six columns
+   * wide sounded like one point. A pop that comes from where you cleared makes
+   * the board a place rather than a picture.
+   *
+   * Optional so every existing voice, and every test that asserts on one, is
+   * untouched.
+   */
+  pan?: number;
 }
 
 /** A4. The pitch the first link of every chain pops at. */
