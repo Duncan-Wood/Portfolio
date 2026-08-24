@@ -212,7 +212,10 @@ const MEMORY_PANEL_LEFT = 476;
  * it is the only prose in the right-hand column, and it gets the whole width of
  * it rather than the narrow strip the nodes are drawn in.
  */
-const ANSWER_ECHO_LEFT = 432;
+// Inside the memory panel's column. It was 432, which overlapped the board
+// (which ends at 444) and the progress ring outside it, so a long answer
+// rendered across the game and clipped off the canvas edge.
+const ANSWER_ECHO_LEFT = MEMORY_PANEL_LEFT;
 const MEMORY_PANEL_WIDTH = 128;
 
 const PREVIEW_CELL = 48;
@@ -389,6 +392,7 @@ export class BoardScene extends Scene {
   private pairTiles: Phaser.GameObjects.Image[];
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
+  private showFps = false;
   private nextAmbientRefresh = 0;
   private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
@@ -919,11 +923,15 @@ export class BoardScene extends Scene {
     // page, so the context is built on the first key rather than here.
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
+    // Dev only. `import.meta.env.DEV` is replaced with `false` at build time
+    // and the whole readout drops out of the bundle, the same way the live
+    // tuning hook does — a shipped game should not have a debug overlay on it.
+    this.showFps = import.meta.env.DEV;
     this.fpsText = this.add.text(8, 8, '', {
       fontFamily: 'monospace',
       fontSize: '16px',
       color: '#8ea3b0',
-    });
+    }).setVisible(this.showFps);
 
     this.scoreText = this.add.text(CANVAS_WIDTH - 8, 8, '', {
       fontFamily: 'monospace',
@@ -1254,6 +1262,14 @@ export class BoardScene extends Scene {
    * read as a hung game rather than as one waiting for you.
    */
   private refreshAnswerLine(time: number): void {
+    // The prompt has done its job the moment anything is typed, and a two-line
+    // answer is drawn straight through where it sits. Fading it on the first
+    // keystroke fixes the collision and reads better than an instruction that
+    // stays up after it has been followed.
+    if (this.awaitingAnswer) {
+      this.revealHint.setVisible(this.answerText.length === 0);
+    }
+
     if (!this.awaitingAnswer) {
       return;
     }
@@ -3006,7 +3022,7 @@ export class BoardScene extends Scene {
   }
 
   private refreshFps(time: number): void {
-    if (time < this.nextFpsRefresh) {
+    if (!this.showFps || time < this.nextFpsRefresh) {
       return;
     }
 

@@ -9,8 +9,29 @@ carries a header explaining what it owns and why.
 
 ## Status
 
-**Stage 3 — Juice. The checklist is done; the benchmark is not, because it needs
-another person.**
+**Stage 3 — Juice is done. The work now is turning a working matcher into a game,
+which is a different problem and the one being worked.**
+
+- **The shadow possesses tiles now.** It used to drop into an empty cell, which made it
+  garbage-dropping with a face. It takes a tile you already placed, remembers its colour,
+  and shows that colour through itself — so it genuinely severs connections, the board
+  never grows from it, and driving it off gives your tile back rather than punching a
+  hole. Shadows have two strengths; a link damages by its depth, so a chain is the fast
+  answer and a single clear is always still an answer. The tier cap is 2 because a bot
+  run through this engine produced **zero** chains of 2+ across 26 pieces — a threat
+  whose only answer is a skill nobody has is not difficulty.
+- **A chain and a memory no longer ruin each other.** Surfacing a fragment used to fire
+  from inside `drawProgress` mid-cascade, freezing a five-link chain at link three with
+  `N CHAIN` still burning at 64px behind the fragment. Fragments are banked until the
+  board settles and then surface one per placement, so a chain worth four of them pays
+  one now and one on each of the next three.
+- **Measured, and the reason all of this started:** the whole memory plus its question
+  took **53 seconds and 26 pieces**, there were **zero** shadows on the board when the
+  question arrived (so its payoff was nothing), and one 4-link chain paid 61 connections
+  against the 43 a whole memory costs.
+- **Open, and being designed:** see the "Finish the Memory" memo — a run should be
+  winnable, the shadow should eat progress off the ring, and what the player types should
+  do something. The player must never be made to write the story.
 
 - **Stages 0–2 are closed.** Setup, the engine, the scene, input, tuning, matching,
   cascades and exponential chain scoring are all built and verified in Chrome.
@@ -36,7 +57,7 @@ another person.**
   weighted by how deep into a cascade they were — and it fills a circuit that rings the
   board, one pad at a time. Closing that circuit surfaces one fragment of a memory over
   the held board, and the fragment lights permanently in the panel beside it, so the
-  memory assembles as you play. One memory is written, in five fragments, ending on a
+  memory assembles as you play. One memory is written, in four fragments, ending on a
   question. This is what replaces the score as the progression.
 - **The shadow has a face.** It shipped as a near-black square with a hairline
   broken outline, which read as a rendering fault rather than as an antagonist. It is
@@ -165,10 +186,22 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | Its eyes are baked apart from its body, so they can blink and flare | `scenes/tile-textures.ts` (`SHADOW_EYES_TEXTURE`) |
 | The idle is computed per frame from one clock, never tweened | `scenes/BoardScene.ts` (`animateShadow`) |
 | An arrival is announced by a counter, like a landing, and it climbs out of the board | `engine/simulation.ts` (`shadowTaken`), `scenes/BoardScene.ts` (`playShadowArrival`) |
-| A link reports which shadow it pushed back, and those cells are blown outward | `engine/simulation.ts` (`CascadeBeat.shadowCleared`) |
+| A link reports which shadow it freed and which it only dented | `engine/matching.ts` (`ChainLink.shadowPurified`, `shadowDamaged`) |
 | Hesitation feeds the shadow every 6 seconds — played, not guessed | `tuning.ts` (`shadowInterval`) |
+| The shadow **possesses a tile** and remembers its colour; it never fills an empty cell | `engine/grid.ts` (`shadowCell`), `engine/simulation.ts` (`encroach`) |
+| Driving it off **restores** that colour — a repair, not a kill | `engine/matching.ts` (`damageShadow`) |
+| Shadows have strength; a link damages by its DEPTH, so chains are the fast answer | `engine/grid.ts` (`MAX_SHADOW_STRENGTH`), `engine/matching.ts` |
+| Two tiers, not three: a bot measured **zero** chains of 2+ in 26 pieces | `engine/grid.ts` (`MAX_SHADOW_STRENGTH`) |
+| A single clear always makes progress against any tier — never a skill gate | `engine/matching.ts` (`damageShadow`) |
+| One hit per shadow per link, however many cleared cells touched it | `engine/matching.ts` (`damageShadow`) |
+| The creature is a **layer over the tile**, not a swapped texture | `scenes/tile-textures.ts` (`shadowBodyTexture`), `scenes/BoardScene.ts` (`shadowBodies`) |
+| Nothing to take means no arrival — and, unlike before, no top-out | `engine/simulation.ts` (`encroach`) |
+| A fragment waits for the cascade to finish, then surfaces one per placement | `scenes/BoardScene.ts` (`surfaceBankedFragment`) |
+| The `N CHAIN` callout is hidden while the story holds the board | `scenes/BoardScene.ts` (`refreshChain`) |
 | `Board.place` throws on an off-board **or** occupied write | `engine/board.ts` (`place`) |
 | Nothing is exempt from `isBlocked`; the ceiling blocks like any other edge | `engine/board.ts` (`isBlocked`) |
+| The game is called **Still Connected** — the title the loss screen contradicts | `shadow-voice.ts` (`CONNECTION_LOST`) |
+| The portfolio stays the crawlable default; the game is a prominent alternate route | `src/components/nav.jsx`, `src/components/home.jsx` |
 
 Two that are recorded here as well as in the code, deliberately:
 
@@ -189,10 +222,10 @@ Two that are recorded here as well as in the code, deliberately:
   whole run is worth roughly **450-700 cells**. What shipped against that is a schedule
   costed per FRAGMENT rather than per memory — `connectionsPerNode` is
   `[6, 9, 12, 16, 20, 26, 32, 40]`, so the first fragment of High School costs 6
-  connections (two or three clears) and all five of them cost 63. The tiny first one is
+  connections (two or three clears) and all four of them cost 43. The tiny first one is
   Dr. Mario's trick: its level 0 is four viruses, and that is the tutorial.
 
-  Two things about it are unplayed. Whether the *whole* memory at 63 is too long a wait
+  Two things about it are unplayed. Whether the *whole* memory at 43 is too long a wait
   for the ending, and what the second memory should cost, since nothing has ever earned
   one.
 - **A figure per fragment, worn by the board.** See ART-DIRECTION under "4b". Needs one
@@ -216,7 +249,6 @@ Two that are recorded here as well as in the code, deliberately:
 
 ### Not blocking any stage
 
-- **The game's name.** `CLAUDE.md` still says "Mind Matcher (name pending)".
 - **Newcomer onramp.** If the Puyo match rule wins, decide whether to ship a gentler mode or
   strong onboarding, or accept the learning curve.
 
