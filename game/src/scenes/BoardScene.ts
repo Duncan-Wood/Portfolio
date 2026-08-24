@@ -552,6 +552,33 @@ export class BoardScene extends Scene {
   private revealRemaining = 0;
 
   /**
+   * A closed circuit waiting for the board to stop moving.
+   *
+   * `drawProgress` runs during a cascade on purpose — the ring filling as a
+   * chain resolves is the best build-up in the game. Surfacing the fragment
+   * from in there was not: it froze the simulation mid-cascade, so a five-link
+   * chain stopped at link three to show a memory, and `refreshChain` went on
+   * drawing "3 CHAIN" at 64px behind it because `resolving` was still true
+   * underneath. The two best moments in the game were landing on top of each
+   * other. The circuit closes when it closes; the fragment waits for the last
+   * link.
+   */
+  private revealPending = false;
+
+  /**
+   * The `piecesLocked` count the last fragment surfaced on, so at most one can
+   * surface per placement.
+   *
+   * A deep chain can pay for every fragment a memory has in one go — a 4-link
+   * clear measured 61 connections against the 43 a whole memory costs — and
+   * without this they arrive as a stack of modals over a board nobody has
+   * touched. Spread across placements the same chain pays FORWARD: the next
+   * few pieces each surface something, which is what a chain reward should
+   * feel like. -1 so the first fragment of a run is never held back.
+   */
+  private lastRevealPiece = -1;
+
+  /**
    * A question waiting for the fragment in front of it to finish.
    *
    * Completing a memory used to swap the last node's words FOR the question,
@@ -1186,6 +1213,7 @@ export class BoardScene extends Scene {
     this.playSounds();
     this.drawBoard();
     this.drawConnections(delta);
+    this.surfaceBankedFragment();
     this.drawProgress();
     this.advanceTrackPulses(delta);
     this.drawPair();
@@ -1375,6 +1403,11 @@ export class BoardScene extends Scene {
     this.nodesRevealed = 0;
     this.revealRemaining = 0;
     this.pendingReveal = null;
+    this.revealPending = false;
+    // Back to -1, not to the engine's count: the new run has locked nothing,
+    // and seeding this from `piecesLocked` would make the first fragment wait
+    // for a placement it has already been paid for.
+    this.lastRevealPiece = -1;
     this.redrawTrack();
     // Drawn here as well as on every change: the panel is otherwise blank until
     // the first pad lights, which is exactly when it has the most to say.
@@ -1813,8 +1846,11 @@ export class BoardScene extends Scene {
       });
     }
 
+    // Banked, not surfaced. `litPads` is capped at `pads`, so the ring holds
+    // full and glowing for the rest of the cascade, which reads as owed rather
+    // than as stuck.
     if (lit === pads) {
-      this.revealNextNode();
+      this.revealPending = true;
     }
   }
 
@@ -1862,6 +1898,36 @@ export class BoardScene extends Scene {
     // caller remembering to check a constant first. `null` makes both callers
     // say what they do when there is nothing left.
     return null;
+  }
+
+  /**
+   * Hand over a banked fragment, once the board has actually stopped moving.
+   *
+   * Three conditions, each of which was a bug before it was a condition. The
+   * cascade has to be over, or the fragment freezes a chain half-resolved. The
+   * story has to be clear, or one fragment lands on top of the last. And a
+   * piece has to have been placed since the previous one, or a chain that
+   * banked a whole memory dumps every fragment of it back to back over a board
+   * the player has not touched.
+   *
+   * The last of those is the one that turns the reward round: a chain worth
+   * four fragments now pays one now and one on each of the next three
+   * placements, so the run keeps handing things back for a while after the
+   * clear that earned them.
+   */
+  private surfaceBankedFragment(): void {
+    if (
+      !this.revealPending
+      || this.simulation.resolving
+      || this.storyHolding
+      || this.simulation.piecesLocked <= this.lastRevealPiece
+    ) {
+      return;
+    }
+
+    this.revealPending = false;
+    this.lastRevealPiece = this.simulation.piecesLocked;
+    this.revealNextNode();
   }
 
   /**
@@ -2790,7 +2856,12 @@ export class BoardScene extends Scene {
    */
   private refreshChain(): void {
     const { resolving, chainLength } = this.simulation;
-    const showing = resolving && chainLength >= 2;
+
+    // Not while the story has the board. A reveal freezes the simulation with
+    // `resolving` still true, so without this the callout from the chain that
+    // paid for the fragment sits at 64px directly behind it — and the question
+    // is drawn in the same slot the callout occupies.
+    const showing = resolving && chainLength >= 2 && !this.storyHolding;
 
     this.chainText.setVisible(showing);
     if (showing && chainLength !== this.shownChain) {
