@@ -73,6 +73,23 @@ export interface Tuning {
   shadowInterval: number;
 
   /**
+   * How many arrivals the shadow spends at one strength before the next one
+   * comes in a tier harder.
+   *
+   * Strength is how many hits a shadow takes, and a link's damage is its
+   * depth, so this dial is really "how long before a single clear stops being
+   * enough". That is the difficulty curve, and it is deliberately shaped by
+   * the antagonist rather than by a level counter: a run that keeps connecting
+   * never advances it, because it never gets the arrivals.
+   *
+   * 4, so at the shipping interval the first weak tier lasts roughly 24
+   * seconds of cumulative dithering. That is long enough to learn the rule on
+   * something a single clear kills, which is the whole reason the first tier
+   * is beatable without a chain.
+   */
+  arrivalsPerShadowStrength: number;
+
+  /**
    * How long a fragment and a question hold the board BEFORE the time it takes
    * to read them, which `readingPerCharacter` adds on top.
    *
@@ -206,6 +223,7 @@ export interface Tuning {
 export const DEFAULT_TUNING: Tuning = {
   connectionsPerNode: [6, 9, 12, 16, 20, 26, 32, 40],
   shadowInterval: 6000,
+  arrivalsPerShadowStrength: 4,
   fragmentDuration: 1400,
   questionDuration: 3000,
   readingPerCharacter: 48,

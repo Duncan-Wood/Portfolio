@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
-  nodeVoice,
   BASE_POP_FREQUENCY,
   MAX_POP_FREQUENCY,
+  answerVoice,
   chainVoices,
+  connectionLostVoice,
   hardDropVoice,
   landVoice,
-  answerVoice,
-  connectionLostVoice,
+  nodeVoice,
   popVoice,
   shadowArrivalVoice,
   shadowRecedeVoice,
+  shadowStruckVoice,
   topOutVoice,
 } from './voices';
 
@@ -197,5 +198,37 @@ describe('losing the board', () => {
   it('stops falling before it drops out of hearing', () => {
     expect(connectionLostVoice(72).startFrequency).toBe(connectionLostVoice(24).startFrequency);
     expect(connectionLostVoice(72).endFrequency).toBeGreaterThan(20);
+  });
+});
+
+describe('a shadow struck but not shifted', () => {
+  it('falls, where the recede voice rises', () => {
+    const struck = shadowStruckVoice(1);
+    const receded = shadowRecedeVoice(1);
+
+    // The one thing that must never blur: staying put has to sound different
+    // from leaving, or a single clear against a strong shadow reads as a win.
+    expect(struck.endFrequency).toBeLessThan(struck.startFrequency);
+    expect(receded.endFrequency).toBeGreaterThan(receded.startFrequency);
+  });
+
+  it('sits below the recede voice rather than beside it', () => {
+    expect(shadowStruckVoice(1).startFrequency).toBeLessThan(
+      shadowRecedeVoice(1).startFrequency,
+    );
+  });
+
+  it('stays quieter than the clear that caused it', () => {
+    // It fires on ordinary clears all run long; anything at pop volume would
+    // be underfoot.
+    expect(shadowStruckVoice(4).gain).toBeLessThan(popVoice(0).gain);
+  });
+
+  it('leans on the hit a little harder when it struck several', () => {
+    expect(shadowStruckVoice(4).gain).toBeGreaterThan(shadowStruckVoice(1).gain);
+  });
+
+  it('plays immediately, since it belongs to the clear that landed it', () => {
+    expect(shadowStruckVoice(2).delay).toBe(0);
   });
 });

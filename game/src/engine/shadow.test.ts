@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLUMNS, ROWS, SHADOW } from './grid';
+import { COLUMNS, ROWS, SHADOW, isShadow } from './grid';
 import { Board } from './board';
 import { findGroups } from './matching';
 import { type CascadeBeat, Simulation } from './simulation';
@@ -78,6 +78,23 @@ describe('shadow as an obstacle', () => {
   });
 });
 
+/**
+ * A tile in every column the spawning pair is not standing in.
+ *
+ * The shadow POSSESSES a tile rather than filling a space, so a bare board
+ * gives it nothing to arrive on — and the columns the pair occupies are
+ * skipped, which on an otherwise-empty board is where the only tiles are.
+ * Every test about arrivals needs something on the board to be taken.
+ */
+const withTilesToTake = (game: Simulation) => {
+  const standing = game.pair.cells().map((cell) => cell.column);
+  for (let column = 0; column < COLUMNS; column += 1) {
+    if (!standing.includes(column) && game.board.isEmpty(column, ROWS - 1)) {
+      game.board.place(column, ROWS - 1, column % 2 === 0 ? RED : BLUE);
+    }
+  }
+};
+
 describe('shadow encroaching while the player stalls', () => {
   it('holds off while the player keeps clearing', () => {
     const game = simulation();
@@ -90,6 +107,7 @@ describe('shadow encroaching while the player stalls', () => {
 
   it('takes a cell once the player has stalled long enough', () => {
     const game = simulation();
+    withTilesToTake(game);
 
     game.update(DEFAULT_TUNING.shadowInterval);
 
@@ -98,6 +116,7 @@ describe('shadow encroaching while the player stalls', () => {
 
   it('keeps taking cells the longer nothing connects', () => {
     const game = simulation();
+    withTilesToTake(game);
 
     game.update(DEFAULT_TUNING.shadowInterval);
     game.update(DEFAULT_TUNING.shadowInterval);
@@ -137,17 +156,30 @@ describe('shadow encroaching while the player stalls', () => {
     }
     const standing = game.pair.cells();
 
-    // The pair is not ON the board, so nothing stopped the shadow being placed
-    // straight into it — and then locking wrote a tile over a tile and threw.
+    // The pair is not ON the board, so nothing structurally stops the shadow
+    // reaching into the cells it occupies — and when the shadow filled empty
+    // cells, that is exactly what happened and locking wrote a tile over a
+    // tile and threw. The guard is no longer a skipped column; it is the rule
+    // that the shadow only ever takes a cell that ALREADY holds a colour, and
+    // the pair only ever occupies empty ones. This test now pins that rule.
     expect(() => game.update(DEFAULT_TUNING.shadowInterval)).not.toThrow();
 
+    // It still arrived — the pair's column being in scope is the point.
+    expect(game.shadowOnBoard).toBe(1);
+
+    // Those cells hold the pair, which locked during that same update — the
+    // point is that they hold a COLOUR and not a shadow that got there first.
     for (const cell of standing) {
-      expect(game.board.pieceAt(cell.column, cell.row)).not.toBe(SHADOW);
+      expect(isShadow(game.board.pieceAt(cell.column, cell.row))).toBe(false);
     }
+
+    // And locking on top of it is safe, which is the failure this guards.
+    expect(() => game.update(DEFAULT_TUNING.lockDelay)).not.toThrow();
   });
 
   it('says where it took a cell, so the scene can show it arriving', () => {
     const game = simulation();
+    withTilesToTake(game);
     expect(game.shadowTaken).toBe(0);
     expect(game.lastShadowCell).toBeNull();
 
@@ -161,52 +193,30 @@ describe('shadow encroaching while the player stalls', () => {
     expect(game.board.pieceAt(taken!.column, taken!.row)).toBe(SHADOW);
   });
 
-  it('does not tick the arrival counter when it had nowhere to go', () => {
+  it('does not tick the arrival counter when there was nothing to take', () => {
     const game = simulation();
-    // Every cell the falling pair is not standing in, full to the top: the
-    // shadow has nowhere to go, and that ends the run rather than counting an
-    // arrival that never landed.
-    const standing = game.pair.cells();
-    for (let column = 0; column < COLUMNS; column += 1) {
-      for (let row = 0; row < ROWS; row += 1) {
-        const occupied = standing.some((cell) => cell.column === column && cell.row === row);
-        if (!occupied && game.board.isEmpty(column, row)) {
-          game.board.place(column, row, column % 2 === 0 ? RED : BLUE);
-        }
-      }
-    }
+    // A board the player has just cleared. The shadow needs a tile to possess,
+    // so there is simply no arrival — and, unlike the rule this replaced, it
+    // does NOT end the run. "You stopped before you finished" has no claim on
+    // a board that was finished.
+    game.board.reset();
 
     game.update(DEFAULT_TUNING.shadowInterval);
 
-    expect(game.toppedOut).toBe(true);
     expect(game.shadowTaken).toBe(0);
+    expect(game.toppedOut).toBe(false);
   });
 
-  it('does not commit the falling pair on the frame it ends the run', () => {
+  it('never adds to the board, only takes from it', () => {
     const game = simulation();
-    const standing = game.pair.cells();
-    for (let column = 0; column < COLUMNS; column += 1) {
-      for (let row = 0; row < ROWS; row += 1) {
-        const occupied = standing.some((cell) => cell.column === column && cell.row === row);
-        if (!occupied && game.board.isEmpty(column, row)) {
-          game.board.place(column, row, column % 2 === 0 ? RED : BLUE);
-        }
-      }
-    }
-    while (game.pair.canFall(game.board)) {
-      game.update(DEFAULT_TUNING.fallInterval);
-    }
+    withTilesToTake(game);
+    const before = game.shadowOnBoard;
 
-    // Long enough to trip the shadow AND to run out the lock delay, which is
-    // the frame where the two used to happen in that order.
-    game.update(DEFAULT_TUNING.shadowInterval + DEFAULT_TUNING.lockDelay);
+    game.update(DEFAULT_TUNING.shadowInterval);
 
-    expect(game.toppedOut).toBe(true);
-    // The run ended before the pair could land, so nothing landed: a lock here
-    // sounds a landing after GAME OVER and can start a cascade that the
-    // top-out guard then stops anything from ever resolving.
-    expect(game.piecesLocked).toBe(0);
-    expect(game.resolving).toBe(false);
+    // The cell it took was already occupied, so the count of filled cells is
+    // unchanged. This is what stops the antagonist being garbage-dropping.
+    expect(game.shadowOnBoard).toBe(before + 1);
   });
 
   it('does not creep in while a cascade is still resolving', () => {
@@ -260,11 +270,14 @@ describe('pushing the shadow back', () => {
     game.board.place(3, ROWS - 2, SHADOW);
 
     const beats = settleCollectingBeats(game);
-    const cleared = beats.flatMap((beat) => (beat.kind === 'clear' ? beat.link.shadowCleared : []));
+    const cleared = beats.flatMap((beat) => (beat.kind === 'clear' ? beat.link.shadowPurified : []));
 
     // The board is already in its post-beat state when the scene reads it, so
-    // "a shadow was here and now is not" is not recoverable by looking.
-    expect(cleared).toEqual([{ column: 3, row: ROWS - 2 }]);
+    // "a shadow was here and now is not" is not recoverable by looking — and
+    // neither is how big it was, which is why the strength rides along.
+    expect(cleared).toEqual([
+      { column: 3, row: ROWS - 2, strength: 1, turnedTo: RED },
+    ]);
   });
 
   it('reports nothing for a link that cleared nowhere near it', () => {
@@ -275,7 +288,7 @@ describe('pushing the shadow back', () => {
     game.board.place(5, ROWS - 1, SHADOW);
 
     const beats = settleCollectingBeats(game);
-    const cleared = beats.flatMap((beat) => (beat.kind === 'clear' ? beat.link.shadowCleared : []));
+    const cleared = beats.flatMap((beat) => (beat.kind === 'clear' ? beat.link.shadowPurified : []));
 
     expect(cleared).toEqual([]);
   });
@@ -318,6 +331,7 @@ describe('pushing the shadow back', () => {
 
   it('forgets the shadow on restart', () => {
     const game = simulation();
+    withTilesToTake(game);
     game.update(DEFAULT_TUNING.shadowInterval);
     expect(game.shadowOnBoard).toBe(1);
 

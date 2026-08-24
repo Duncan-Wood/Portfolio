@@ -1,7 +1,23 @@
-import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, SHADOW } from './grid';
+import {
+  COLUMNS,
+  FIRST_VISIBLE_ROW,
+  MAX_SHADOW_STRENGTH,
+  ROWS,
+  isColour,
+  isShadow,
+  shadowCell,
+  shadowHolding,
+} from './grid';
 import { Board, type TileMove } from './board';
 import { FallingPair, type PairCell } from './falling-pair';
-import { clearStep, findGroups, scoreLink, type ChainLink, type GroupCell } from './matching';
+import {
+  clearStep,
+  findGroups,
+  scoreLink,
+  type ChainLink,
+  type GroupCell,
+  type ShadowHit,
+} from './matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
 /*
@@ -136,7 +152,7 @@ export class Simulation {
 
     for (let row = 0; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
-        if (this.board.pieceAt(column, row) === SHADOW) {
+        if (isShadow(this.board.pieceAt(column, row))) {
           held += 1;
         }
       }
@@ -286,13 +302,15 @@ export class Simulation {
       this.stallTimer = 0;
       this.encroach();
 
-      // `encroach` can end the run — the shadow had nowhere left to take. The
-      // rest of this frame belongs to a game that is still being played, and
-      // without this the pair that was falling commits ANYWAY: its halves are
-      // written to a board the player has already lost, a landing is sounded
-      // after GAME OVER, and a group completed by that phantom lock starts a
-      // cascade that can never resolve, because every later update returns at
-      // the top on `toppedOut`.
+      // Kept as a guard rather than deleted, though `encroach` can no longer
+      // reach it: it used to end the run when the shadow had nowhere to land,
+      // and possessing a tile has no such failure. The RULE it encodes is
+      // still real and costs one comparison — nothing after an arrival may run
+      // on a board the run has already lost. Without it, back when this could
+      // fire, the falling pair committed anyway: its halves were written to a
+      // lost board, a landing sounded after the game was over, and a group
+      // completed by that phantom lock started a cascade that could never
+      // resolve, because every later update returns at the top on `toppedOut`.
       if (this.toppedOut) {
         return;
       }
@@ -448,7 +466,10 @@ export class Simulation {
       return;
     }
 
-    const link = clearStep(this.board);
+    // The depth this link lands at is also what it damages shadow by, so the
+    // same 0-based index that doubles the score is what decides whether the
+    // clear kills what it is touching or only dents it.
+    const link = clearStep(this.board, this.chainLength);
     if (link === null) {
       // Not a beat: the cascade is simply over, and nothing moved to show.
       this.resolving = false;
@@ -490,14 +511,18 @@ export class Simulation {
    * board is empty by the time anything renders — the same reason a link
    * reports its own push-back.
    */
-  answerQuestion(): readonly GroupCell[] {
-    const driven: GroupCell[] = [];
+  answerQuestion(): readonly ShadowHit[] {
+    const driven: ShadowHit[] = [];
 
     for (let row = ROWS - 1; row >= 0; row -= 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
-        if (this.board.pieceAt(column, row) === SHADOW) {
+        const cell = this.board.pieceAt(column, row);
+        if (isShadow(cell)) {
           this.board.clear(column, row);
-          driven.push({ column, row });
+          // Reported so the wave can blow off the creature that was actually
+          // standing there, over the tile it was holding. Answering ignores
+          // the tier — it is the one thing in the game that does.
+          driven.push({ column, row, strength: 1, turnedTo: shadowHolding(cell) });
         }
       }
     }
@@ -506,43 +531,89 @@ export class Simulation {
   }
 
   /**
-   * Take the emptiest column's next free cell.
+   * Take the topmost tile of the emptiest column that has one.
    *
-   * The emptiest rather than the fullest: the cruel choice would be to pile on
-   * where the player is already in trouble, but the shadow is not trying to
-   * kill them, it is trying to make the board less connected. Spreading it
-   * evenly costs them reach everywhere instead of ending the run in one place.
+   * It POSSESSES a tile rather than filling an empty cell, and that changes
+   * what the antagonist is. It no longer drops junk on the board to crowd the
+   * player out; it takes something they already made and switches it off, so
+   * it genuinely severs the connections between whatever it sits between. The
+   * threat stops being "you will run out of room" and becomes "the board you
+   * built stops working" — which is the one this game is actually about.
+   *
+   * The emptiest column, still, and for the reason it always was: the cruel
+   * choice would be to pile on where the player is already in trouble, but the
+   * shadow is not trying to kill them, it is trying to make the board less
+   * connected. Spreading it costs them reach everywhere instead of ending the
+   * run in one place. The TOPMOST tile of that column, because a tile buried
+   * under six others is not one they were about to use.
+   *
+   * NO column is off limits, including the one the falling pair is in. That
+   * skip was load-bearing when the shadow dropped into an empty cell — the
+   * pair is not on the board until it locks, so a column scan looked straight
+   * through it and the shadow could take the very cell the pair was about to
+   * occupy, and locking then wrote a tile over a tile and threw. Possession
+   * cannot do that: it only ever takes a cell that is ALREADY occupied, and
+   * the pair only ever locks into empty ones, so occupancy is unchanged and
+   * there is nothing to collide with.
+   *
+   * Deleting it also closed a hole the smoke test found. A player who never
+   * moves the piece stacks everything in the spawn column, and with that
+   * column skipped there was no tile anywhere the shadow was allowed to touch
+   * — so doing nothing at all, the one thing this antagonist exists to
+   * punish, went completely unpunished for a whole run.
+   *
+   * If there is nothing to take, nothing happens. That is deliberate and it is
+   * a change: this used to end the run when the shadow had nowhere to land,
+   * which no longer means anything now that it needs a tile rather than a
+   * space. A board with no tiles on it is a board the player has just cleared,
+   * and the antagonist of "you stopped before you finished" has no business
+   * winning there. Topping out is `spawnOrTopOut`'s job alone now.
    */
   private encroach(): void {
-    // The falling pair is NOT on the board — it is a separate object until it
-    // locks — so a column scan looks straight through it. Skipping the columns
-    // it is standing in is the fix at the root: without it the shadow could be
-    // dropped into the very cell the pair occupied, and locking then wrote a
-    // tile over a tile and threw.
-    const busy = this.pair.cells().map((cell) => cell.column);
-
     let chosenColumn = -1;
-    let deepest = -1;
+    let chosenRow = -1;
+    let fewest = Number.POSITIVE_INFINITY;
 
     for (let column = 0; column < COLUMNS; column += 1) {
-      if (busy.includes(column)) {
-        continue;
+      let tiles = 0;
+      let topmost = -1;
+
+      for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
+        // Only a real colour can be possessed. A cell the shadow already holds
+        // is not a foothold it can take twice.
+        if (isColour(this.board.pieceAt(column, row))) {
+          tiles += 1;
+          if (topmost === -1) {
+            topmost = row;
+          }
+        }
       }
 
-      const row = this.board.landingRow(column);
-      if (row > deepest) {
-        deepest = row;
+      if (topmost !== -1 && tiles < fewest) {
+        fewest = tiles;
         chosenColumn = column;
+        chosenRow = topmost;
       }
     }
 
-    if (chosenColumn === -1 || deepest < FIRST_VISIBLE_ROW) {
-      this.toppedOut = true;
+    if (chosenColumn === -1) {
       return;
     }
 
-    this.board.place(chosenColumn, deepest, SHADOW);
-    this.lastShadowCell = { column: chosenColumn, row: deepest };
+    // Strength escalates with how many arrivals this run has already had, so
+    // the first few are freed by an ordinary clear and the late ones are not.
+    // `shadowTaken` is still 0 here for the first arrival, which is what makes
+    // the opening tier the weakest one.
+    const strength = Math.min(
+      1 + Math.floor(this.shadowTaken / this.tuning.arrivalsPerShadowStrength),
+      MAX_SHADOW_STRENGTH,
+    );
+
+    const taken = this.board.pieceAt(chosenColumn, chosenRow) as number;
+    this.board.clear(chosenColumn, chosenRow);
+    this.board.place(chosenColumn, chosenRow, shadowCell(strength, taken));
+
+    this.lastShadowCell = { column: chosenColumn, row: chosenRow };
     this.shadowTaken += 1;
   }
 

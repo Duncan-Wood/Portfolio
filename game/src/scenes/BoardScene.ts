@@ -4,13 +4,15 @@ import {
   FIRST_VISIBLE_ROW,
   PIECE_TYPE_COUNT,
   ROWS,
-  SHADOW,
   VISIBLE_ROWS,
   isColour,
+  isShadow,
+  shadowHolding,
+  shadowStrength,
 } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
-import { type ChainLink } from '../engine/matching';
+import { type ChainLink, type ShadowHit } from '../engine/matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 import {
   GROUND_COLOR,
@@ -25,6 +27,7 @@ import {
   SHADOW_EYES_TEXTURE,
   TRACE_TEXTURE,
   bakeTileTextures,
+  shadowBodyTexture,
   tileTexture,
 } from './tile-textures';
 import { TrackPath, mitredRectangle } from '../track-geometry';
@@ -43,6 +46,7 @@ import {
   popVoice,
   shadowArrivalVoice,
   shadowRecedeVoice,
+  shadowStruckVoice,
   topOutVoice,
 } from '../audio/voices';
 
@@ -410,6 +414,17 @@ export class BoardScene extends Scene {
    * shadows there can be — the board is 72 cells and every one of them can end
    * up holding one.
    */
+  /**
+   * The creature laid over each cell it has taken, one slot per visible cell
+   * and indexed exactly like `cellTiles`.
+   *
+   * A layer rather than a swapped texture, because a shadow POSSESSES a tile:
+   * the cell underneath goes on drawing its real colour, and this sits on top
+   * of it. Freeing the tile is then this coming off, which is the mechanic
+   * animating itself.
+   */
+  private shadowBodies: Phaser.GameObjects.Image[];
+
   private shadowEyes: Phaser.GameObjects.Image[];
 
   /**
@@ -680,6 +695,19 @@ export class BoardScene extends Scene {
       }
     }
 
+    // Between the cells and the eyes: over the tile it has taken, under the
+    // eyes that belong to it.
+    this.shadowBodies = [];
+    for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
+      for (let column = 0; column < COLUMNS; column += 1) {
+        this.shadowBodies.push(
+          this.add
+            .image(centerOfColumn(column), centerOfRow(row), shadowBodyTexture(1))
+            .setVisible(false),
+        );
+      }
+    }
+
     // Straight after the cells, so a pair falling past a shadow still passes in
     // front of its eyes.
     this.shadowEyes = [];
@@ -718,8 +746,16 @@ export class BoardScene extends Scene {
     this.popTiles = [];
     this.fallTiles = [];
     for (let index = 0; index < COLUMNS * VISIBLE_ROWS; index += 1) {
-      this.popTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
       this.fallTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
+    }
+    // Twice the board for the pop pool, because a purified cell borrows TWO —
+    // the creature breaking open and the tile blooming under it — on top of one
+    // per cleared cell. `borrowPopTile` refuses past the end rather than
+    // indexing off it: an exception escaping `update` is never caught by
+    // Phaser, the rAF chain is never re-requested, and the game is dead until a
+    // reload.
+    for (let index = 0; index < COLUMNS * VISIBLE_ROWS * 2; index += 1) {
+      this.popTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
     }
     // One round white dot, drawn once and thrown away. Tinted per group at emit
     // time, so four colours of debris cost one texture and no art.
@@ -1358,11 +1394,17 @@ export class BoardScene extends Scene {
       for (let column = 0; column < COLUMNS; column += 1) {
         const pieceType = this.settledPieceAt(column, row);
         const index = visibleCellIndex(column, row);
+        const possessed = isShadow(pieceType);
 
-        this.cellTiles[index].setTexture(tileTexture(pieceType));
+        // A possessed cell still draws its own tile. The colour the shadow is
+        // standing on is the whole point: it took a specific thing, and the
+        // player has to be able to see which.
+        this.cellTiles[index].setTexture(
+          tileTexture(possessed ? shadowHolding(pieceType as number) : pieceType),
+        );
 
-        if (pieceType === SHADOW) {
-          this.animateShadow(index, column, row);
+        if (possessed) {
+          this.animateShadow(index, column, row, shadowStrength(pieceType as number));
         } else if (this.animatedShadowCells.delete(index)) {
           this.restoreCell(index);
         }
@@ -1385,7 +1427,7 @@ export class BoardScene extends Scene {
    * landing bounce is already tweening those same objects. A tween here would
    * have to be found, killed and rebuilt on every one of those events.
    */
-  private animateShadow(index: number, column: number, row: number): void {
+  private animateShadow(index: number, column: number, row: number, strength: number): void {
     this.animatedShadowCells.add(index);
 
     const phase = column * 2.1 + row * 1.7;
@@ -1403,7 +1445,13 @@ export class BoardScene extends Scene {
     const y = centerOfRow(row) + bob + (1 - risen) * CELL_SIZE * 0.55;
     const opening = Math.min(arriving * 2.5, 1);
 
-    this.cellTiles[index]
+    // Only the creature moves. The tile underneath stays square in the grid
+    // where the player left it — it is still part of the board, and a cell
+    // that leans and breathes reads as the TILE being alive rather than as
+    // something crouching on top of it.
+    this.shadowBodies[index]
+      .setVisible(true)
+      .setTexture(shadowBodyTexture(strength))
       .setPosition(x, y)
       .setAngle(lean)
       .setScale(breath * (0.5 + 0.5 * risen))
@@ -1496,6 +1544,7 @@ export class BoardScene extends Scene {
       .setAngle(0)
       .setScale(1)
       .setAlpha(1);
+    this.shadowBodies[index].setVisible(false);
     this.shadowEyes[index].setVisible(false);
   }
 
@@ -1507,7 +1556,7 @@ export class BoardScene extends Scene {
    * shadow is simply there, and being there is not an event.
    *
    * Every arrival is in a visible row, so there is no hidden-row case to
-   * handle: `encroach` ends the run rather than taking a cell the player cannot
+   * handle: `encroach` only ever possesses a tile the player can
    * see.
    */
   private playShadowArrival(): void {
@@ -1903,7 +1952,7 @@ export class BoardScene extends Scene {
       const tile = this.popTiles[index];
       tile
         .setPosition(x, y)
-        .setTexture(tileTexture(SHADOW))
+        .setTexture(shadowBodyTexture(cell.strength))
         .setScale(1)
         .setAngle(0)
         .setAlpha(1)
@@ -2196,8 +2245,8 @@ export class BoardScene extends Scene {
    * Shrink and fade a tile where one just cleared. Shorter than the beat that
    * carries it, so the hole is empty and legible before the next beat starts.
    */
-  private popCells(link: ChainLink, connections: number): void {
-    const shadowPushed = link.shadowCleared;
+  private popCells(link: ChainLink, connections: number): number | null {
+    const purified = link.shadowPurified;
     this.tweens.killTweensOf(this.popTiles);
     this.hitStopRemaining = this.tuning.hitStopDuration;
     this.kickCamera();
@@ -2212,6 +2261,9 @@ export class BoardScene extends Scene {
         const y = centerOfRow(cell.row);
 
         const tile = this.popTiles[borrowed];
+        if (tile === undefined) {
+          continue;
+        }
         borrowed += 1;
 
         tile
@@ -2243,7 +2295,7 @@ export class BoardScene extends Scene {
     // would drag it off toward whatever happened to be standing beside it.
     const poppedCells = borrowed;
 
-    for (const cell of shadowPushed) {
+    for (const cell of purified) {
       if (!isVisibleRow(cell.row)) {
         continue;
       }
@@ -2251,41 +2303,158 @@ export class BoardScene extends Scene {
       const x = centerOfColumn(cell.column);
       const y = centerOfRow(cell.row);
 
-      const tile = this.popTiles[borrowed];
+      // The creature breaking open, drawn over the top of the tile that is now
+      // underneath it. Outward and fading, where a cleared tile collapses
+      // inward — a piece falls into the hole it leaves, and this cell has no
+      // hole to fall into. Bigger the stronger it was, so turning something a
+      // single clear could not have touched is visibly the larger event.
+      const husk = this.popTiles[borrowed];
+      if (husk === undefined) {
+        continue;
+      }
       borrowed += 1;
 
-      tile
+      husk
         .setPosition(x, y)
-        .setTexture(tileTexture(SHADOW))
+        .setTexture(shadowBodyTexture(cell.strength))
         .setScale(1)
         .setAngle(0)
         .setAlpha(1)
         .setVisible(true);
 
-      // Blown outward, where a cleared tile collapses inward. A piece falls
-      // into the hole it leaves; this is the one thing on the board that is
-      // being driven off it, and the two should not read as the same event.
       this.tweens.add({
-        targets: tile,
-        scale: 1.45,
+        targets: husk,
+        scale: 1.45 + cell.strength * 0.22,
         alpha: 0,
         duration: this.tuning.popDuration * 1.6,
+        ease: 'Quad.easeOut',
+        onComplete: () => husk.setVisible(false),
+      });
+
+      // And the tile arriving under it, blooming up from nothing. `drawBoard`
+      // already shows the real cell at full size the moment the engine turns
+      // it, so without this the colour simply APPEARS and the beat reads as a
+      // substitution rather than as something becoming something else.
+      const born = cell.turnedTo === undefined ? undefined : this.popTiles[borrowed];
+      if (born !== undefined && cell.turnedTo !== undefined) {
+        borrowed += 1;
+
+        // Held back from `drawBoard` for exactly as long as the bloom runs, the
+        // same trick a falling tile uses. The engine turns the cell the instant
+        // the link resolves, so without this the finished tile is already
+        // sitting there at full size and the bloom is a second copy growing on
+        // top of it.
+        const index = visibleCellIndex(cell.column, cell.row);
+        this.cellsBeingFilled.add(index);
+
+        born
+          .setPosition(x, y)
+          .setTexture(tileTexture(cell.turnedTo))
+          .setScale(0.2)
+          .setAngle(0)
+          .setAlpha(0)
+          .setVisible(true);
+
+        this.tweens.add({
+          targets: born,
+          scale: 1,
+          alpha: 1,
+          duration: this.tuning.popDuration * 1.4,
+          ease: 'Back.easeOut',
+          onComplete: () => {
+            born.setVisible(false);
+            this.cellsBeingFilled.delete(index);
+          },
+        });
+
+        // Sparks in the colour it turned INTO, not the shadow's violet. The
+        // cell gained something; the particles should say which side won it.
+        this.sparks.setParticleTint(PIECE_COLORS[cell.turnedTo]);
+      } else {
+        this.sparks.setParticleTint(SHADOW_EYE_GLOW);
+      }
+
+      this.restoreCell(visibleCellIndex(cell.column, cell.row));
+      this.sparks.emitParticleAt(x, y, SPARKS_PER_CELL);
+    }
+
+    borrowed = this.flinchDamagedShadow(link.shadowDamaged, borrowed);
+
+    if (purified.length > 0) {
+      this.soundBoard.play(shadowRecedeVoice(purified.length));
+    }
+
+    if (poppedCells === 0) {
+      return null;
+    }
+
+    this.showConnectionPopup(sumX / poppedCells, sumY / poppedCells, connections);
+    return sumX / poppedCells;
+  }
+
+  /**
+   * A shadow that was hit and survived: knocked back, then held.
+   *
+   * The whole tiered mechanic is invisible without this. A single clear beside
+   * a strong shadow leaves it standing, and with no reaction that is
+   * indistinguishable from a clear that did nothing at all — so the player
+   * learns "singles don't work on that one" instead of "singles wear it down".
+   *
+   * The tile is already showing its weaker texture by now, because `drawBoard`
+   * reads the board and the engine has already stepped it down a tier. So the
+   * crest shrinking IS the damage readout; this just puts a hit behind it.
+   * `animateShadow` recomputes position and scale from the shadow clock every
+   * frame, which would fight a tween on the same properties — so the knock is
+   * drawn on a borrowed pop tile over the top, and the cell underneath is left
+   * alone.
+   */
+  private flinchDamagedShadow(damaged: readonly ShadowHit[], from: number): number {
+    let borrowed = from;
+
+    for (const cell of damaged) {
+      if (!isVisibleRow(cell.row)) {
+        continue;
+      }
+
+      const x = centerOfColumn(cell.column);
+      const y = centerOfRow(cell.row);
+
+      // One tier up from what it is now — the creature it was a moment ago,
+      // flashing off as it is knocked down to the one underneath. Borrowed
+      // from the same running count as everything else this beat, so it can
+      // never land on a tile that is already mid-tween.
+      const tile = this.popTiles[borrowed];
+      if (tile === undefined) {
+        continue;
+      }
+      borrowed += 1;
+
+      tile
+        .setPosition(x, y)
+        .setTexture(shadowBodyTexture(cell.strength + 1))
+        .setScale(1)
+        .setAngle(0)
+        .setAlpha(0.85)
+        .setVisible(true);
+
+      this.tweens.add({
+        targets: tile,
+        scale: 1.3,
+        alpha: 0,
+        duration: this.tuning.popDuration * 1.2,
         ease: 'Quad.easeOut',
         onComplete: () => tile.setVisible(false),
       });
 
-      this.restoreCell(visibleCellIndex(cell.column, cell.row));
-      this.sparks.setParticleTint(SHADOW_EYE_GLOW);
-      this.sparks.emitParticleAt(x, y, SPARKS_PER_CELL);
+      this.sparks.setParticleTint(SHADOW_EDGE_COLOR);
+      this.sparks.emitParticleAt(x, y, Math.ceil(SPARKS_PER_CELL / 2));
     }
 
-    if (shadowPushed.length > 0) {
-      this.soundBoard.play(shadowRecedeVoice(shadowPushed.length));
+    if (damaged.length > 0) {
+      this.soundBoard.play(shadowStruckVoice(damaged.length));
     }
 
-    if (poppedCells > 0) {
-      this.showConnectionPopup(sumX / poppedCells, sumY / poppedCells, connections);
-    }
+    return borrowed;
   }
 
   /**

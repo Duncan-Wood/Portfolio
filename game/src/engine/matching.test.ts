@@ -198,23 +198,23 @@ describe('clearing without settling', () => {
 
   it('removes the matched group', () => {
     const board = hangingTrigger();
-    clearStep(board);
+    clearStep(board, 0);
     expect(board.isEmpty(1, ROWS - 1)).toBe(true);
   });
 
   it('leaves the tile above the hole hanging, so the drop can be seen', () => {
     const board = hangingTrigger();
-    clearStep(board);
+    clearStep(board, 0);
     expect(board.pieceAt(1, ROWS - 4)).toBe(PIECE_LETTERS.R);
   });
 
   it('reports nothing when there is no group to clear', () => {
-    expect(clearStep(boardFrom('R R B B . .'))).toBeNull();
+    expect(clearStep(boardFrom('R R B B . .'), 0)).toBeNull();
   });
 
   it('settling afterwards drops the hanging tile to the floor', () => {
     const board = hangingTrigger();
-    clearStep(board);
+    clearStep(board, 0);
     board.settle();
     expect(board.pieceAt(1, ROWS - 1)).toBe(PIECE_LETTERS.R);
   });
@@ -251,7 +251,7 @@ describe('the hidden row is inert', () => {
     board.place(1, FIRST_VISIBLE_ROW, RED);
     board.place(0, FIRST_VISIBLE_ROW - 1, RED);
 
-    clearStep(board);
+    clearStep(board, 0);
 
     expect(board.pieceAt(0, FIRST_VISIBLE_ROW - 1)).toBe(RED);
   });

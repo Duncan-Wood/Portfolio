@@ -158,6 +158,32 @@ export function shadowRecedeVoice(cellsPushed: number): Voice {
 }
 
 /**
+ * A shadow hit hard enough to hurt and not hard enough to shift.
+ *
+ * Deliberately NOT a smaller `shadowRecedeVoice`. That one rises, because it
+ * reports something leaving; this one has to report something staying, so it
+ * falls — and it is a square rather than a triangle, which is the difference
+ * between a chime and a knock. The player needs to hear that they connected
+ * without hearing that they won, or a single clear against a strong shadow
+ * sounds like a success that did nothing.
+ *
+ * Low, short and quiet on purpose. It happens far more often than the recede
+ * does, and anything with a tail on it would be underfoot for the whole run.
+ */
+export function shadowStruckVoice(cellsStruck: number): Voice {
+  const weight = Math.min(cellsStruck, 4) / 4;
+
+  return {
+    waveform: 'square',
+    startFrequency: 210 + 40 * weight,
+    endFrequency: 120,
+    duration: 70,
+    gain: 0.05 + 0.03 * weight,
+    delay: 0,
+  };
+}
+
+/**
  * One cell of the wave that answering the question sends across the board.
  *
  * Climbs a semitone per cell and is staggered, so a board full of shadow walks

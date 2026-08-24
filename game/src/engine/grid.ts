@@ -62,6 +62,74 @@ export const PIECE_TYPE_COUNT = 4;
 export const SHADOW = PIECE_TYPE_COUNT;
 
 /**
+ * How many hits the strongest shadow survives.
+ *
+ * TWO, and the reason is a measured one. The damage a link deals is its depth,
+ * so a third tier would need a 3-link chain to remove in one go — and a bot
+ * playing this engine greedily produced ZERO chains of 2+ across 26 pieces,
+ * with accidental 2-chains landing about once in ten. A tier that in practice
+ * needs three separate clears against the same cell, while more of them keep
+ * arriving, is not a hard tier; it is a tier the board wins.
+ *
+ * The rule this enforces: a single clear always makes progress against
+ * anything on the board, and a chain is the FASTER answer, never the only one.
+ * A threat whose only answer is a skill most players do not have is not
+ * difficulty.
+ */
+export const MAX_SHADOW_STRENGTH = 2;
+
+/**
+ * A shadow does not sit in an empty cell. It POSSESSES a tile, and it
+ * remembers the colour it is standing on.
+ *
+ * This is the whole character of the antagonist expressed as a number. It
+ * arrives by taking something you already built rather than by dropping more
+ * junk on the board, so it genuinely severs the connections between whatever
+ * it sits between — which is what this file claimed it did long before it
+ * could. Driving it off RESTORES that colour rather than inventing one, so
+ * fighting it gives you back what was yours.
+ *
+ * Encoded as one number, still, for the reason `SHADOW` always was: every
+ * board cell stays a single `number | null` and nothing that reads the board
+ * has to learn a second shape. The layout is
+ * `SHADOW + (strength - 1) * PIECE_TYPE_COUNT + heldColour`, so the values run
+ * from `SHADOW` to `SHADOW + MAX_SHADOW_STRENGTH * PIECE_TYPE_COUNT - 1`.
+ * `isColour` is unchanged and still `< PIECE_TYPE_COUNT`, so every existing
+ * caller kept working.
+ */
+const SHADOW_VALUES = MAX_SHADOW_STRENGTH * PIECE_TYPE_COUNT;
+
+/**
+ * Whether a cell holds a shadow of any strength, over any colour.
+ *
+ * The counterpart to `isColour`, and the reason both exist as predicates: the
+ * shadow deliberately shares the number space the colour tables are indexed
+ * by, so `=== SHADOW` written at a call site silently stopped being true the
+ * moment a shadow could be strength 2 or could be holding teal.
+ */
+export function isShadow(pieceType: number | null): pieceType is number {
+  return pieceType !== null
+    && pieceType >= SHADOW
+    && pieceType < SHADOW + SHADOW_VALUES;
+}
+
+/** The cell value for a shadow of `strength` standing on `holding`. */
+export function shadowCell(strength: number, holding: number): number {
+  const tier = Math.min(Math.max(strength, 1), MAX_SHADOW_STRENGTH) - 1;
+  return SHADOW + tier * PIECE_TYPE_COUNT + holding;
+}
+
+/** How many more hits this shadow takes. Meaningless unless `isShadow`. */
+export function shadowStrength(pieceType: number): number {
+  return Math.floor((pieceType - SHADOW) / PIECE_TYPE_COUNT) + 1;
+}
+
+/** The colour underneath this shadow. Meaningless unless `isShadow`. */
+export function shadowHolding(pieceType: number): number {
+  return (pieceType - SHADOW) % PIECE_TYPE_COUNT;
+}
+
+/**
  * Whether a cell holds one of the playable colours, as opposed to nothing or
  * one of the occupants that has no colour.
  *

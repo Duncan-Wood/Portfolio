@@ -1,5 +1,5 @@
 import { Math as PhaserMath } from 'phaser';
-import { PIECE_TYPE_COUNT, SHADOW } from '../engine/grid';
+import { MAX_SHADOW_STRENGTH, PIECE_TYPE_COUNT } from '../engine/grid';
 import {
   EMPTY_COLOR,
   PIECE_COLORS,
@@ -56,6 +56,30 @@ const TRACE_OVERLAP = 11;
  * one being blown off the board — would go briefly, and visibly, blind.
  */
 export const SHADOW_EYES_TEXTURE = 'shadow-eyes';
+
+/**
+ * The creature on its own, one texture per strength, to be laid OVER the tile
+ * it has taken.
+ *
+ * A layer rather than a replacement, because the shadow possesses a tile now
+ * and the player has to be able to see which one. The pit behind it is drawn
+ * part-transparent so the colour and figure underneath still read, and the
+ * creature itself stays opaque so it keeps its silhouette against any of the
+ * four. Freeing it is then just this layer coming off, and the tile that was
+ * always underneath is revealed — which is exactly what the mechanic does.
+ */
+export function shadowBodyTexture(strength: number): string {
+  return `shadow-body-${Math.min(Math.max(strength, 1), MAX_SHADOW_STRENGTH)}`;
+}
+
+/**
+ * How much of the possessed tile shows through the pit.
+ *
+ * Tuned against the two jobs it has to do at once: dark enough that the
+ * creature reads as a silhouette on top of a bright yellow tile, light enough
+ * that the colour underneath is still nameable at a glance on a violet one.
+ */
+const PIT_OPACITY = 0.8;
 
 /** Where the shadow's head and eyes sit, as fractions of the tile's size. */
 const HEAD_ROW = 0.5;
@@ -187,7 +211,15 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   // whose only per-frame change is which key it points at.
   bakeOne(graphics, EMPTY_TILE_TEXTURE, size, EMPTY_COLOR, null);
 
-  bakeShadow(graphics, size);
+  // One overlay per shadow strength. The creature is the same at every tier —
+  // what grows is its crown and the light on it, because the crown is already
+  // the largest thing on the silhouette and is what survives at speed. A hit
+  // that fails to free the tile swaps the overlay down a tier, so the crown
+  // visibly shrinks: the damage feedback costs nothing beyond baking these.
+  // Two textures, not one per colour: the colour comes from the tile below.
+  for (let strength = 1; strength <= MAX_SHADOW_STRENGTH; strength += 1) {
+    bakeShadow(graphics, size, strength);
+  }
   bakeShadowEyes(graphics, size);
 
   bakeTrace(graphics, gap);
@@ -196,7 +228,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
 }
 
 /**
- * A cell the shadow holds.
+ * The creature that has taken a cell, drawn to sit on top of that cell's tile.
  *
  * Not a tile with the colour taken out — a pit, with something crouching in it.
  * Drawn from a pencil study rather than invented: a jagged crown springing from
@@ -215,14 +247,20 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
  * respect, so a run of them merges across the gaps into one mass rather than
  * lining up as a tidy row of blocks.
  */
-function bakeShadow(graphics: Phaser.GameObjects.Graphics, size: number): void {
+function bakeShadow(
+  graphics: Phaser.GameObjects.Graphics,
+  size: number,
+  strength: number,
+): void {
   const middle = size / 2;
+  const menace = (strength - 1) / (MAX_SHADOW_STRENGTH - 1);
 
   graphics.clear();
 
   // The pit it sits in, kept to the same rounded rect as every other cell so
   // the grid itself stays readable — the board still has to be scannable.
-  graphics.fillStyle(SHADOW_COLOR, 1);
+  // Part-transparent, so the tile it has taken still shows through.
+  graphics.fillStyle(SHADOW_COLOR, PIT_OPACITY);
   graphics.fillRoundedRect(
     TILE_INSET,
     TILE_INSET,
@@ -253,7 +291,7 @@ function bakeShadow(graphics: Phaser.GameObjects.Graphics, size: number): void {
     );
   }
 
-  drawCrown(graphics, size);
+  drawCrown(graphics, size, strength);
 
   graphics.fillCircle(middle, size * HEAD_ROW, size * HEAD_RADIUS);
 
@@ -271,7 +309,7 @@ function bakeShadow(graphics: Phaser.GameObjects.Graphics, size: number): void {
   // not an outline — an unbroken outline is what made the first version look
   // like a box someone had forgotten to fill in.
   for (const light of [
-    { x: 0.5, y: HEAD_ROW, radius: HEAD_RADIUS, from: 1.2, to: 1.62, alpha: 0.8 },
+    { x: 0.5, y: HEAD_ROW, radius: HEAD_RADIUS, from: 1.2, to: 1.62, alpha: 0.5 + menace * 0.45 },
   ]) {
     graphics.lineStyle(2, SHADOW_EDGE_COLOR, light.alpha);
     graphics.beginPath();
@@ -288,9 +326,9 @@ function bakeShadow(graphics: Phaser.GameObjects.Graphics, size: number): void {
   // Eyes, dimmed. The scene lays the lit pair on top of these — dimmed toward
   // their own halo rather than toward the pit, because grey eyes on a violet
   // creature read as two chips of stone.
-  drawEyes(graphics, size, mix(SHADOW_EYE_GLOW, SHADOW_COLOR, 0.22));
+  drawEyes(graphics, size, mix(SHADOW_EYE_GLOW, SHADOW_COLOR, 0.36 - menace * 0.18));
 
-  graphics.generateTexture(tileTexture(SHADOW), size, size);
+  graphics.generateTexture(shadowBodyTexture(strength), size, size);
 }
 
 /**
@@ -390,6 +428,34 @@ function drawMouth(graphics: Phaser.GameObjects.Graphics, size: number): void {
 }
 
 /**
+ * The crest at each strength, weakest first.
+ *
+ * The one axis the tiers are told apart on, because at 64 pixels it is the
+ * only one that survives: the crest is the biggest thing on the silhouette, so
+ * a stubby four-tip ridge and a tall eight-tip one are separable across the
+ * board at a glance where a colour shift or an extra pixel of outline is not.
+ *
+ * Tips never go negative: `generateTexture` crops at the texture edge, so a
+ * spike given a negative y is silently flattened rather than drawn taller. A
+ * taller tier has to buy its height from a lower base and valley instead.
+ *
+ * One entry per strength, so this array and `MAX_SHADOW_STRENGTH` have to stay
+ * the same length — `drawCrown` indexes straight into it.
+ */
+const CROWNS = [
+  {
+    tips: [[0.22, 0.25], [0.38, 0.17], [0.58, 0.16], [0.76, 0.27]],
+    base: 0.45,
+    valley: 0.35,
+  },
+  {
+    tips: [[0.16, 0.15], [0.29, 0.03], [0.42, 0.11], [0.55, 0.0], [0.68, 0.08], [0.82, 0.18]],
+    base: 0.42,
+    valley: 0.28,
+  },
+] as const;
+
+/**
  * The crown: a torn crest of spikes rising off the top of the head.
  *
  * A crest rather than the two radial antler-fans this was built as first. Those
@@ -402,12 +468,8 @@ function drawMouth(graphics: Phaser.GameObjects.Graphics, size: number): void {
  * one torn mass. The tips are uneven and the tallest is off centre: an even
  * crest is a crown, and this is meant to look broken.
  */
-function drawCrown(graphics: Phaser.GameObjects.Graphics, size: number): void {
-  const tips = [
-    [0.16, 0.15], [0.29, 0.03], [0.42, 0.11], [0.55, 0.0], [0.68, 0.08], [0.82, 0.18],
-  ] as const;
-  const base = 0.42;
-  const valley = 0.28;
+function drawCrown(graphics: Phaser.GameObjects.Graphics, size: number, strength: number): void {
+  const { tips, base, valley } = CROWNS[Math.min(strength, MAX_SHADOW_STRENGTH) - 1];
 
   const points = [point(size, 0.1, base)];
   for (let index = 0; index < tips.length; index += 1) {

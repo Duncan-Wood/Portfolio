@@ -1,5 +1,14 @@
 import { Board } from './board';
-import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, SHADOW, isColour } from './grid';
+import {
+  COLUMNS,
+  FIRST_VISIBLE_ROW,
+  ROWS,
+  isColour,
+  isShadow,
+  shadowCell,
+  shadowHolding,
+  shadowStrength,
+} from './grid';
 
 /*
  * The match rule and the cascade: what counts as a group, what clearing does,
@@ -40,6 +49,24 @@ export interface GroupCell {
   row: number;
 }
 
+/**
+ * A shadow cell a link hit, and the strength that reading refers to.
+ *
+ * Carried because the scene cannot recover it: a purified cell holds a colour
+ * by the time anything renders, and a damaged one already holds its new
+ * strength. Without this the animation would draw the weakest creature however
+ * big the one that just went was, which reads as a smaller payoff than the
+ * chain actually earned.
+ *
+ * For `shadowPurified` it is the strength it was broken AT, and `turnedTo` is
+ * the colour left in its place; for `shadowDamaged` it is the strength it has
+ * LEFT and `turnedTo` is absent.
+ */
+export interface ShadowHit extends GroupCell {
+  strength: number;
+  turnedTo?: number;
+}
+
 /** One set of connected same-coloured tiles that is large enough to clear. */
 export interface Group {
   pieceType: number;
@@ -53,15 +80,23 @@ export interface Group {
  * animate each link separately — which tiles popped, and where. `cellsCleared`
  * is the total, used for scoring.
  *
- * `shadowCleared` is what this link drove off the board, which is not
- * recoverable afterwards: the cells are empty by the time anything reads them,
- * and a shadow that was pushed back looks exactly like a shadow that was never
- * there.
+ * `shadowPurified` is what this link TURNED — shadow that stopped being
+ * shadow. Not recoverable afterwards: those cells hold ordinary colour by the
+ * time anything reads them, and a cell that was purified looks exactly like a
+ * cell that always held a tile.
+ *
+ * `shadowDamaged` is what it hit and failed to destroy, reported for the same
+ * reason and a sharper one: a dented shadow is still on the board, so without
+ * this the scene has no way to tell "your clear did nothing" from "your clear
+ * took a hit off it". That distinction is the entire mechanic — a single clear
+ * has to visibly hurt something it cannot yet kill, or nobody learns that a
+ * chain is what finishes the job.
  */
 export interface ChainLink {
   groups: Group[];
   cellsCleared: number;
-  shadowCleared: GroupCell[];
+  shadowPurified: ShadowHit[];
+  shadowDamaged: ShadowHit[];
 }
 
 export function findGroups(board: Board): Group[] {
@@ -104,7 +139,7 @@ export function findGroups(board: Board): Group[] {
  * Returns `null` when nothing matched, which is how callers detect that a
  * cascade has finished.
  */
-export function clearStep(board: Board): ChainLink | null {
+export function clearStep(board: Board, linkIndex: number): ChainLink | null {
   const groups = findGroups(board);
   if (groups.length === 0) {
     return null;
@@ -118,16 +153,39 @@ export function clearStep(board: Board): ChainLink | null {
     }
   }
 
-  return { groups, cellsCleared, shadowCleared: pushBackShadow(board, groups) };
+  // Depth is the damage. `linkIndex` is 0-based, so an ordinary clear deals 1.
+  const { purified, damaged } = damageShadow(board, groups, linkIndex + 1);
+
+  return { groups, cellsCleared, shadowPurified: purified, shadowDamaged: damaged };
 }
 
 /**
- * Clear any shadow touching what just cleared.
+ * Hit every shadow touching what just cleared, for `damage` of its strength,
+ * and TURN the ones that break.
  *
- * Shadow cannot be matched, so this is the only way it ever leaves — the rule
- * ART-DIRECTION asked for, *shadow recedes from light*, and the reason a board
- * full of it is one you have to play out of rather than one you have already
- * lost.
+ * A broken shadow does not leave a hole. It gives back the tile it was
+ * standing on, and that is the most important rule in this file. The shadow
+ * arrives by TAKING something you built, so driving it off is a repair rather
+ * than a kill — you cannot delete the part of yourself that stops without
+ * finishing, you can only get back what it took. A restored tile can complete
+ * a group, so pushing the shadow back can extend the very chain that did it.
+ *
+ * Shadow cannot be matched, so this is the only way it ever leaves during play
+ * — the rule ART-DIRECTION asked for, *shadow recedes from light*, and the
+ * reason a board full of it is one you have to play out of rather than one you
+ * have already lost.
+ *
+ * The damage is the LINK'S DEPTH, and that is the whole design. A single clear
+ * deals 1: it kills the weakest shadow and merely dents anything above it. A
+ * chain deals more with every link, so a deep cascade is the only thing that
+ * clears a board the shadow has really taken hold of. Chains previously paid
+ * more progress and more score and did nothing a single clear could not do;
+ * this is the thing they can do that singles cannot.
+ *
+ * ONE hit per shadow per link, no matter how many of the cleared cells were
+ * touching it. Counting per adjacent cell instead would mean a fat single
+ * clear in a pocket out-damaged a chain, which inverts the rule this exists to
+ * express — so the shadows are gathered into a set before any of them is hit.
  *
  * Here, inside the clearing step, rather than one layer up in `Simulation`.
  * This file's header says it owns what clearing DOES, and it owns the only
@@ -136,24 +194,56 @@ export function clearStep(board: Board): ChainLink | null {
  * tests built on them — cleared groups without the shadow ever receding, and
  * reported a board the real game would never produce.
  */
-function pushBackShadow(board: Board, groups: Group[]): GroupCell[] {
-  const pushed: GroupCell[] = [];
+function damageShadow(
+  board: Board,
+  groups: Group[],
+  damage: number,
+): { purified: ShadowHit[]; damaged: ShadowHit[] } {
+  // Keyed by cell so each shadow is hit once per link however many of the
+  // cleared cells were touching it.
+  const touched = new Map<number, GroupCell>();
 
   for (const group of groups) {
     for (const cell of group.cells) {
       for (const step of NEIGHBOURS) {
         const column = cell.column + step.column;
         const row = cell.row + step.row;
+        const key = row * COLUMNS + column;
 
-        if (board.isInside(column, row) && board.pieceAt(column, row) === SHADOW) {
-          board.clear(column, row);
-          pushed.push({ column, row });
+        if (board.isInside(column, row) && isShadow(board.pieceAt(column, row))) {
+          touched.set(key, { column, row });
         }
       }
     }
   }
 
-  return pushed;
+  const purified: ShadowHit[] = [];
+  const damaged: ShadowHit[] = [];
+
+  for (const { column, row } of touched.values()) {
+    // Non-null by construction: nothing between the scan and here writes to
+    // the board, and every key in the map was `isShadow` when it went in.
+    const cell = board.pieceAt(column, row) as number;
+    const was = shadowStrength(cell);
+    const holding = shadowHolding(cell);
+    const remaining = was - damage;
+
+    board.clear(column, row);
+
+    if (remaining <= 0) {
+      // Back to the colour it was standing on. Not the colour of whatever
+      // group reached it — the shadow took a specific tile, and this is that
+      // tile being given back.
+      board.place(column, row, holding);
+      purified.push({ column, row, strength: was, turnedTo: holding });
+    } else {
+      // Weaker, still holding the same tile.
+      board.place(column, row, shadowCell(remaining, holding));
+      damaged.push({ column, row, strength: remaining });
+    }
+  }
+
+  return { purified, damaged };
 }
 
 /**
@@ -163,9 +253,9 @@ function pushBackShadow(board: Board, groups: Group[]): GroupCell[] {
  * looked for, so a floating tile can never be scored as part of a group it
  * would not have belonged to once gravity ran.
  */
-export function resolveStep(board: Board): ChainLink | null {
+export function resolveStep(board: Board, linkIndex = 0): ChainLink | null {
   board.settle();
-  return clearStep(board);
+  return clearStep(board, linkIndex);
 }
 
 /**
@@ -181,7 +271,9 @@ export function resolveChain(board: Board): ChainLink[] {
   const links: ChainLink[] = [];
 
   for (;;) {
-    const link = resolveStep(board);
+    // The depth a link lands at is what it damages shadow by, so the index has
+    // to travel with it here exactly as it does through the timed path.
+    const link = resolveStep(board, links.length);
     if (link === null) {
       return links;
     }
