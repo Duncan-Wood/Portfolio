@@ -33,7 +33,8 @@ import {
   tileTexture,
 } from './tile-textures';
 import { TrackPath, mitredRectangle } from '../track-geometry';
-import { MEMORIES, nodeLayout } from '../memories';
+import { drawBrain } from './brain';
+import { MEMORIES } from '../memories';
 import {
   CONNECTION_LOST,
   SHADOW_CLOSING_LINE,
@@ -209,7 +210,6 @@ const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
  */
 const MEMORY_PANEL_TOP = 300;
 const MEMORY_PANEL_HEIGHT = 450;
-const MEMORY_PAD = 6;
 
 /** Clear of the progress track's stubs on the left, and the canvas on the right. */
 const MEMORY_PANEL_LEFT = 476;
@@ -223,7 +223,21 @@ const MEMORY_PANEL_LEFT = 476;
 // (which ends at 444) and the progress ring outside it, so a long answer
 // rendered across the game and clipped off the canvas edge.
 const ANSWER_ECHO_LEFT = MEMORY_PANEL_LEFT;
-const MEMORY_PANEL_WIDTH = 128;
+
+/**
+ * The brain's box, filling the right-hand column under the preview.
+ *
+ * Wider than the constellation panel it replaces, because it is now the
+ * progress meter for the whole game rather than an outline of the next memory,
+ * and a brain squeezed into 128px reads as a blob. It takes every pixel the
+ * column has between the preview and the answer echo.
+ */
+const BRAIN_BOX = {
+  left: ORIGIN_X + BOARD_WIDTH + 14,
+  top: MEMORY_PANEL_TOP - 46,
+  width: CANVAS_WIDTH - (ORIGIN_X + BOARD_WIDTH) - 26,
+  height: 300,
+};
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -2383,52 +2397,7 @@ export class BoardScene extends Scene {
    * thing that arrives is the thing they watched.
    */
   private redrawMemoryPanel(progress: number): void {
-    // Past the last fragment there is no next memory to draw, so the panel
-    // holds the one just finished, every node of it lit.
-    const at = this.locate(this.nodesRevealed);
-    const memoryIndex = at === null ? MEMORIES.length - 1 : at.memoryIndex;
-    const memory = MEMORIES[memoryIndex];
-    const count = memory.nodes.length;
-    const panel = this.memoryPanel;
-
-    // Nodes already surfaced stay lit for the rest of the run; the one being
-    // worked toward is the only thing `progress` moves.
-    const lit = at === null ? count : at.nodeIndex;
-
-    panel.clear();
-
-    for (let index = 0; index < count; index += 1) {
-      const point = this.memoryNodePosition(index, count);
-      const earned = index < lit;
-      const arriving = index === lit && progress > 0;
-      const color = earned ? TRACK_LIT_COLOR : TRACK_COLOR;
-
-      if (index > 0) {
-        const previous = this.memoryNodePosition(index - 1, count);
-        const turn = (previous.y + point.y) / 2;
-        panel.lineStyle(2, earned ? TRACK_LIT_COLOR : TRACK_COLOR, earned ? 0.9 : 0.45);
-        panel.beginPath();
-        panel.moveTo(previous.x, previous.y);
-        panel.lineTo(previous.x, turn);
-        panel.lineTo(point.x, turn);
-        panel.lineTo(point.x, point.y);
-        panel.strokePath();
-      }
-
-      // Rects, not circles, for the reason the track's pads are: Phaser walks a
-      // Graphics command buffer every frame and steps an arc at a fixed 1/100
-      // turn, so a round pad costs a hundred vertices a frame however small.
-      panel.fillStyle(arriving ? TRACK_LIT_COLOR : color, earned ? 1 : 0.35 + (arriving ? progress * 0.5 : 0));
-      panel.fillRect(point.x - MEMORY_PAD, point.y - MEMORY_PAD, MEMORY_PAD * 2, MEMORY_PAD * 2);
-    }
-  }
-
-  private memoryNodePosition(index: number, count: number): { x: number; y: number } {
-    const layout = nodeLayout(index, count);
-    return {
-      x: MEMORY_PANEL_LEFT + layout.x * MEMORY_PANEL_WIDTH,
-      y: MEMORY_PANEL_TOP + layout.y * MEMORY_PANEL_HEIGHT,
-    };
+    drawBrain(this.memoryPanel, BRAIN_BOX, this.nodesRevealed, progress);
   }
 
   /**

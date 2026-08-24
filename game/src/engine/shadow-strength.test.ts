@@ -17,6 +17,16 @@ import { clearStep, findGroups } from './matching';
 import { Simulation } from './simulation';
 import { DEFAULT_TUNING } from '../tuning';
 
+/*
+ * These drive the pair by letting it FALL, so they ask for gravity explicitly.
+ * The shipped game has it off — see `gravityEnabled` in `tuning.ts` — because
+ * the game is an escape room made of boards and a piece descending while you
+ * read one is a clock. What is being tested here is still real: hard drop,
+ * lock delay and the cascade all behave the same either way, and the
+ * deliberate-placement rules have their own block in `simulation.test.ts`.
+ */
+const FALLING = { ...DEFAULT_TUNING, gravityEnabled: true };
+
 const RED = 0;
 const BLUE = 1;
 
@@ -38,7 +48,9 @@ const shadowOnTeal = (strength: number) => shadowCell(strength, BLUE);
 
 /** Lock whatever is falling and run the cascade it starts to the end. */
 const settleAll = (game: Simulation) => {
-  while (game.pair.canFall(game.board)) {
+  // Bounded. With gravity off a pair never falls on its own, so an unbounded
+  // wait here does not fail a test — it hangs the whole run.
+  for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
     game.update(DEFAULT_TUNING.fallInterval);
   }
   game.update(DEFAULT_TUNING.lockDelay);
@@ -207,7 +219,7 @@ describe('a link damages shadow by its depth', () => {
 });
 
 describe('arrivals get stronger the longer a run hesitates', () => {
-  const stalling = () => new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+  const stalling = () => new Simulation(() => [RED, RED], FALLING);
 
   /** Every shadow on the board, weakest first, as plain strengths. */
   const strengthsOn = (game: Simulation): number[] => {
@@ -403,7 +415,7 @@ describe('light gives back what the shadow took', () => {
     // Answering is a different verb from playing: play GIVES BACK what the
     // shadow took, an answer BANISHES it. Restoring a whole board of held
     // colour at once would hand back a wall of tiles the player never placed.
-    const game = new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+    const game = new Simulation(() => [RED, RED], FALLING);
     game.board.place(0, ROWS - 1, shadowCell(1, RED));
     game.board.place(1, ROWS - 1, shadowCell(2, BLUE));
 
@@ -415,7 +427,7 @@ describe('light gives back what the shadow took', () => {
 });
 
 describe('the shadow tells you where it is reaching', () => {
-  const stalling = () => new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+  const stalling = () => new Simulation(() => [RED, RED], FALLING);
 
   const seedBottomRow = (game: Simulation) => {
     for (let column = 0; column < COLUMNS; column += 1) {
@@ -483,7 +495,7 @@ describe('the shadow tells you where it is reaching', () => {
 
 describe('answering leaves the board standing up', () => {
   it('drops the tiles that were resting on what it drove off', () => {
-    const game = new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+    const game = new Simulation(() => [RED, RED], FALLING);
     // A shadow on the floor with an ordinary tile stacked on top of it.
     game.board.place(0, ROWS - 1, shadowCell(1, RED));
     game.board.place(0, ROWS - 2, BLUE);
@@ -497,7 +509,7 @@ describe('answering leaves the board standing up', () => {
   });
 
   it('reports the drop so the scene can animate it', () => {
-    const game = new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+    const game = new Simulation(() => [RED, RED], FALLING);
     game.board.place(0, ROWS - 1, shadowCell(1, RED));
     game.board.place(0, ROWS - 2, BLUE);
 
@@ -507,7 +519,7 @@ describe('answering leaves the board standing up', () => {
   });
 
   it('still names every shadow it drove off', () => {
-    const game = new Simulation(() => [RED, RED], { ...DEFAULT_TUNING });
+    const game = new Simulation(() => [RED, RED], FALLING);
     game.board.place(0, ROWS - 1, shadowCell(1, RED));
     game.board.place(1, ROWS - 1, shadowCell(2, BLUE));
 

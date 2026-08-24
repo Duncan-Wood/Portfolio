@@ -3,15 +3,27 @@ import { COLUMNS, FIRST_VISIBLE_ROW, ROWS } from './grid';
 import { DEFAULT_TUNING } from '../tuning';
 import { SPAWN_COLUMN, SPAWN_ROW, Simulation } from './simulation';
 
+/*
+ * These drive the pair by letting it FALL, so they ask for gravity explicitly.
+ * The shipped game has it off — see `gravityEnabled` in `tuning.ts` — because
+ * the game is an escape room made of boards and a piece descending while you
+ * read one is a clock. What is being tested here is still real: hard drop,
+ * lock delay and the cascade all behave the same either way, and the
+ * deliberate-placement rules have their own block in `simulation.test.ts`.
+ */
+const FALLING = { ...DEFAULT_TUNING, gravityEnabled: true };
+
 const { fallInterval, lockDelay, softDropInterval } = DEFAULT_TUNING;
 
 const RED = 0;
 const BLUE = 1;
 
-const simulation = () => new Simulation(() => [RED, BLUE]);
+const simulation = () => new Simulation(() => [RED, BLUE], FALLING);
 
 const dropToFloor = (game: Simulation) => {
-  while (game.pair.canFall(game.board)) {
+  // Bounded. With gravity off a pair never falls on its own, so an unbounded
+  // wait here does not fail a test — it hangs the whole run.
+  for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
     game.update(fallInterval);
   }
 };
@@ -42,7 +54,7 @@ describe('spawning', () => {
   });
 
   it('takes both piece types from the supplier', () => {
-    const game = new Simulation(() => [4, 5]);
+    const game = new Simulation(() => [4, 5], FALLING);
     expect(game.pair.pivotType).toBe(4);
     expect(game.pair.satelliteType).toBe(5);
   });
@@ -152,7 +164,7 @@ describe('lock delay', () => {
 
 describe('live tuning', () => {
   it('re-reads the tuning object each update, so a later mutation takes effect', () => {
-    const tuning = { ...DEFAULT_TUNING };
+    const tuning = { ...FALLING };
     const game = new Simulation(() => [RED, BLUE], tuning);
 
     tuning.fallInterval = 100;
@@ -163,7 +175,7 @@ describe('live tuning', () => {
 
   it('leaves the shared defaults untouched when a caller mutates its own tuning', () => {
     const original = DEFAULT_TUNING.fallInterval;
-    const tuning = { ...DEFAULT_TUNING };
+    const tuning = { ...FALLING };
     tuning.fallInterval = original + 1;
 
     expect(DEFAULT_TUNING.fallInterval).toBe(original);
@@ -451,7 +463,7 @@ describe('the next-piece preview', () => {
   };
 
   it('exposes the upcoming pair while the current one is still falling', () => {
-    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW]));
+    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW]), FALLING);
 
     expect(game.pair.pivotType).toBe(RED);
     expect(game.pair.satelliteType).toBe(BLUE);
@@ -459,7 +471,7 @@ describe('the next-piece preview', () => {
   });
 
   it('spawns exactly the pair it previewed', () => {
-    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW], [BLUE, RED]));
+    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW], [BLUE, RED]), FALLING);
     dropToFloor(game);
     game.update(lockDelay);
 
@@ -468,7 +480,7 @@ describe('the next-piece preview', () => {
   });
 
   it('shows a new upcoming pair once the previewed one has spawned', () => {
-    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW], [BLUE, RED]));
+    const game = new Simulation(sequence([RED, BLUE], [GREEN, YELLOW], [BLUE, RED]), FALLING);
     dropToFloor(game);
     game.update(lockDelay);
 
@@ -480,7 +492,7 @@ describe('the next-piece preview', () => {
     const game = new Simulation((): [number, number] => {
       draws += 1;
       return [RED, BLUE];
-    });
+    }, FALLING);
 
     expect(draws).toBe(game.piecesSpawned + 1);
 
@@ -914,7 +926,7 @@ describe('reporting where a pair came to rest', () => {
    * column's topmost tile would find.
    */
   it('reports where a half ended up after settling, not where it was placed', () => {
-    const game = new Simulation(() => [RED, BLUE]);
+    const game = new Simulation(() => [RED, BLUE], FALLING);
     // A ledge one column over, so the horizontal pair straddles a gap and its
     // right half keeps falling after the left half stops.
     game.board.place(SPAWN_COLUMN, ROWS - 1, 3);
@@ -959,5 +971,69 @@ describe('reporting where a pair came to rest', () => {
 
     expect(game.piecesLocked).toBe(0);
     expect(game.lastLanded).toEqual([]);
+  });
+});
+
+describe('with gravity cut, a piece waits for the player', () => {
+  const deliberate = () => new Simulation(
+    () => [0, 1],
+    { ...DEFAULT_TUNING, gravityEnabled: false },
+  );
+
+  it('does not fall on its own, however long you think', () => {
+    const game = deliberate();
+    const startedAt = game.pair.row;
+
+    game.update(DEFAULT_TUNING.fallInterval * 20);
+
+    // An escape room is a thinking game. A piece that descends while you read
+    // the board is a clock, and a clock is the thing that made this unable to
+    // hold a puzzle.
+    expect(game.pair.row).toBe(startedAt);
+  });
+
+  it('still descends while soft drop is held, so placing stays quick', () => {
+    const game = deliberate();
+    const startedAt = game.pair.row;
+
+    game.softDropping = true;
+    game.update(DEFAULT_TUNING.softDropInterval * 3);
+
+    expect(game.pair.row).toBeGreaterThan(startedAt);
+  });
+
+  it('never locks itself, even resting on the floor', () => {
+    const game = deliberate();
+    game.softDropping = true;
+    game.update(DEFAULT_TUNING.softDropInterval * 40);
+    game.softDropping = false;
+    expect(game.pair.canFall(game.board)).toBe(false);
+
+    game.update(DEFAULT_TUNING.lockDelay * 6);
+
+    // Nothing commits a piece but the player. Sliding it along the floor for
+    // as long as you like is the whole point of cutting the clock.
+    expect(game.piecesLocked).toBe(0);
+  });
+
+  it('commits on a hard drop, which is the only thing that does', () => {
+    const game = deliberate();
+
+    game.hardDrop();
+
+    expect(game.piecesLocked).toBe(1);
+  });
+
+  it('still lets the shadow take ground while you think', () => {
+    const game = deliberate();
+    for (let column = 0; column < COLUMNS; column += 1) {
+      game.board.place(column, ROWS - 1, column % 4);
+    }
+
+    game.update(DEFAULT_TUNING.shadowInterval);
+
+    // Cutting gravity must not cut the pressure. Hesitation is still the thing
+    // that costs you, and it is now the ONLY thing that does.
+    expect(game.shadowOnBoard).toBe(1);
   });
 });

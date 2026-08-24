@@ -316,10 +316,27 @@ export class Simulation {
       }
     }
 
+    // Nothing moves or commits itself while gravity is off unless the player is
+    // actively pushing it down. No fall, and no lock delay either: a piece that
+    // committed on a timer would put the clock straight back, and the point of
+    // cutting gravity is that a board can be thought about for as long as it
+    // takes. `hardDrop` is then the only thing that locks a piece.
+    if (!this.tuning.gravityEnabled && !this.softDropping) {
+      this.lockTimer = 0;
+      return;
+    }
+
     if (!this.pair.canFall(this.board)) {
       // LOCK DELAY: a grace period between touching down and being committed.
       // Without it a landed piece freezes instantly and you can never slide it
       // into a gap at the last moment, which feels punishing.
+      //
+      // Skipped entirely with gravity off — see above — so a piece soft-dropped
+      // onto the floor still waits for the player to commit it.
+      if (!this.tuning.gravityEnabled) {
+        return;
+      }
+
       this.lockTimer += delta;
 
       if (this.lockTimer >= this.tuning.lockDelay) {

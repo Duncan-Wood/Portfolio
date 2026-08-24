@@ -128,6 +128,26 @@ export interface Tuning {
    * soft drop as held by default — so this is the pace of a player who is
    * thinking, not the pace they are forced to sit through.
    */
+  /**
+   * Whether a piece descends on its own.
+   *
+   * OFF. The game is an escape room made of boards — each one a stated
+   * objective you solve rather than a stack you survive — and a piece that
+   * falls while you are reading the board is a clock. A clock is exactly what
+   * stops a puzzle being thinkable, and thinking is the whole point: the
+   * satisfaction wanted here is working something out, not reacting fast.
+   *
+   * Cutting it does NOT cut the pressure. Hesitation still feeds the shadow
+   * every `shadowInterval`, so there is a cost to dithering — it is just one
+   * you can think your way through instead of one that runs you over. It also
+   * makes the shadow the only antagonist in the game, which is what it should
+   * always have been.
+   *
+   * Soft drop still works, so placing a piece you have already decided on is
+   * quick. Nothing commits a piece but the player.
+   */
+  gravityEnabled: boolean;
+
   fallInterval: number;
 
   /**
@@ -228,6 +248,7 @@ export const DEFAULT_TUNING: Tuning = {
   questionDuration: 3000,
   readingPerCharacter: 48,
   progressPads: 6,
+  gravityEnabled: false,
   fallInterval: 400,
   softDropInterval: 50,
   lockDelay: 500,

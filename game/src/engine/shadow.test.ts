@@ -5,13 +5,25 @@ import { findGroups } from './matching';
 import { type CascadeBeat, Simulation } from './simulation';
 import { DEFAULT_TUNING } from '../tuning';
 
+/*
+ * These drive the pair by letting it FALL, so they ask for gravity explicitly.
+ * The shipped game has it off — see `gravityEnabled` in `tuning.ts` — because
+ * the game is an escape room made of boards and a piece descending while you
+ * read one is a clock. What is being tested here is still real: hard drop,
+ * lock delay and the cascade all behave the same either way, and the
+ * deliberate-placement rules have their own block in `simulation.test.ts`.
+ */
+const FALLING = { ...DEFAULT_TUNING, gravityEnabled: true };
+
 const RED = 0;
 const BLUE = 1;
-const simulation = () => new Simulation(() => [RED, BLUE], { ...DEFAULT_TUNING });
+const simulation = () => new Simulation(() => [RED, BLUE], FALLING);
 
 /** Lock whatever is falling and run the cascade it starts to the end. */
 const settle = (game: Simulation) => {
-  while (game.pair.canFall(game.board)) {
+  // Bounded. With gravity off a pair never falls on its own, so an unbounded
+  // wait here does not fail a test — it hangs the whole run.
+  for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
     game.update(DEFAULT_TUNING.fallInterval);
   }
   game.update(DEFAULT_TUNING.lockDelay);
@@ -26,7 +38,9 @@ const settleCollectingBeats = (game: Simulation): CascadeBeat[] => {
   const beats: CascadeBeat[] = [];
   let seen = game.beatsPlayed;
 
-  while (game.pair.canFall(game.board)) {
+  // Bounded. With gravity off a pair never falls on its own, so an unbounded
+  // wait here does not fail a test — it hangs the whole run.
+  for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
     game.update(DEFAULT_TUNING.fallInterval);
   }
   game.update(DEFAULT_TUNING.lockDelay);
@@ -151,7 +165,9 @@ describe('shadow encroaching while the player stalls', () => {
     game.board.place(4, ROWS - 1, RED);
     game.board.place(5, ROWS - 1, RED);
 
-    while (game.pair.canFall(game.board)) {
+    // Bounded. With gravity off a pair never falls on its own, so an unbounded
+  // wait here does not fail a test — it hangs the whole run.
+  for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
       game.update(DEFAULT_TUNING.fallInterval);
     }
     const standing = game.pair.cells();
@@ -225,7 +241,9 @@ describe('shadow encroaching while the player stalls', () => {
       game.board.place(0, ROWS - 1 - offset, RED);
     }
     game.board.place(1, ROWS - 1, RED);
-    while (game.pair.canFall(game.board)) game.update(DEFAULT_TUNING.fallInterval);
+    for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
+      game.update(DEFAULT_TUNING.fallInterval);
+    }
     game.update(DEFAULT_TUNING.lockDelay);
     expect(game.resolving).toBe(true);
 
