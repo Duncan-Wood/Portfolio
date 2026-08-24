@@ -33,7 +33,13 @@ import {
 } from './tile-textures';
 import { TrackPath, mitredRectangle } from '../track-geometry';
 import { MEMORIES, nodeLayout } from '../memories';
-import { CONNECTION_LOST, SHADOW_CLOSING_LINE, shadowLine } from '../shadow-voice';
+import {
+  CONNECTION_LOST,
+  SHADOW_CLOSING_LINE,
+  closingLine,
+  shadowLine,
+  type UnfinishedBusiness,
+} from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
 import { SoundBoard } from '../audio/sound-board';
@@ -1066,6 +1072,11 @@ export class BoardScene extends Scene {
         color: '#b07dff',
         backgroundColor: '#221038',
         padding: { x: 12, y: 6 },
+        align: 'center',
+        // Wrapped, because this line is composed at the end from the fragment
+        // the run was reaching for, and a long title ran it off both edges of
+        // the canvas. Two centred lines still clear the restart prompt below.
+        wordWrap: { width: BOARD_WIDTH - 24 },
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
@@ -2979,11 +2990,38 @@ export class BoardScene extends Scene {
       if (!this.simulation.toppedOut) {
         return;
       }
+      // Composed here rather than at creation, because what the run was
+      // reaching for is only known once it has ended.
+      this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
+
       for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint]) {
         text.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: text, alpha: 1, duration: 420 });
       }
     });
+  }
+
+  /**
+   * The fragment this run was working toward, and how far off it was.
+   *
+   * Read at the end rather than tracked, because nothing needs it until then.
+   * `locate` returns null once every fragment has surfaced, and that is a real
+   * ending too — there was nothing left to fail to reach, so the closing line
+   * has nothing specific to name and says the general thing instead.
+   */
+  private unfinishedBusiness(): UnfinishedBusiness {
+    const at = this.locate(this.nodesRevealed);
+    if (at === null) {
+      return { reaching: null, connectionsShort: 0 };
+    }
+
+    const earned = this.simulation.connectionsMade - this.connectionsSpent();
+    const needed = this.nodeCost(this.nodesRevealed) - earned;
+
+    return {
+      reaching: MEMORIES[at.memoryIndex].nodes[at.nodeIndex].title,
+      connectionsShort: Math.max(1, needed),
+    };
   }
 
   /**

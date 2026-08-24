@@ -4,6 +4,7 @@ import {
   CONNECTION_LOST,
   SHADOW_CLOSING_LINE,
   SHADOW_LINES,
+  closingLine,
   shadowLine,
 } from './shadow-voice';
 
@@ -99,5 +100,42 @@ describe('what is left when the shadow has won', () => {
   it('keeps both short enough to land', () => {
     expect(CONNECTION_LOST.length).toBeLessThanOrEqual(24);
     expect(SHADOW_CLOSING_LINE.length).toBeLessThanOrEqual(56);
+  });
+});
+
+describe('what a lost run says it lost', () => {
+  it('names the fragment the run was reaching for, and how close it got', () => {
+    const line = closingLine({ reaching: 'The Hat', connectionsShort: 3 });
+
+    expect(line).toContain('The Hat');
+    expect(line).toContain('3');
+  });
+
+  it('says something different when the run was one connection away', () => {
+    // "1 connections" is the tell of a string built without looking at it, and
+    // this is the last sentence anyone reads.
+    expect(closingLine({ reaching: 'My Voice', connectionsShort: 1 }))
+      .not.toContain('1 connections');
+  });
+
+  it('falls back to the thesis when there was nothing left to reach for', () => {
+    // Every fragment already surfaced. There is no specific loss to name, so it
+    // says the general thing instead of an empty sentence with a hole in it.
+    expect(closingLine({ reaching: null, connectionsShort: 0 }))
+      .toBe(SHADOW_CLOSING_LINE);
+  });
+
+  it('never gives the player permission to leave', () => {
+    // The rule the first version broke. Whatever else it says, it must not be
+    // readable as "stop now" at the moment someone decides whether to press R.
+    const lines = [
+      closingLine({ reaching: 'The Build', connectionsShort: 7 }),
+      closingLine({ reaching: 'The Hat', connectionsShort: 1 }),
+      closingLine({ reaching: null, connectionsShort: 0 }),
+    ];
+
+    for (const line of lines) {
+      expect(line.toLowerCase()).not.toMatch(/tomorrow|come back|rest|another day|stop now/);
+    }
   });
 });

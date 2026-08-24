@@ -83,6 +83,50 @@ export const CONNECTION_LOST = 'CONNECTION LOST';
  */
 export const SHADOW_CLOSING_LINE = 'That is usually where it stops.';
 
+/** What the run was reaching for when it ended, if it was reaching for anything. */
+export interface UnfinishedBusiness {
+  /** The title of the fragment that was next, or `null` if none was left. */
+  reaching: string | null;
+  /** How many more connections it needed. */
+  connectionsShort: number;
+}
+
+/**
+ * The shadow's last word, naming what THIS run did not finish.
+ *
+ * `SHADOW_CLOSING_LINE` states a thesis about the player, and a thesis is the
+ * weakest thing you can end on: it is equally true of every run, so it lands
+ * like a fortune cookie rather than like something that just happened. What a
+ * player actually lost is sitting right there and was never said — they were
+ * three connections from The Hat, and that is specific, earned, and only true
+ * of the attempt they just made.
+ *
+ * Dark Souls' "YOU DIED" carries on context, not vocabulary. This is the
+ * context.
+ *
+ * The rule the general line has to obey applies here too, and harder: it must
+ * not give the player permission to leave. Naming the unfinished thing is the
+ * opposite of permission — it is the reason to press R, said by the one thing
+ * in the game that does not want you to.
+ *
+ * DRAFT wording, like the two constants above: the shape is the point and the
+ * sentences are Duncan's to settle. Nothing imports this file, so rewriting
+ * them touches nothing else.
+ */
+export function closingLine({ reaching, connectionsShort }: UnfinishedBusiness): string {
+  if (reaching === null) {
+    return SHADOW_CLOSING_LINE;
+  }
+
+  // Singular, because "1 connections from" is the tell of a sentence nobody
+  // read back, and this is the last one anyone sees.
+  const distance = connectionsShort <= 1
+    ? 'One connection'
+    : `${connectionsShort} connections`;
+
+  return `${distance} short of ${reaching}. That is usually where it stops.`;
+}
+
 /**
  * How many cells it has to hold before it will use the next tier's lines.
  *
