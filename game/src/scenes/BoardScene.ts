@@ -34,6 +34,7 @@ import {
 } from './tile-textures';
 import { TrackPath, mitredRectangle } from '../track-geometry';
 import { drawBrain } from './brain';
+import { LOCKS, isSolved, seedLock } from '../engine/locks';
 import { MEMORIES } from '../memories';
 import {
   CONNECTION_LOST,
@@ -424,6 +425,11 @@ export class BoardScene extends Scene {
   private fpsText: Phaser.GameObjects.Text;
   private showFps = false;
   private nextAmbientRefresh = 0;
+  private objectiveText: Phaser.GameObjects.Text;
+
+  /** Which lock this board is posing, and whether it has been solved yet. */
+  private lockIndex = 0;
+  private lockSolved = false;
 
   /**
    * The visible cell the shadow is currently reaching for, so the warning on
@@ -975,6 +981,14 @@ export class BoardScene extends Scene {
       color: '#e8eef2',
     }).setOrigin(1, 0);
 
+    // What this board is asking for, stated in words. A lock the player cannot
+    // read is just a board that ends for reasons of its own.
+    this.objectiveText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, 12, '', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#c98cff',
+    }).setOrigin(0.5, 0);
+
     this.chainText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2, '', {
       fontFamily: 'monospace',
       fontSize: '64px',
@@ -1261,6 +1275,7 @@ export class BoardScene extends Scene {
     this.playCascadeBeat();
     this.playSounds();
     this.drawBoard();
+    this.checkLock();
     this.drawThreat();
     this.drawConnections(delta);
     this.surfaceBankedFragment();
@@ -1384,6 +1399,7 @@ export class BoardScene extends Scene {
   private resetShownState(): void {
     this.cellsBeingFilled.clear();
     this.threatenedIndex = null;
+    this.startLock();
 
     // A restart opens on a dark network. Without this the traces keep whatever
     // charge and lit level the last run left them holding, and the new board
@@ -1561,6 +1577,49 @@ export class BoardScene extends Scene {
         }
       }
     }
+  }
+
+  /**
+   * Lay out the lock this board is posing, and say what it asks for.
+   *
+   * The board no longer opens empty. It opens as a puzzle with a stated goal,
+   * which is the whole escape-room turn: something to solve rather than
+   * something to survive.
+   */
+  private startLock(): void {
+    const lock = LOCKS[Math.min(this.lockIndex, LOCKS.length - 1)];
+    this.lockSolved = false;
+    seedLock(this.simulation.board, lock, Math.random);
+    this.objectiveText.setText(lock.objective).setAlpha(1);
+  }
+
+  /**
+   * Check whether the board has been solved, once per settled board.
+   *
+   * Only while nothing is resolving: mid-cascade the shadows are already gone
+   * from the cells they were in but the board has not finished falling, and
+   * calling a lock solved on a board still in motion means the payoff lands
+   * under the tail of the clear that earned it.
+   */
+  private checkLock(): void {
+    if (this.lockSolved || this.simulation.resolving || this.storyHolding) {
+      return;
+    }
+
+    const lock = LOCKS[Math.min(this.lockIndex, LOCKS.length - 1)];
+    if (!isSolved(lock, this.simulation.board)) {
+      return;
+    }
+
+    this.lockSolved = true;
+    this.objectiveText.setText(`${lock.objective}  \u2014  done`);
+    this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
+
+    // Solving is what surfaces a fragment now. It used to be a connection
+    // count, which is the thing that made the writing feel bolted on: a
+    // threshold crossing has no relationship to what the words say, where
+    // opening a lock is the memory being recovered.
+    this.revealPending = true;
   }
 
   /**

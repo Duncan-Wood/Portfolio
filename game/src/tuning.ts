@@ -64,11 +64,17 @@ export interface Tuning {
    * dithering is. Every clear resets it, which makes the counter-play the same
    * verb the whole game is about.
    *
-   * 6 seconds, played rather than reasoned about. It shipped at a guessed 12,
-   * and at 12 the shadow was something you noticed afterwards rather than
-   * something you played around; 20 was dead air. This is the dial that decides
-   * whether the game is tense or nagging, so it is the one most worth replaying
-   * whenever the rest of the pacing moves.
+   * 6 seconds was played and it was right — for a game with gravity in it,
+   * where six seconds was several pieces and hesitating was a choice. With
+   * gravity cut it is not: six seconds is now most of a single thinking turn,
+   * so the shadow arrived while the player was doing exactly what the game
+   * asks them to do. A prototype lock seeded with three shadows had six on it
+   * before it could be solved.
+   *
+   * 12 seconds is a STARTING POINT, not a played value, and it is the dial
+   * most in need of an ear now that the rest of the pacing has moved. It was
+   * guessed at 12 once before and judged too slow; that was against gravity,
+   * and this is not the same game.
    */
   shadowInterval: number;
 
@@ -242,7 +248,7 @@ export interface Tuning {
  */
 export const DEFAULT_TUNING: Tuning = {
   connectionsPerNode: [6, 9, 12, 16, 20, 26, 32, 40],
-  shadowInterval: 6000,
+  shadowInterval: 12000,
   arrivalsPerShadowStrength: 4,
   fragmentDuration: 1400,
   questionDuration: 3000,
