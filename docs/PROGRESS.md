@@ -9,6 +9,92 @@ carries a header explaining what it owns and why.
 
 ## Status
 
+**The objective is a place on the board now. That is the change the last two
+weeks were missing: everything shipped between the shadow's face and the
+escape-room pivot was craft, and craft cannot manufacture a reason to play.**
+
+- **Neurons.** `game-pieces-1.jpg` specifies them and they had never been built —
+  "Neurons unlock memories & appear after a certain # of box clears. Activated by
+  popping an adjacent block." A board seeds three, anchored in cells; clearing a
+  group beside one lights it and draws a thread to the last one lit, so the
+  storyboard's memory map is drawn BY the play. Every progression before this
+  measured something — score, then connections, then pads on a ring — and a
+  measure can be filling toward anything, which is why the writing it paid out
+  always felt bolted on. You cannot plan a route to a number.
+- **The goal and the threat are no longer the same axis.** The old lock was "free
+  every shadow" while hesitation FED the shadow, so dithering lengthened the
+  puzzle instead of costing anything. `isSolved` is now every neuron lit and says
+  nothing about shadows.
+- **A piece budget is the constraint.** Twelve on the first lock, counting down
+  beside the preview. Cutting gravity removed the only thing that made a
+  placement a commitment; a count restores it without putting a clock back in
+  front of a puzzle. Run out with a neuron dark and the BOARD is re-seeded, never
+  the run — a lost board never costs a memory already earned.
+- **The aha being chased, and it is seeded deliberately on lock 1:** freeing a
+  shadow restores the tile it took, so **a shadow beside a neuron is an
+  opportunity, not a threat**. Clearing there repairs the board and lights the
+  node. Nobody is told; it is found. It is also the project's own sentence — the
+  part of you that stopped is the part you build from.
+- **One story in three places.** The ring around the board now measures the
+  objective rather than cells cleared, so the node on the board, the ring around
+  it and the node on the brain all move together. The escalating
+  `connectionsPerNode` schedule is gone with the meter it drove.
+- **Measured, with a bot playing at RANDOM over 300 runs of lock 1** (a weak
+  proxy — it is here to bound the board, not to judge it):
+
+  | budget | solved | median win | how the losses ended |
+  |---|---|---|---|
+  | 12 | 4% | 7 pieces | 6 topped out; the budget ends the board, as designed |
+  | 24 | 10% | 14 pieces | 96 topped out |
+  | 200 | 12% | 15 pieces | **all 265 topped out** |
+
+  Two readings. The budget is doing its job — at twelve, a board ends because it
+  is spent rather than because the stack reached the ceiling. And the plateau at
+  12% with unlimited pieces is random play filling the board, not the lock being
+  unwinnable: **the budget is not the binding constraint, competence is.**
+  Whether twelve is right for a person is unproven and a random bot cannot
+  settle it.
+
+- **Then measured again with a bot that PLAYS FOR NEURONS**, which is the thing
+  a random one could not do. It searches every placement, resolves the cascade,
+  and scores lighting a neuron above everything else. It also checked itself
+  against the real engine after every placement — several hundred of them,
+  **zero mismatches** — so the numbers are the engine's, not a model's.
+
+  It falsified the reading above. Competence takes lock 1 from 4% to 56%, and
+  then stops dead:
+
+  | budget | solved | median win |
+  |---|---|---|
+  | 12 | 56% | 5 pieces |
+  | 18 | 56% | 9 pieces |
+  | 30 | 56% | 9 pieces |
+
+  **Identical at every budget.** More pieces bought nothing, because the boards
+  it failed were not hard, they were impossible — and the failures averaged 1.7
+  of 3 neurons lit, so they got most of the way and hit a wall. Dumping one
+  showed the wall exactly: a neuron in the bottom corner with two walls, a
+  shadow and a single tile beside it. Light that one tile's group or never
+  light it, and since neurons are ANCHORS nothing can ever fall in to help.
+  **The binding constraint was neither the budget nor competence. It was that
+  `seedLock` produced dead boards.**
+
+  The seeder now sites neurons only where a clear can actually reach them, keeps
+  the deliberate shadow from taking a neuron's last way in, and prefers cells
+  with nothing on top — a buried neuron is solvable but it is a dig, and siting
+  for room alone pushed the median solve from four pieces to twelve. After it:
+
+  | budget | solved | median win |
+  |---|---|---|
+  | 12 | 50% | 8 pieces |
+  | 30 | 69% | 8 pieces |
+
+  The dead-board plateau is gone: the budget is a real dial again. What is left
+  is a difficulty question rather than a structural one — **the first lock is
+  the tutorial and it should be beaten, and at 50% for a bot playing well it is
+  not.** Sixteen runs per cell, so treat single points as noise; the flatness in
+  the first table is the finding, not the exact percentages.
+
 **Stage 3 — Juice is done. The work now is turning a working matcher into a game,
 which is a different problem and the one being worked.**
 
@@ -172,12 +258,17 @@ records *what* was decided and where to read *why*, so the two cannot drift.
 | The spawn cells being occupied ends the game; the board is left on screen | `engine/simulation.ts` (`spawnOrTopOut`), `scenes/BoardScene.ts` (`refreshGameOver`) |
 | Losing plays out: the connections die one by one, then the shadow speaks | `scenes/BoardScene.ts` (`loseTheBoard`) |
 | The ending's two lines are placeholders, isolated with no imports | `shadow-voice.ts` (`CONNECTION_LOST`, `SHADOW_CLOSING_LINE`) |
-| Progress is measured in **connections**: cells cleared, weighted by chain depth | `engine/simulation.ts` (`connectionsMade`) |
-| The meter is the board: a circuit ringing it, lit one pad at a time | `scenes/BoardScene.ts` (`drawProgress`), `track-geometry.ts` |
-| Closing the circuit surfaces ONE fragment, over the held board — never a cutscene | `scenes/BoardScene.ts` (`revealNextNode`) |
+| Progress is measured in **neurons reached**, not cells cleared. `connectionsMade` survives as score, not as progression | `engine/neurons.ts`, `engine/simulation.ts` (`connectionsMade`) |
+| The meter is the board: a circuit ringing it, lit one pad at a time — and it measures the OBJECTIVE now, not cells cleared | `scenes/BoardScene.ts` (`drawProgress`), `track-geometry.ts` |
+| Solving the LOCK surfaces ONE fragment, over the held board — never a cutscene | `scenes/BoardScene.ts` (`checkLock`, `revealNextNode`) |
 | Fragments light permanently in the panel: the memory assembles as you play | `scenes/BoardScene.ts` (`redrawMemoryPanel`) |
 | A memory's question follows its last fragment rather than replacing it | `scenes/BoardScene.ts` (`pendingReveal`) |
-| Fragment cost escalates on a schedule, and the first one is deliberately tiny | `tuning.ts` (`connectionsPerNode`) |
+| A lock is solved by lighting every neuron; the shadows are beside the point | `engine/locks.ts` (`isSolved`) |
+| A neuron is ANCHORED: it does not fall, and nothing falls past it | `engine/grid.ts` (`isAnchored`), `engine/board.ts` (`settle`) |
+| `landingRow` scans from the top down, since anchors break the no-gaps invariant | `engine/board.ts` (`landingRow`) |
+| Lighting a neuron is one hit per neuron per link, like shadow damage | `engine/neurons.ts` (`lightAdjacent`) |
+| A board hands you a piece budget; spending it re-seeds the BOARD, never the run | `engine/locks.ts` (`Lock.pieces`), `engine/simulation.ts` (`pieceBudget`) |
+| A spent board stops feeding the shadow, but its last cascade still plays out | `engine/simulation.ts` (`update`) |
 | The coming memory's shape fills in beside the board as it is earned | `scenes/BoardScene.ts` (`redrawMemoryPanel`) |
 | One node layout, shared, so the outline you fill is the shape you walk | `memories.ts` (`nodeLayout`) |
 | Each memory ends on a question that is never scored or branched on | `memories.ts` (`Memory.question`) |

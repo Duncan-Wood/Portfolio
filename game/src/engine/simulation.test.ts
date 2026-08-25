@@ -1002,21 +1002,31 @@ describe('with gravity cut, a piece waits for the player', () => {
     expect(game.pair.row).toBeGreaterThan(startedAt);
   });
 
-  it('never locks itself, even resting on the floor', () => {
+  it('settles once it is resting on the floor', () => {
+    // REVERSED, deliberately, and the old assertion was "never locks itself,
+    // even resting on the floor". The reasoning was that nothing should commit
+    // a piece but the player — but with no gravity, hard drop was then the ONLY
+    // thing that could commit anything, so every placement in the game cost a
+    // press of space after the piece was already where the player put it. That
+    // is a keystroke tax, not a decision, and it broke the flow of the one
+    // action the game is made of.
+    //
+    // What the old rule was protecting is still protected: an AIRBORNE piece
+    // never moves or commits on its own (the test above), so the board can be
+    // thought about for as long as it takes. The clock only starts once the
+    // player has chosen somewhere to put it.
     const game = deliberate();
     game.softDropping = true;
     game.update(DEFAULT_TUNING.softDropInterval * 40);
     game.softDropping = false;
     expect(game.pair.canFall(game.board)).toBe(false);
 
-    game.update(DEFAULT_TUNING.lockDelay * 6);
+    game.update(DEFAULT_TUNING.lockDelay + 1);
 
-    // Nothing commits a piece but the player. Sliding it along the floor for
-    // as long as you like is the whole point of cutting the clock.
-    expect(game.piecesLocked).toBe(0);
+    expect(game.piecesLocked).toBe(1);
   });
 
-  it('commits on a hard drop, which is the only thing that does', () => {
+  it('commits on a hard drop with no delay at all', () => {
     const game = deliberate();
 
     game.hardDrop();
@@ -1035,5 +1045,207 @@ describe('with gravity cut, a piece waits for the player', () => {
     // Cutting gravity must not cut the pressure. Hesitation is still the thing
     // that costs you, and it is now the ONLY thing that does.
     expect(game.shadowOnBoard).toBe(1);
+  });
+});
+
+describe('the piece budget', () => {
+  const budgeted = (pieces: number) => {
+    const simulation = new Simulation(() => [0, 1]);
+    simulation.pieceBudget = pieces;
+    simulation.restart();
+    return simulation;
+  };
+
+  it('is unlimited when no budget is set, so nothing else has to know about it', () => {
+    const simulation = new Simulation(() => [0, 1]);
+    expect(simulation.outOfPieces).toBe(false);
+    expect(simulation.piecesRemaining).toBe(Infinity);
+  });
+
+  it('counts down as pieces are committed', () => {
+    const simulation = budgeted(3);
+    expect(simulation.piecesRemaining).toBe(3);
+
+    simulation.hardDrop();
+    expect(simulation.piecesRemaining).toBe(2);
+
+    simulation.hardDrop();
+    expect(simulation.piecesRemaining).toBe(1);
+  });
+
+  it('runs out when the last piece is spent, and refuses input after', () => {
+    const simulation = budgeted(2);
+
+    simulation.hardDrop();
+    expect(simulation.outOfPieces).toBe(false);
+
+    simulation.hardDrop();
+    expect(simulation.outOfPieces).toBe(true);
+    expect(simulation.piecesRemaining).toBe(0);
+    expect(simulation.moveLeft()).toBe(false);
+    expect(simulation.rotate()).toBe(false);
+  });
+
+  it('never reports a negative count', () => {
+    const simulation = budgeted(1);
+    simulation.hardDrop();
+    simulation.hardDrop();
+
+    expect(simulation.piecesRemaining).toBe(0);
+  });
+
+  it('gives the budget back on a restart', () => {
+    const simulation = budgeted(2);
+    simulation.hardDrop();
+    simulation.hardDrop();
+    expect(simulation.outOfPieces).toBe(true);
+
+    simulation.restart();
+
+    expect(simulation.outOfPieces).toBe(false);
+    expect(simulation.piecesRemaining).toBe(2);
+  });
+});
+
+describe('a board that has run out of pieces', () => {
+  it('still lets the last piece\'s cascade play out', () => {
+    // `outOfPieces` goes true inside the lock, before the chain it started has
+    // resolved. Stopping the clock at the top of `update` would freeze the
+    // strongest moment the board has on its very last piece.
+    const simulation = new Simulation(() => [0, 0]);
+    simulation.pieceBudget = 2;
+    simulation.restart();
+
+    // Both pairs down the same column: four of colour 0 stacked is a group.
+    simulation.hardDrop();
+    simulation.hardDrop();
+
+    expect(simulation.outOfPieces).toBe(true);
+    expect(simulation.resolving).toBe(true);
+
+    for (let step = 0; step < 40; step += 1) {
+      simulation.update(50);
+    }
+
+    expect(simulation.resolving).toBe(false);
+    expect(simulation.score).toBeGreaterThan(0);
+  });
+
+  it('stops feeding the shadow once nothing can be done about it', () => {
+    const simulation = new Simulation(() => [0, 1]);
+    simulation.pieceBudget = 1;
+    simulation.restart();
+    simulation.hardDrop();
+
+    for (let step = 0; step < 200; step += 1) {
+      simulation.update(50);
+    }
+
+    expect(simulation.shadowTaken).toBe(0);
+  });
+});
+
+describe('committing a piece with gravity off', () => {
+  // `DEFAULT_TUNING` already has gravity off; named here so the test says what
+  // it is testing rather than relying on a default staying put.
+  const STILL = { ...DEFAULT_TUNING, gravityEnabled: false };
+  const grounded = () => new Simulation(() => [0, 1], STILL);
+
+  /**
+   * Soft-drop until the pair touches down, and not one step further.
+   *
+   * One row per call, so the lock delay never accrues while it is still moving
+   * and the loop cannot run past the landing into the NEXT piece — which is
+   * what the first version of this did, leaving the test asserting about a
+   * piece two placements later.
+   */
+  const land = (simulation: Simulation) => {
+    simulation.softDropping = true;
+    for (let step = 0; step < ROWS + 2 && simulation.pair.canFall(simulation.board); step += 1) {
+      simulation.update(STILL.softDropInterval);
+    }
+    simulation.softDropping = false;
+  };
+
+  it('never commits a piece that is still in the air', () => {
+    // The whole point of cutting gravity: a board can be thought about for as
+    // long as it takes, and nothing takes the decision away.
+    const simulation = grounded();
+    const before = simulation.piecesLocked;
+
+    for (let step = 0; step < 400; step += 1) {
+      simulation.update(50);
+    }
+
+    expect(simulation.piecesLocked).toBe(before);
+  });
+
+  it('commits a piece that has LANDED, without waiting for a hard drop', () => {
+    // Being forced to press space for every placement is not a decision, it is
+    // a keystroke tax — the piece is already where the player put it. A landed
+    // piece settles on the lock delay like it does in every game in the genre.
+    const simulation = grounded();
+
+    land(simulation);
+
+    expect(simulation.pair.canFall(simulation.board)).toBe(false);
+    const before = simulation.piecesLocked;
+
+    simulation.update(STILL.lockDelay + 1);
+
+    expect(simulation.piecesLocked).toBe(before + 1);
+  });
+
+  it('still lets a landed piece be slid, since a move resets the lock delay', () => {
+    const simulation = grounded();
+
+    land(simulation);
+
+    const before = simulation.piecesLocked;
+    for (let slide = 0; slide < 3; slide += 1) {
+      simulation.update(STILL.lockDelay - 40);
+      simulation.moveLeft();
+    }
+
+    expect(simulation.piecesLocked).toBe(before);
+  });
+});
+
+describe('the shadow waits for the player to start', () => {
+  it('takes nothing until the first piece of a board has been committed', () => {
+    // Found by watching a seeded board sit untouched: after two minutes, EIGHT
+    // of its twelve tiles had been possessed, with nothing left to build a
+    // group from. The first thing anyone does with a new board is read it, and
+    // charging them for that is indefensible.
+    //
+    // Gravity is deliberately OFF here, and only here. The rule under test is
+    // "nothing is taken before the first piece is committed", and with gravity
+    // on a piece commits itself within a few seconds whether or not the player
+    // has touched anything — which would test the falling speed rather than the
+    // rule. The grace is genuinely shorter in the shipped game, and that is
+    // fine; what must not happen is the clock running before the player has
+    // begun.
+    const simulation = new Simulation(() => [0, 1], { ...DEFAULT_TUNING, gravityEnabled: false });
+    simulation.restart();
+
+    for (let step = 0; step < 400; step += 1) {
+      simulation.update(50);
+    }
+
+    expect(simulation.shadowTaken).toBe(0);
+  });
+
+  it('starts the clock once a piece is down, and keeps it running after', () => {
+    // Gravity off for the same reason as above: this has to prove the LOCK is
+    // what starts the clock, not that a piece eventually falls.
+    const simulation = new Simulation(() => [0, 1], { ...DEFAULT_TUNING, gravityEnabled: false });
+    simulation.restart();
+    simulation.hardDrop();
+
+    for (let step = 0; step < 400; step += 1) {
+      simulation.update(50);
+    }
+
+    expect(simulation.shadowTaken).toBeGreaterThan(0);
   });
 });

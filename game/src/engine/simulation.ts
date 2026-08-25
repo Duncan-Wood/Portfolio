@@ -116,6 +116,27 @@ export class Simulation {
    */
   toppedOut = false;
 
+  /**
+   * How many pieces this board gives you, or `0` for no limit.
+   *
+   * The constraint that makes a board a puzzle rather than a sandbox. Gravity
+   * used to be the only thing making a placement a commitment; with it cut and
+   * pieces unlimited, every board fell to brute force — place until four touch.
+   * A budget restores the commitment without putting a clock back in front of a
+   * puzzle you were meant to think about, which is the trade cutting gravity
+   * was for.
+   *
+   * A COUNT, not a timer, and that distinction is the whole design. A timer
+   * punishes thinking; a count prices it at nothing and prices ACTION instead,
+   * which is what makes one cascade reaching two neurons worth more than two
+   * clears reaching two — same result, half the board's resources.
+   *
+   * `0` means unlimited, and it is the default so nothing that does not set a
+   * budget has to know this exists: every test written before it, and the
+   * endless board itself, behave exactly as they did.
+   */
+  pieceBudget = 0;
+
   chainLength = 0;
 
   /**
@@ -297,6 +318,16 @@ export class Simulation {
       return;
     }
 
+    // A spent board is finished, whatever it looks like. The cascade from the
+    // last piece was allowed to play out above — `outOfPieces` goes true inside
+    // `lockPair`, before the chain it started has resolved — but nothing may
+    // accrue on a board the player can no longer act on. A shadow arriving
+    // after the last piece is a punishment for a decision nobody was allowed to
+    // make.
+    if (this.outOfPieces) {
+      return;
+    }
+
     this.stallTimer += delta;
     if (this.stallTimer >= this.tuning.shadowInterval) {
       this.stallTimer = 0;
@@ -316,12 +347,20 @@ export class Simulation {
       }
     }
 
-    // Nothing moves or commits itself while gravity is off unless the player is
-    // actively pushing it down. No fall, and no lock delay either: a piece that
-    // committed on a timer would put the clock straight back, and the point of
-    // cutting gravity is that a board can be thought about for as long as it
-    // takes. `hardDrop` is then the only thing that locks a piece.
-    if (!this.tuning.gravityEnabled && !this.softDropping) {
+    // Nothing moves or commits itself while gravity is off and the piece is
+    // still IN THE AIR. That is the point of cutting gravity: a board can be
+    // thought about for as long as it takes, and no clock takes the decision
+    // away while the piece is somewhere the player has not chosen yet.
+    //
+    // A piece that has LANDED is a different case, and this used to get it
+    // wrong. It held the lock timer at zero there too, so the only thing that
+    // could ever commit a piece was `hardDrop` — every single placement in the
+    // game cost a press of space after the piece was already exactly where the
+    // player wanted it. That is not a decision, it is a keystroke tax, and it
+    // broke the flow of the one action the game is made of. A landed piece
+    // settles on the lock delay, like it does in every game in this genre, and
+    // the delay still resets on a move so it can be slid along the floor.
+    if (!this.tuning.gravityEnabled && !this.softDropping && this.pair.canFall(this.board)) {
       this.lockTimer = 0;
       return;
     }
@@ -331,12 +370,9 @@ export class Simulation {
       // Without it a landed piece freezes instantly and you can never slide it
       // into a gap at the last moment, which feels punishing.
       //
-      // Skipped entirely with gravity off — see above — so a piece soft-dropped
-      // onto the floor still waits for the player to commit it.
-      if (!this.tuning.gravityEnabled) {
-        return;
-      }
-
+      // It runs with gravity off too. It used to return here instead, which is
+      // what made space the only way to commit anything — see the note above
+      // the airborne guard.
       this.lockTimer += delta;
 
       if (this.lockTimer >= this.tuning.lockDelay) {
@@ -451,8 +487,33 @@ export class Simulation {
    * One home for the refusal rule, so a fourth input method cannot be added
    * that honours only half of it.
    */
+  /**
+   * Pieces left before the board is spent, or `Infinity` when unbudgeted.
+   *
+   * Floored at zero rather than allowed to go negative: the number is drawn on
+   * screen, and "-1 pieces" is a bug the player reads before anyone else does.
+   */
+  get piecesRemaining(): number {
+    return this.pieceBudget === 0
+      ? Infinity
+      : Math.max(this.pieceBudget - this.piecesLocked, 0);
+  }
+
+  /**
+   * True once the budget is spent. Input is refused from here, the same as
+   * after a top-out and for the same reason: the board is final, and it stays
+   * on screen so the player can see the position they ran out in.
+   *
+   * What HAPPENS next is not this file's business. A spent board is a board
+   * that failed its lock, and the run structure above decides whether that
+   * means re-seeding the same lock or something else.
+   */
+  get outOfPieces(): boolean {
+    return this.pieceBudget !== 0 && this.piecesLocked >= this.pieceBudget;
+  }
+
   private get acceptsInput(): boolean {
-    return !this.resolving && !this.toppedOut;
+    return !this.resolving && !this.toppedOut && !this.outOfPieces;
   }
 
   /**

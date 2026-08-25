@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLUMNS, ROWS } from './grid';
+import { COLUMNS, ROWS, neuronCell } from './grid';
 import { Board } from './board';
 
 const BOTTOM = ROWS - 1;
@@ -191,5 +191,63 @@ describe('resetting', () => {
 
     expect(() => board.place(0, BOTTOM, 4)).not.toThrow();
     expect(board.pieceAt(0, BOTTOM)).toBe(4);
+  });
+});
+
+describe('anchored cells', () => {
+  it('leaves a neuron where it is when everything under it clears', () => {
+    const board = new Board();
+    board.place(3, BOTTOM, 0);
+    board.place(3, BOTTOM - 1, neuronCell(false));
+
+    board.clear(3, BOTTOM);
+    board.settle();
+
+    expect(board.pieceAt(3, BOTTOM - 1)).toBe(neuronCell(false));
+    expect(board.isEmpty(3, BOTTOM)).toBe(true);
+  });
+
+  it('stacks tiles on top of a neuron instead of pouring past it', () => {
+    const board = new Board();
+    board.place(2, BOTTOM - 2, neuronCell(false));
+    board.place(2, BOTTOM - 6, 1);
+
+    board.settle();
+
+    expect(board.pieceAt(2, BOTTOM - 2)).toBe(neuronCell(false));
+    expect(board.pieceAt(2, BOTTOM - 3)).toBe(1);
+  });
+
+  it('compacts the tiles below a neuron among themselves', () => {
+    const board = new Board();
+    board.place(4, BOTTOM - 1, 2);
+    board.place(4, BOTTOM - 4, neuronCell(true));
+
+    board.settle();
+
+    expect(board.pieceAt(4, BOTTOM)).toBe(2);
+    expect(board.pieceAt(4, BOTTOM - 4)).toBe(neuronCell(true));
+  });
+
+  it('lands a dropped tile above a neuron, never in the pocket beneath it', () => {
+    const board = new Board();
+    board.place(1, BOTTOM - 3, neuronCell(false));
+
+    expect(board.landingRow(1)).toBe(BOTTOM - 4);
+  });
+
+  it('still lands on the floor of a column with nothing anchored in it', () => {
+    const board = new Board();
+    expect(board.landingRow(0)).toBe(BOTTOM);
+    board.place(0, BOTTOM, 0);
+    expect(board.landingRow(0)).toBe(BOTTOM - 1);
+  });
+
+  it('reports a column blocked to the ceiling as having nowhere to land', () => {
+    const board = new Board();
+    for (let row = 0; row < ROWS; row += 1) {
+      board.place(5, row, 0);
+    }
+    expect(board.landingRow(5)).toBe(-1);
   });
 });

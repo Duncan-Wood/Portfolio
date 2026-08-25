@@ -1,4 +1,4 @@
-import { COLUMNS, ROWS } from './grid';
+import { COLUMNS, ROWS, isAnchored } from './grid';
 
 /*
  * The settled contents of the playfield. It knows nothing about the falling
@@ -90,6 +90,13 @@ export class Board {
    * Because it reads upward and writes downward it can never overwrite a tile
    * it has not yet visited, so no temporary copy is needed.
    *
+   * An ANCHORED cell — a neuron — is the exception, and it is what makes a
+   * board a designed puzzle instead of a stack. It stays exactly where it was
+   * placed and nothing falls past it, so the tiles above it come to rest ON it
+   * while the ones below compact among themselves. Dr. Mario's viruses work
+   * this way for the same reason: geometry that rearranges itself under you
+   * cannot be planned around, and planning is the whole satisfaction here.
+   *
    * Two runtime callers: `FallingPair.lock` (which is what lets the two halves
    * come to rest at different heights and SPLIT APART — Puyo behaviour, where a
    * Tetris piece stays rigid) and the cascade's settle beat. `resolveStep` is a
@@ -104,6 +111,14 @@ export class Board {
       for (let row = ROWS - 1; row >= 0; row -= 1) {
         const pieceType = this.pieceAt(column, row);
         if (pieceType === EMPTY) {
+          continue;
+        }
+
+        // It does not move, and it is the floor for everything above it. The
+        // scan is bottom-up, so `target` is never below `row` by the time this
+        // runs and the tiles already packed underneath are left alone.
+        if (isAnchored(pieceType)) {
+          target = row - 1;
           continue;
         }
 
@@ -124,21 +139,29 @@ export class Board {
 
   /**
    * The row a tile dropped down this column would come to rest in, or `-1` if
-   * the column is full to the ceiling.
+   * nothing can enter the column at all.
+   *
+   * Scanned from the TOP down, stopping at the first thing in the way. It used
+   * to scan up from the floor and return the deepest empty cell, which was only
+   * correct while `settle` guaranteed a column had no floating gaps. Anchored
+   * cells break that guarantee on purpose: clear the tiles beneath a neuron and
+   * the pocket under it is empty and unreachable, and a piece dropped into that
+   * column has to land on the neuron rather than teleport underneath it.
    *
    * Here rather than in whatever wants it because it is gravity's inverse, and
-   * it is only correct because `settle` guarantees a column has no floating
-   * gaps — the deepest empty cell is reachable from above precisely because
-   * this module keeps that invariant.
+   * gravity is this module's business.
    */
   landingRow(column: number): number {
-    for (let row = ROWS - 1; row >= 0; row -= 1) {
-      if (this.isEmpty(column, row)) {
-        return row;
+    let landing = -1;
+
+    for (let row = 0; row < ROWS; row += 1) {
+      if (!this.isEmpty(column, row)) {
+        break;
       }
+      landing = row;
     }
 
-    return -1;
+    return landing;
   }
 
   /** Empty every cell, for a restart. */

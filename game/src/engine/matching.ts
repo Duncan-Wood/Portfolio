@@ -1,4 +1,5 @@
 import { Board } from './board';
+import { lightAdjacent, type NeuronSite } from './neurons';
 import {
   COLUMNS,
   FIRST_VISIBLE_ROW,
@@ -91,12 +92,19 @@ export interface Group {
  * took a hit off it". That distinction is the entire mechanic — a single clear
  * has to visibly hurt something it cannot yet kill, or nobody learns that a
  * chain is what finishes the job.
+ *
+ * `neuronsLit` is what this link REACHED — the objective advancing. Reported
+ * per link rather than per cascade on purpose: a chain that lights its third
+ * neuron four links deep should light them one beat at a time as the cascade
+ * plays, because a payoff delivered all at once at the end is a payoff the
+ * player cannot attribute to anything they did.
  */
 export interface ChainLink {
   groups: Group[];
   cellsCleared: number;
   shadowPurified: ShadowHit[];
   shadowDamaged: ShadowHit[];
+  neuronsLit: NeuronSite[];
 }
 
 export function findGroups(board: Board): Group[] {
@@ -156,7 +164,15 @@ export function clearStep(board: Board, linkIndex: number): ChainLink | null {
   // Depth is the damage. `linkIndex` is 0-based, so an ordinary clear deals 1.
   const { purified, damaged } = damageShadow(board, groups, linkIndex + 1);
 
-  return { groups, cellsCleared, shadowPurified: purified, shadowDamaged: damaged };
+  // Here rather than a layer up in `Simulation`, for the reason `damageShadow`
+  // gives at length: every other path into this function — `resolveStep`,
+  // `resolveChain`, and every test built on them — would otherwise clear groups
+  // without the objective ever advancing, and report a board the real game
+  // could not produce. Depth does not matter to a neuron the way it matters to
+  // a shadow: reaching one is reaching one. What a chain buys is REACH.
+  const neuronsLit = lightAdjacent(board, groups.flatMap((group) => group.cells));
+
+  return { groups, cellsCleared, shadowPurified: purified, shadowDamaged: damaged, neuronsLit };
 }
 
 /**

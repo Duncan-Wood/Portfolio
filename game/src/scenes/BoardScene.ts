@@ -4,6 +4,7 @@ import {
   FIRST_VISIBLE_ROW,
   PIECE_TYPE_COUNT,
   ROWS,
+  isNeuronLit,
   VISIBLE_ROWS,
   isColour,
   isShadow,
@@ -35,6 +36,7 @@ import {
 import { TrackPath, mitredRectangle } from '../track-geometry';
 import { drawBrain } from './brain';
 import { LOCKS, isSolved, seedLock } from '../engine/locks';
+import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { MEMORIES } from '../memories';
 import {
   CONNECTION_LOST,
@@ -430,6 +432,33 @@ export class BoardScene extends Scene {
   private lockSolved = false;
 
   /**
+   * Counts down while a spent board is being shown to the player before it is
+   * re-seeded. Zero when nothing is failing.
+   *
+   * A beat rather than an instant reset. Running out of pieces on an unsolved
+   * board is the only way to lose one, and a board that vanished the frame the
+   * last piece landed would never tell the player what happened — they would
+   * see a fresh board and assume the game had glitched.
+   */
+  private lockFailingIn = 0;
+
+  /** What the piece counter last showed, so the text is only rewritten on a change. */
+  private shownPiecesRemaining = -1;
+
+  /**
+   * The neurons this board has lit, in the order they went.
+   *
+   * Order is the whole reason this is kept here rather than read off the board:
+   * the board knows WHICH are lit, but the thread is drawn between them in the
+   * sequence the player reached them, and that sequence is a fact about the run
+   * rather than about the position. It is the memory map from the storyboard
+   * being drawn by the play instead of handed over finished.
+   */
+  private litNeurons: NeuronSite[] = [];
+
+  private neuronThread: Phaser.GameObjects.Graphics;
+
+  /**
    * The visible cell the shadow is currently reaching for, so the warning on
    * it can be taken off again when it moves or the timer resets.
    */
@@ -454,6 +483,8 @@ export class BoardScene extends Scene {
 
   private gameOverHint: Phaser.GameObjects.Text;
   private previewTiles: Phaser.GameObjects.Image[];
+
+  private piecesText: Phaser.GameObjects.Text;
   private shownPivotType = -1;
   private shownSatelliteType = -1;
   private shownScore = -1;
@@ -854,6 +885,12 @@ export class BoardScene extends Scene {
       }
     }
 
+    // Over the tiles and under the falling pair, so a thread runs across the
+    // board it was drawn on without ever hiding the piece being placed.
+    this.neuronThread = this.add.graphics();
+    this.neuronThread.enableFilters();
+    this.neuronThread.filters?.internal.addGlow(TRACK_LIT_COLOR, 2.5, 0, 1, false, 4, 8);
+
     this.pairTiles = [
       this.add.image(0, 0, tileTexture(null)),
       this.add.image(0, 0, tileTexture(null)),
@@ -930,6 +967,22 @@ export class BoardScene extends Scene {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#8ea3b0',
+    }).setOrigin(0.5, 0.5);
+
+    // What the board has left to spend, in the gap between the preview and the
+    // memory panel. It sat ABOVE the preview first, which put the label at
+    // y = -16 — off the top of the canvas entirely, with the number stranded in
+    // the corner beside the FPS readout looking like part of the debug overlay.
+    this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 88, 'PIECES', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#7a5f96',
+    }).setOrigin(0.5, 0.5);
+
+    this.piecesText = this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 112, '', {
+      fontFamily: 'monospace',
+      fontSize: '32px',
+      color: '#e9dcff',
     }).setOrigin(0.5, 0.5);
 
     this.add.text(PREVIEW_CENTER_X, MEMORY_PANEL_TOP - 40, 'MEMORY', {
@@ -1273,6 +1326,8 @@ export class BoardScene extends Scene {
     this.playSounds();
     this.drawBoard();
     this.checkLock();
+    this.refreshPieces(delta);
+    this.drawNeuronThread();
     this.drawThreat();
     this.drawConnections(delta);
     this.surfaceBankedFragment();
@@ -1360,7 +1415,12 @@ export class BoardScene extends Scene {
    * also work, but it destroys and rebuilds every game object — including the
    * pools above — to change state the simulation can reset on its own.
    */
-  private restart(): void {
+  /**
+   * Start again. `keepMemory` re-seeds the BOARD only, which is what running
+   * out of pieces does: a lost board costs you the board. R, which is the
+   * player asking for a new run, does not pass it and loses everything.
+   */
+  private restart(keepMemory = false): void {
     // A held game that restarts is a running game: leaving the flag set would
     // start the new run frozen behind an overlay the player just dismissed.
     this.setPaused(false);
@@ -1381,7 +1441,7 @@ export class BoardScene extends Scene {
       popup.setVisible(false);
     }
 
-    this.resetShownState();
+    this.resetShownState(keepMemory);
   }
 
   /**
@@ -1392,7 +1452,7 @@ export class BoardScene extends Scene {
    * are seeded from the engine rather than zeroed, so a restart cannot sound a
    * landing or replay a beat that belonged to the run before it.
    */
-  private resetShownState(): void {
+  private resetShownState(keepMemory = false): void {
     this.cellsBeingFilled.clear();
     this.threatenedIndex = null;
     this.startLock();
@@ -1441,12 +1501,19 @@ export class BoardScene extends Scene {
     this.revealSkippableIn = 0;
     this.awaitingAnswer = false;
     this.answerText = '';
-    this.memoryAnswers = [];
+    if (!keepMemory) {
+      this.memoryAnswers = [];
+    }
     this.tweens.killTweensOf([this.answerLine, this.answerEcho]);
     this.answerLine.setVisible(false);
     this.answerEcho.setVisible(false);
 
-    for (const index of this.animatedShadowCells) {
+    // EVERY cell, not only the ones a shadow was standing on. `killAll` above
+    // stops any tween mid-flight, and a cell left part-way through the flare a
+    // lit neuron plays would keep that scale for the rest of the session —
+    // `drawBoard` only ever swaps a texture, so nothing would put it back.
+    this.tweens.killTweensOf(this.cellTiles);
+    for (let index = 0; index < this.cellTiles.length; index += 1) {
       this.restoreCell(index);
     }
     this.animatedShadowCells.clear();
@@ -1470,8 +1537,10 @@ export class BoardScene extends Scene {
     this.hitStopRemaining = 0;
     this.nextScorePopup = 0;
 
-    this.litPads = 0;
-    this.nodesRevealed = 0;
+    if (!keepMemory) {
+      this.litPads = 0;
+      this.nodesRevealed = 0;
+    }
     this.revealRemaining = 0;
     this.pendingReveal = null;
     this.revealPending = false;
@@ -1585,8 +1654,28 @@ export class BoardScene extends Scene {
   private startLock(): void {
     const lock = LOCKS[Math.min(this.lockIndex, LOCKS.length - 1)];
     this.lockSolved = false;
+    this.lockFailingIn = 0;
+    this.simulation.pieceBudget = lock.pieces;
     seedLock(this.simulation.board, lock, Math.random);
-    this.objectiveText.setText(lock.objective).setAlpha(1);
+    this.shownPiecesRemaining = -1;
+    this.litNeurons = [];
+    this.refreshObjective();
+    this.objectiveText.setAlpha(1);
+  }
+
+  /**
+   * Say what the board is asking for, and how much of it is left.
+   *
+   * The count matters as much as the words. "Light every neuron" alone is a
+   * title; "light every neuron — 1 of 3" is a position, and a player who can
+   * read their position can tell whether the last thing they did helped.
+   */
+  private refreshObjective(): void {
+    const lock = LOCKS[Math.min(this.lockIndex, LOCKS.length - 1)];
+    const total = neuronsOn(this.simulation.board).length;
+    const lit = total - unlitCount(this.simulation.board);
+
+    this.objectiveText.setText(`${lock.objective}  \u2014  ${lit} of ${total}`);
   }
 
   /**
@@ -1608,7 +1697,7 @@ export class BoardScene extends Scene {
     }
 
     this.lockSolved = true;
-    this.objectiveText.setText(`${lock.objective}  \u2014  done`);
+    this.objectiveText.setText(`${lock.objective}  \u2014  open`);
     this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
 
     // Solving is what surfaces a fragment now. It used to be a connection
@@ -1616,6 +1705,114 @@ export class BoardScene extends Scene {
     // threshold crossing has no relationship to what the words say, where
     // opening a lock is the memory being recovered.
     this.revealPending = true;
+  }
+
+  /**
+   * Draw the route the run has taken between the neurons it has lit.
+   *
+   * The storyboard's memory panels are vignettes wired together by threads with
+   * circle terminals, and this is that figure being drawn BY the play rather
+   * than handed over finished. It is the reason lighting the second neuron
+   * feels different from lighting the first: the first is a dot, the second is
+   * the beginning of a shape.
+   *
+   * Redrawn every frame from `litNeurons` rather than appended to, for the same
+   * reason `drawBoard` repaints unconditionally — one source of truth, no
+   * invalidation to keep correct across a cascade, a settle and a retry.
+   *
+   * The dashed run past the end reaches toward the next neuron still dark. That
+   * is the foreshadowing the notes asked for: the shape of what is coming,
+   * shown before it has been earned.
+   */
+  private drawNeuronThread(): void {
+    this.neuronThread.clear();
+
+    const centre = (site: NeuronSite) => ({
+      x: centerOfColumn(site.column),
+      y: centerOfRow(site.row),
+    });
+
+    if (this.litNeurons.length > 1) {
+      this.neuronThread.lineStyle(3, TRACK_LIT_COLOR, 0.85);
+      this.neuronThread.beginPath();
+      const first = centre(this.litNeurons[0]);
+      this.neuronThread.moveTo(first.x, first.y);
+      for (const site of this.litNeurons.slice(1)) {
+        const at = centre(site);
+        this.neuronThread.lineTo(at.x, at.y);
+      }
+      this.neuronThread.strokePath();
+    }
+
+    if (this.litNeurons.length === 0) {
+      return;
+    }
+
+    const dark = neuronsOn(this.simulation.board)
+      .find(({ column, row }) => !isNeuronLit(this.simulation.board.pieceAt(column, row) as number));
+    if (dark === undefined) {
+      return;
+    }
+
+    const from = centre(this.litNeurons[this.litNeurons.length - 1]);
+    const to = centre(dark);
+    const span = Math.hypot(to.x - from.x, to.y - from.y);
+    const steps = Math.max(Math.floor(span / 14), 1);
+
+    this.neuronThread.lineStyle(2, TRACK_LIT_COLOR, 0.22);
+    for (let step = 0; step < steps; step += 2) {
+      const a = step / steps;
+      const b = Math.min((step + 1) / steps, 1);
+      this.neuronThread.lineBetween(
+        from.x + (to.x - from.x) * a,
+        from.y + (to.y - from.y) * a,
+        from.x + (to.x - from.x) * b,
+        from.y + (to.y - from.y) * b,
+      );
+    }
+  }
+
+  /**
+   * Keep the piece counter honest, and run out the clock on a spent board.
+   *
+   * A board is lost exactly one way: the pieces are gone and a neuron is still
+   * dark. The lock is re-seeded rather than the run ended, because there is no
+   * death in front of the writing — what you lose is the board, never the
+   * memory you have already earned.
+   */
+  private refreshPieces(delta: number): void {
+    const remaining = this.simulation.piecesRemaining;
+    if (remaining !== this.shownPiecesRemaining) {
+      this.shownPiecesRemaining = remaining;
+      this.piecesText.setText(Number.isFinite(remaining) ? `${remaining}` : '');
+      // Two left is the point at which the plan has to change, so it says so.
+      this.piecesText.setColor(remaining <= 2 ? '#e4572e' : '#e9dcff');
+    }
+
+    if (this.lockFailingIn > 0) {
+      this.lockFailingIn -= delta;
+      if (this.lockFailingIn <= 0) {
+        this.lockFailingIn = 0;
+        this.restart(true);
+      }
+      return;
+    }
+
+    // Not while a cascade is still running: the last piece's chain can light
+    // the neuron that solves the board, and calling it failed before that has
+    // played out would take a win away on the frame it was won.
+    if (
+      !this.simulation.outOfPieces
+      || this.simulation.resolving
+      || this.lockSolved
+      || this.storyHolding
+    ) {
+      return;
+    }
+
+    this.lockFailingIn = 1600;
+    this.objectiveText.setText('out of pieces').setAlpha(1);
+    this.soundBoard.play(connectionLostVoice(0));
   }
 
   /**
@@ -1997,9 +2194,17 @@ export class BoardScene extends Scene {
       return;
     }
 
+    // The ring measures THE OBJECTIVE now, not connections.
+    //
+    // It used to fill with cells cleared, and that was the whole reason the
+    // writing felt bolted on: a meter counting clears can be filling toward
+    // anything, so the fragment it paid out arrived as a reward dispenser going
+    // off rather than as something the board had been about. Driven by the
+    // neurons it says one thing in three places — the node on the board, the
+    // ring around it, the node on the brain — and lighting one moves all three.
     const pads = this.tuning.progressPads;
-    const earned = this.simulation.connectionsMade - this.connectionsSpent();
-    const progress = Math.min(earned / this.nodeCost(this.nodesRevealed), 1);
+    const total = neuronsOn(this.simulation.board).length;
+    const progress = total === 0 ? 0 : (total - unlitCount(this.simulation.board)) / total;
     const lit = Math.floor(progress * pads);
 
     if (lit === this.litPads) {
@@ -2026,32 +2231,9 @@ export class BoardScene extends Scene {
       });
     }
 
-    // Banked, not surfaced. `litPads` is capped at `pads`, so the ring holds
-    // full and glowing for the rest of the cascade, which reads as owed rather
-    // than as stuck.
-    if (lit === pads) {
-      this.revealPending = true;
-    }
-  }
-
-  /**
-   * What the next fragment costs, and what every fragment so far has cost.
-   *
-   * Costs escalate, so progress cannot be a single division. Spending is summed
-   * rather than subtracted from a running balance because the engine's counter
-   * only ever goes up.
-   */
-  private nodeCost(index: number): number {
-    const schedule = this.tuning.connectionsPerNode;
-    return schedule[Math.min(index, schedule.length - 1)];
-  }
-
-  private connectionsSpent(): number {
-    let spent = 0;
-    for (let index = 0; index < this.nodesRevealed; index += 1) {
-      spent += this.nodeCost(index);
-    }
-    return spent;
+    // Deliberately does NOT bank a fragment. `checkLock` owns that now, and a
+    // full ring is the same instant as a solved lock — asking for the reveal in
+    // both places would surface two fragments for one board.
   }
 
   /**
@@ -2578,6 +2760,12 @@ export class BoardScene extends Scene {
 
     const poppedAt = this.popCells(lastBeat.link, lastBeat.connections);
 
+    // Recorded per LINK, which is what makes a chain read as reaching. A
+    // cascade that lights three neurons draws three segments of thread on three
+    // separate beats, so the player watches the route being taken rather than
+    // finding it already drawn when the board stops moving.
+    this.reachNeurons(lastBeat.link.neuronsLit);
+
     // `chainLength` has already been incremented past this link, so the first
     // link of a cascade pops at index 0. The pop is placed where the clear
     // actually happened, which is what stops a six-wide board sounding like a
@@ -2586,6 +2774,42 @@ export class BoardScene extends Scene {
       ...popVoice(this.simulation.chainLength - 1),
       pan: poppedAt === null ? 0 : panForX(poppedAt),
     });
+  }
+
+  /**
+   * Take the neurons a link just reached: record the route, and sound them.
+   *
+   * The pitch climbs with how many are already lit, the same shape `answerVoice`
+   * uses when it drives the shadows off — this is the other moment in the game
+   * where something the player did resolves a whole board, and the two should
+   * be recognisably the same instrument.
+   */
+  private reachNeurons(lit: readonly NeuronSite[]): void {
+    const total = neuronsOn(this.simulation.board).length;
+
+    for (const site of lit) {
+      this.litNeurons.push(site);
+      this.soundBoard.play({
+        ...nodeVoice(this.litNeurons.length - 1, Math.max(total, 1)),
+        pan: panForX(centerOfColumn(site.column)),
+      });
+
+      const index = visibleCellIndex(site.column, site.row);
+      // A flare on the cell itself, so the moment has a place. The tile below
+      // it is the one that cleared; without this the neuron simply changes
+      // texture and the cause is invisible.
+      this.cellTiles[index].setScale(1.35);
+      this.tweens.add({
+        targets: this.cellTiles[index],
+        scale: 1,
+        duration: 260,
+        ease: 'Back.easeOut',
+      });
+    }
+
+    if (lit.length > 0) {
+      this.refreshObjective();
+    }
   }
 
   /**
@@ -3129,12 +3353,12 @@ export class BoardScene extends Scene {
       return { reaching: null, connectionsShort: 0 };
     }
 
-    const earned = this.simulation.connectionsMade - this.connectionsSpent();
-    const needed = this.nodeCost(this.nodesRevealed) - earned;
-
+    // Counted in neurons still dark, and the word survives the change because a
+    // neuron IS a connection — the closing line reads "two connections short of
+    // The Hat" and means the two nodes on the board that never lit.
     return {
       reaching: MEMORIES[at.memoryIndex].nodes[at.nodeIndex].title,
-      connectionsShort: Math.max(1, needed),
+      connectionsShort: Math.max(1, unlitCount(this.simulation.board)),
     };
   }
 

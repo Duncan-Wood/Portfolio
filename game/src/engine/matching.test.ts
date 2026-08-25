@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Board } from './board';
-import { COLUMNS, FIRST_VISIBLE_ROW, ROWS } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, neuronCell } from './grid';
 import { clearStep, findGroups, resolveChain, scoreChain } from './matching';
 
-const PIECE_LETTERS: Record<string, number> = { R: 0, B: 1, G: 2, Y: 3 };
+const PIECE_LETTERS: Record<string, number> = {
+  R: 0, B: 1, G: 2, Y: 3, N: neuronCell(false), n: neuronCell(true),
+};
 
 const boardFrom = (...rows: string[]): Board => {
   const board = new Board();
@@ -263,5 +265,51 @@ describe('the hidden row is inert', () => {
     }
 
     expect(findGroups(board)).toEqual([]);
+  });
+});
+
+describe('reaching a neuron', () => {
+  it('lights one a cleared group was touching', () => {
+    const board = boardFrom('N R R R R .');
+
+    const link = clearStep(board, 0);
+
+    expect(link?.neuronsLit).toEqual([{ column: 0, row: ROWS - 1 }]);
+  });
+
+  it('lights every neuron the same clear reached', () => {
+    const board = boardFrom('N R R R R N');
+
+    expect(clearStep(board, 0)?.neuronsLit).toHaveLength(2);
+  });
+
+  it('leaves a neuron the clear never touched dark', () => {
+    const board = boardFrom(
+      'N . . . . .',
+      '. R R R R .',
+    );
+
+    expect(clearStep(board, 0)?.neuronsLit).toEqual([]);
+  });
+
+  it('reports the neuron on the LINK that reached it, not the first', () => {
+    const board = boardFrom(
+      'N B . . . .',
+      'B R . . . .',
+      'B R . . . .',
+      'B R R R . .',
+    );
+
+    const links = resolveChain(board);
+
+    expect(links).toHaveLength(2);
+    expect(links[0].neuronsLit).toEqual([]);
+    expect(links[1].neuronsLit).toEqual([{ column: 0, row: ROWS - 4 }]);
+  });
+
+  it('does not report one that was already lit', () => {
+    const board = boardFrom('n R R R R .');
+
+    expect(clearStep(board, 0)?.neuronsLit).toEqual([]);
   });
 });

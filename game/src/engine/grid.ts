@@ -130,6 +130,64 @@ export function shadowHolding(pieceType: number): number {
 }
 
 /**
+ * A neuron: the goal, sitting in a cell.
+ *
+ * `game-pieces-1.jpg` specifies it exactly — "Neurons unlock memories & appear
+ * after a certain # of box clears. Activated by popping an adjacent block." It
+ * is a place on the board you have to REACH, which is the thing every previous
+ * version of the progression replaced with a counter. A meter can be filling
+ * toward anything; a node in a cell is somewhere you can see, plan a route to,
+ * and reach two of at once with a chain.
+ *
+ * Encoded past the shadow values, for the same reason the shadow is encoded
+ * past the colours: every board cell stays one `number | null`. Two values, lit
+ * and unlit, because lighting one is the entire mechanic and the board is the
+ * only place that state could honestly live — a neuron's cell IS whether it has
+ * been reached.
+ *
+ * A lit neuron stays on the board rather than vanishing. It is a terminal in
+ * the figure being drawn, and the figure is what the memory pays out; removing
+ * it would erase the thing the run just made.
+ */
+export const NEURON = SHADOW + SHADOW_VALUES;
+
+const NEURON_VALUES = 2;
+
+/** The cell value for a neuron, lit or not. */
+export function neuronCell(lit: boolean): number {
+  return lit ? NEURON + 1 : NEURON;
+}
+
+export function isNeuron(pieceType: number | null): pieceType is number {
+  return pieceType !== null
+    && pieceType >= NEURON
+    && pieceType < NEURON + NEURON_VALUES;
+}
+
+/** Whether this neuron has been reached. Meaningless unless `isNeuron`. */
+export function isNeuronLit(pieceType: number): boolean {
+  return pieceType === NEURON + 1;
+}
+
+/**
+ * Whether a cell is fixed in place: it does not fall, and nothing falls past
+ * it.
+ *
+ * A predicate rather than `isNeuron` written at each site, and the reason is
+ * the one `isColour` already gives about colourless occupants. ART-DIRECTION's
+ * Stage 4 names Blockers, which are anchored for the same reason a neuron is,
+ * and `settle` should be asking "does this move" rather than naming today's
+ * only answer.
+ *
+ * Dr. Mario is the precedent and the argument: its viruses do not fall, and
+ * that is exactly what makes a bottle a designed puzzle rather than a stack.
+ * Geometry that rearranges itself under you cannot be planned around.
+ */
+export function isAnchored(pieceType: number | null): boolean {
+  return isNeuron(pieceType);
+}
+
+/**
  * Whether a cell holds one of the playable colours, as opposed to nothing or
  * one of the occupants that has no colour.
  *

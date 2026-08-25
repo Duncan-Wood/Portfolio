@@ -82,6 +82,25 @@ export const TRACK_LIT_COLOR = 0xc98cff;
 export const EMPTY_COLOR = 0x241038;
 
 /**
+ * A neuron, dark and lit.
+ *
+ * Dark was the track colour the board's dormant wiring is printed in, on the
+ * theory that an unreached neuron IS a part of the network with nothing running
+ * through it. That theory produced a cell nobody could see: it matched the
+ * substrate so closely that tiles resting on one looked like they were floating
+ * and the board read as broken. An unlit neuron has to be quieter than a tile
+ * and louder than a hole, and this is well up from where it started.
+ *
+ * Lit is the same violet the brain's earned nodes use, and deliberately not a
+ * new colour. The neuron on the board and the node on the panel are the same
+ * thing at two scales: reaching one here lights one there, and a player should
+ * be able to see that without being told.
+ */
+export const NEURON_COLOR = 0x6d4f96;
+
+export const NEURON_LIT_COLOR = TRACK_LIT_COLOR;
+
+/**
  * A cell the shadow holds — the pit it is crouching in. Darker than an empty
  * one on purpose: an empty cell is room to work in, and this is the absence of
  * room.

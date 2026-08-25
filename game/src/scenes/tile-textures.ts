@@ -1,7 +1,9 @@
 import { Math as PhaserMath } from 'phaser';
-import { MAX_SHADOW_STRENGTH, PIECE_TYPE_COUNT } from '../engine/grid';
+import { MAX_SHADOW_STRENGTH, PIECE_TYPE_COUNT, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   EMPTY_COLOR,
+  NEURON_LIT_COLOR,
+  NEURON_COLOR,
   PIECE_COLORS,
   PIECE_SHAPES,
   SHADOW_BODY_COLOR,
@@ -103,9 +105,105 @@ function tileCornerRadius(size: number): number {
   return Math.round(size * 0.18);
 }
 
+const NEURON_TEXTURE = 'neuron';
+const NEURON_LIT_TEXTURE = 'neuron-lit';
+
 /** The texture key for a piece type. Bake before any of these are used. */
 export function tileTexture(pieceType: number | null): string {
-  return pieceType === null ? EMPTY_TILE_TEXTURE : `tile-${pieceType}`;
+  if (pieceType === null) {
+    return EMPTY_TILE_TEXTURE;
+  }
+  // Asked here rather than at the call site, so the scene keeps painting a
+  // board by mapping each cell to one key and nothing has to learn that a
+  // neuron is a different KIND of occupant.
+  if (isNeuron(pieceType)) {
+    return isNeuronLit(pieceType) ? NEURON_LIT_TEXTURE : NEURON_TEXTURE;
+  }
+  return `tile-${pieceType}`;
+}
+
+/**
+ * A neuron: a socket set into the board, with a terminal at the centre of it.
+ *
+ * The FIRST version of this was invisible, and the way it failed is worth
+ * keeping. It was drawn from the same two primitives the empty cell is drawn
+ * from — a cross of dormant runs and a drilled via — in a slightly lighter
+ * violet. On paper that made it part of the vocabulary. On the board it made it
+ * indistinguishable from a hole, so tiles resting on one looked like tiles
+ * floating in mid-air and the whole board read as a settling bug.
+ *
+ * What separates every OCCUPIED cell in this game from an empty one is an EDGE:
+ * a tile has its leading stroked around it, a possessed cell has the dark rim of
+ * its pit. An empty cell has no edge at all. A neuron is occupied — things rest
+ * on it, nothing falls past it — so it gets an edge, and that single change is
+ * what makes the board legible.
+ *
+ * Unlit it is a dark socket with a dull violet bezel: findable, obviously a
+ * fixture, and still quiet enough that the tiles win the eye. Lit it is the same
+ * socket with the bezel and the terminal burning in the game's own violet. It
+ * does not become a different object when you reach it; it turns on.
+ */
+function bakeNeuron(graphics: Phaser.GameObjects.Graphics, size: number, lit: boolean): void {
+  const middle = size / 2;
+  const inset = TILE_INSET;
+  const span = size - inset * 2;
+  const corner = tileCornerRadius(size);
+  const ink = lit ? NEURON_LIT_COLOR : NEURON_COLOR;
+  const run = Math.max(3, Math.round(size * 0.055));
+
+  graphics.clear();
+
+  // The socket, sunk below the substrate so the bezel has something to sit
+  // against. Deliberately NOT as dark as the shadow's pit: that darkness means
+  // "no room here", and a neuron is the opposite — it is the thing you want.
+  graphics.fillStyle(mix(EMPTY_COLOR, 0x000000, 0.45), 1);
+  graphics.fillRoundedRect(inset, inset, span, span, corner);
+
+  if (lit) {
+    for (const [radius, alpha] of [[0.42, 0.2], [0.26, 0.18]] as const) {
+      graphics.fillStyle(SHADOW_EYE_GLOW, alpha);
+      graphics.fillCircle(middle, middle, size * radius);
+    }
+  }
+
+  // Dendrites: four stubs reaching OUT to the edges, so a neuron is visibly
+  // wired into the board rather than an icon dropped on top of one. Stubs
+  // rather than a full cross — a full cross is what the empty cell prints, and
+  // borrowing it back is how this went invisible the first time.
+  graphics.fillStyle(ink, lit ? 1 : 0.85);
+  for (const [x, y, w, h] of [
+    [middle - run / 2, 0, run, size * 0.3],
+    [middle - run / 2, size * 0.7, run, size * 0.3],
+    [0, middle - run / 2, size * 0.3, run],
+    [size * 0.7, middle - run / 2, size * 0.3, run],
+  ] as const) {
+    graphics.fillRect(x, y, w, h);
+  }
+
+  // The terminal: the circle-and-dot the memory maps put at the end of every
+  // thread — but only a LIT one has the dot.
+  //
+  // That is the whole lit/unlit read, and it is binary on purpose. Both states
+  // started out as the same figure at two brightnesses, which meant telling
+  // them apart was a judgement about violet — hopeless at a glance, and a
+  // glance is all a player gets while deciding where the next piece goes. An
+  // empty socket and a socket with a light in it need no comparison.
+  const ring = size * 0.2;
+  graphics.lineStyle(run * 1.3, ink, 1);
+  graphics.strokeCircle(middle, middle, ring);
+
+  if (lit) {
+    graphics.fillStyle(SHADOW_EYE_GLOW, 0.5);
+    graphics.fillCircle(middle, middle, size * 0.14);
+    graphics.fillStyle(SHADOW_EYE_COLOR, 1);
+    graphics.fillCircle(middle, middle, size * 0.09);
+  }
+
+  // The edge. The whole reason this reads as a cell with something in it.
+  graphics.lineStyle(3, ink, lit ? 1 : 0.9);
+  graphics.strokeRoundedRect(inset, inset, span, span, corner);
+
+  graphics.generateTexture(lit ? NEURON_LIT_TEXTURE : NEURON_TEXTURE, size, size);
 }
 
 /**
@@ -261,6 +359,9 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   // The empty cell gets a texture too, so every cell on the board is one image
   // whose only per-frame change is which key it points at.
   bakeEmpty(graphics, size);
+
+  bakeNeuron(graphics, size, false);
+  bakeNeuron(graphics, size, true);
 
   // One overlay per shadow strength. The creature is the same at every tier —
   // what grows is its crown and the light on it, because the crown is already
