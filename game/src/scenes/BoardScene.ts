@@ -85,7 +85,6 @@ const GAP = 4;
  * often enough to be worth throttling — it also stops the readout flickering.
  */
 /** How often the hum is re-levelled. Per frame is pointless; it moves slowly. */
-const AMBIENT_REFRESH_INTERVAL = 200;
 
 const FPS_REFRESH_INTERVAL = 250;
 
@@ -424,7 +423,6 @@ export class BoardScene extends Scene {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
   private showFps = false;
-  private nextAmbientRefresh = 0;
   private objectiveText: Phaser.GameObjects.Text;
 
   /** Which lock this board is posing, and whether it has been solved yet. */
@@ -1215,7 +1213,6 @@ export class BoardScene extends Scene {
       this.refreshAnswerLine(time);
       this.refreshGameOver();
       this.refreshFps(time);
-      this.refreshAmbient(time);
       return;
     }
 
@@ -1289,7 +1286,6 @@ export class BoardScene extends Scene {
     this.refreshStatic();
     this.refreshGameOver();
     this.refreshFps(time);
-    this.refreshAmbient(time);
   }
 
   /**
@@ -3140,41 +3136,6 @@ export class BoardScene extends Scene {
       reaching: MEMORIES[at.memoryIndex].nodes[at.nodeIndex].title,
       connectionsShort: Math.max(1, needed),
     };
-  }
-
-  /**
-   * Level the hum against how full the board is.
-   *
-   * On a timer rather than per frame because it moves slowly and
-   * `setTargetAtTime` glides between values anyway — re-levelling 120 times a
-   * second would schedule 120 automation events for a number that changes
-   * once a placement.
-   */
-  private refreshAmbient(time: number): void {
-    if (time < this.nextAmbientRefresh) {
-      return;
-    }
-    this.nextAmbientRefresh = time + AMBIENT_REFRESH_INTERVAL;
-
-    // The run is over, or held. The hum goes with the colour, not after it.
-    if (this.simulation.toppedOut || this.paused) {
-      this.soundBoard.setAmbient(0);
-      return;
-    }
-
-    let highest = ROWS;
-    for (let row = FIRST_VISIBLE_ROW; row < ROWS && highest === ROWS; row += 1) {
-      for (let column = 0; column < COLUMNS; column += 1) {
-        if (!this.simulation.board.isEmpty(column, row)) {
-          highest = row;
-          break;
-        }
-      }
-    }
-
-    // Never silent while a run is live — an empty board still has current in it.
-    const filled = (ROWS - highest) / VISIBLE_ROWS;
-    this.soundBoard.setAmbient(0.3 + filled * 0.7);
   }
 
   private refreshFps(time: number): void {

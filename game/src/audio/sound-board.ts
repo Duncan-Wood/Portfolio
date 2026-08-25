@@ -84,56 +84,5 @@ export class SoundBoard {
     }
   }
 
-  /** The ceiling on the hum. It plays for the whole run, so it stays under everything. */
-  private static readonly AMBIENT_CEILING = 0.045;
-
-  private ambient: GainNode | null = null;
-
-  /**
-   * A low mains hum under the whole run, rising as the stack does.
-   *
-   * Two jobs at once. It gives the board a floor to sit on, which is what makes
-   * a synthesised game sound like hardware rather than like a series of beeps —
-   * before this there was no continuous sound in the game at all, just ten
-   * one-shot oscillators and silence between them. And because it tracks how
-   * full the board is, it is also the danger cue the game never had: you hear a
-   * run going wrong before you have read it.
-   *
-   * `setTargetAtTime` rather than a ramp, because this is called every frame
-   * and scheduled ramps would pile up on the same parameter.
-   */
-  setAmbient(level: number): void {
-    const context = this.context;
-    if (context === null || context.state !== 'running') {
-      return;
-    }
-
-    if (this.ambient === null) {
-      const gain = context.createGain();
-      gain.gain.setValueAtTime(0, context.currentTime);
-
-      // Rolled off hard: what is wanted is the body of the note, not its edge.
-      const filter = context.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(240, context.currentTime);
-
-      // Two, slightly out of tune with each other, so they beat against each
-      // other slowly. One oscillator is a test tone; two is a room.
-      for (const hertz of [55, 110.7]) {
-        const oscillator = context.createOscillator();
-        oscillator.type = hertz < 100 ? 'sine' : 'sawtooth';
-        oscillator.frequency.setValueAtTime(hertz, context.currentTime);
-        oscillator.connect(gain);
-        oscillator.start();
-      }
-
-      gain.connect(filter);
-      filter.connect(context.destination);
-      this.ambient = gain;
-    }
-
-    const target = Math.max(0, Math.min(1, level)) * SoundBoard.AMBIENT_CEILING;
-    this.ambient.gain.setTargetAtTime(target, context.currentTime, 0.4);
-  }
 
 }
