@@ -4,10 +4,11 @@ import {
   FIRST_VISIBLE_ROW,
   PIECE_TYPE_COUNT,
   ROWS,
-  isNeuronLit,
   VISIBLE_ROWS,
   isColour,
+  isNeuronLit,
   isShadow,
+  neuronCell,
   shadowHolding,
   shadowStrength,
 } from '../engine/grid';
@@ -561,6 +562,12 @@ export class BoardScene extends Scene {
    * flatten the landing bounce, which is a tween on those same tiles.
    */
   private animatedShadowCells = new Set<number>();
+
+  /**
+   * Visible cells currently breathing because they hold an unlit neuron, so
+   * the pulse can be taken off again when one is lit or falls out of view.
+   */
+  private pulsingCells = new Set<number>();
 
   private shadowArrival: { cellIndex: number; age: number } | null = null;
 
@@ -1648,6 +1655,22 @@ export class BoardScene extends Scene {
           this.animateShadow(index, column, row, shadowStrength(pieceType as number));
         } else if (this.animatedShadowCells.delete(index)) {
           this.restoreCell(index);
+        }
+
+        // An unlit neuron breathes. It is the objective, and it was the
+        // quietest thing on the board — a muted violet socket on a violet
+        // ground, read as background while the coloured tiles shouted. Motion
+        // is what the eye actually catches, and a neuron waiting to be
+        // connected is the one thing here that should look like it is waiting.
+        const waiting = pieceType === neuronCell(false);
+        if (waiting) {
+          this.pulsingCells.add(index);
+          const beat = Math.sin(this.shadowClock / 430 + column * 1.3 + row * 0.7);
+          this.cellTiles[index]
+            .setScale(1 + beat * 0.045)
+            .setAlpha(0.88 + beat * 0.12);
+        } else if (this.pulsingCells.delete(index) && !possessed) {
+          this.cellTiles[index].setScale(1).setAlpha(1);
         }
       }
     }
