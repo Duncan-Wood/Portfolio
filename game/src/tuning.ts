@@ -30,17 +30,16 @@ export interface Tuning {
    * dithering is. Every clear resets it, which makes the counter-play the same
    * verb the whole game is about.
    *
-   * 6 seconds was played and it was right — for a game with gravity in it,
-   * where six seconds was several pieces and hesitating was a choice. With
-   * gravity cut it is not: six seconds is now most of a single thinking turn,
-   * so the shadow arrived while the player was doing exactly what the game
-   * asks them to do. A prototype lock seeded with three shadows had six on it
-   * before it could be solved.
+   * 6 seconds, played rather than reasoned about. It shipped at a guessed 12,
+   * and at 12 the shadow was something you noticed afterwards rather than
+   * something you played around; 20 was dead air. This is the dial that decides
+   * whether the game is tense or nagging, so it is the one most worth replaying
+   * whenever the rest of the pacing moves.
    *
-   * 12 seconds is a STARTING POINT, not a played value, and it is the dial
-   * most in need of an ear now that the rest of the pacing has moved. It was
-   * guessed at 12 once before and judged too slow; that was against gravity,
-   * and this is not the same game.
+   * It went to 12 while gravity was cut, because six seconds with no clock is
+   * most of a single thinking turn and the shadow arrived while the player was
+   * doing exactly what the game asked. Gravity is back, so this is back with
+   * it.
    */
   shadowInterval: number;
 
@@ -117,20 +116,29 @@ export interface Tuning {
   /**
    * Whether a piece descends on its own.
    *
-   * OFF. The game is an escape room made of boards — each one a stated
-   * objective you solve rather than a stack you survive — and a piece that
-   * falls while you are reading the board is a clock. A clock is exactly what
-   * stops a puzzle being thinkable, and thinking is the whole point: the
-   * satisfaction wanted here is working something out, not reacting fast.
+   * ON, and this flip-flopped once — record it here so it does not flip again
+   * without somebody knowing it was tried.
    *
-   * Cutting it does NOT cut the pressure. Hesitation still feeds the shadow
-   * every `shadowInterval`, so there is a cost to dithering — it is just one
-   * you can think your way through instead of one that runs you over. It also
-   * makes the shadow the only antagonist in the game, which is what it should
-   * always have been.
+   * The argument for cutting it was good on paper: the game is an escape room
+   * made of boards, each a stated objective you solve rather than a stack you
+   * survive, and a piece falling while you read the board is a clock. Clocks
+   * stop puzzles being thinkable. So it was cut.
    *
-   * Soft drop still works, so placing a piece you have already decided on is
-   * quick. Nothing commits a piece but the player.
+   * Played, it was worse. Without gravity nothing ever says "now" — the board
+   * sits still, there is no forcing function, and "confusing on what to do
+   * next" is what a player actually reports. The falling pace was not
+   * incidental either; it was TUNED. 800ms a row read as sluggish and 400 was
+   * the fix, against DAS and ARR values that were already authentic Puyo. That
+   * is real feel work and cutting gravity threw all of it away for an argument.
+   *
+   * What the cut was really pointing at was legibility, not physics: with no
+   * clock the player is looking rather than busy, and the board was not showing
+   * them their options. The landing ghost is the fix for that, and it earns its
+   * place with gravity on.
+   *
+   * Kept as a dial rather than deleted, because the no-gravity mode is a
+   * coherent thing this engine can still do and `simulation.test.ts` has a
+   * block pinning its rules.
    */
   gravityEnabled: boolean;
 
@@ -227,13 +235,13 @@ export interface Tuning {
  * DAS/ARR were never swept.
  */
 export const DEFAULT_TUNING: Tuning = {
-  shadowInterval: 12000,
+  shadowInterval: 6000,
   arrivalsPerShadowStrength: 4,
   fragmentDuration: 1400,
   questionDuration: 3000,
   readingPerCharacter: 48,
   progressPads: 6,
-  gravityEnabled: false,
+  gravityEnabled: true,
   fallInterval: 400,
   softDropInterval: 50,
   lockDelay: 500,
