@@ -145,6 +145,16 @@ const SHADOW_ARRIVAL_DURATION = 340;
  * hitting Space to hard-drop — so an instant skip would let the reward for a
  * whole minute of play be thrown away by a reflex.
  */
+/**
+ * The box a memory's photograph is fitted into.
+ *
+ * Narrower than the board so the tiles either side of it stay visible: a
+ * fragment DIMS the run it interrupts rather than replacing it, and that only
+ * holds if the board is still there behind the picture.
+ */
+const PHOTO_MAX_WIDTH = 330;
+const PHOTO_MAX_HEIGHT = 250;
+
 const REVEAL_SKIP_GRACE = 420;
 
 /**
@@ -343,6 +353,11 @@ function isVisibleRow(row: number): boolean {
  * Where a board cell sits in `cellRectangles`, which is indexed from
  * `FIRST_VISIBLE_ROW` because the hidden row gets no rectangle.
  */
+/** The texture key for a memory's photograph. */
+function photoKey(photo: string): string {
+  return `memory-photo-${photo}`;
+}
+
 function visibleCellIndex(column: number, row: number): number {
   return (row - FIRST_VISIBLE_ROW) * COLUMNS + column;
 }
@@ -569,6 +584,11 @@ export class BoardScene extends Scene {
    */
   private pulsingCells = new Set<number>();
 
+  /** Photo keys the loader could not find, so nothing tries to draw them. */
+  private missingPhotos = new Set<string>();
+
+  private revealPhoto: Phaser.GameObjects.Image;
+
   private shadowArrival: { cellIndex: number; age: number } | null = null;
 
   /**
@@ -780,6 +800,34 @@ export class BoardScene extends Scene {
    * allocation-free: `drawPair` builds a fresh cells array each frame. It is
    * tiny and short-lived.
    */
+  /**
+   * Load the photographs, if any are there.
+   *
+   * A missing file is deliberately not an error. The four fragments each name a
+   * photo, and they will arrive one at a time as Duncan picks them — a run must
+   * play perfectly with none of them present, showing the words alone, or the
+   * game would be broken for every state except the finished one.
+   *
+   * Paths are relative, so they resolve against the page at `/game/` and land
+   * on `public/memories/`, which Vite serves verbatim.
+   */
+  preload(): void {
+    this.load.on('loaderror', (file: { key: string }) => {
+      // Swallowed on purpose. `showReveal` asks the texture manager whether the
+      // image actually exists before drawing it, so a fragment whose photo has
+      // not been chosen yet simply has none.
+      this.missingPhotos.add(file.key);
+    });
+
+    for (const memory of MEMORIES) {
+      for (const node of memory.nodes) {
+        if (node.photo !== undefined) {
+          this.load.image(photoKey(node.photo), `memories/${node.photo}.jpg`);
+        }
+      }
+    }
+  }
+
   create(): void {
     // A COPY of the defaults, so mutating this scene's tuning at runtime cannot
     // corrupt the shared defaults that the engine tests rely on.
@@ -1069,6 +1117,11 @@ export class BoardScene extends Scene {
       BOARD_HEIGHT + TRACK_MARGIN * 2,
       GROUND_COLOR,
     ).setVisible(false);
+
+    // The photograph, above its own words. Created before them so the title
+    // and body always draw over it rather than under.
+    this.revealPhoto = this.add.image(ORIGIN_X + BOARD_WIDTH / 2, 0, TRACE_TEXTURE)
+      .setVisible(false);
 
     this.revealTitle = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 - 70, '', {
       fontFamily: 'monospace',
@@ -2372,7 +2425,12 @@ export class BoardScene extends Scene {
     // escalating schedule, can be a minute later.
     this.redrawMemoryPanel(0);
 
-    this.showReveal(node.title, node.body, this.holdFor(node.body, this.tuning.fragmentDuration));
+    this.showReveal(
+      node.title,
+      node.body,
+      this.holdFor(node.body, this.tuning.fragmentDuration),
+      node.photo,
+    );
   }
 
   /**
@@ -2577,17 +2635,46 @@ export class BoardScene extends Scene {
   }
 
   /** Hold the board and put a line over it. */
-  private showReveal(title: string, body: string, duration: number): void {
+  /**
+   * Fit the photograph above the words, if there is one.
+   *
+   * Scaled DOWN only. An image smaller than the box is left alone rather than
+   * blown up, because a stretched photograph of somebody's life looks like a
+   * mistake, and the whole reason a photo is here is that it is the one thing
+   * in this game that is real.
+   */
+  private showRevealPhoto(photo?: string): void {
+    const key = photo === undefined ? null : photoKey(photo);
+    if (key === null || this.missingPhotos.has(key) || !this.textures.exists(key)) {
+      this.revealPhoto.setVisible(false);
+      return;
+    }
+
+    const image = this.revealPhoto.setTexture(key);
+    const fit = Math.min(
+      PHOTO_MAX_WIDTH / image.width,
+      PHOTO_MAX_HEIGHT / image.height,
+      1,
+    );
+
+    image
+      .setScale(fit)
+      .setPosition(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 - 90 - (image.height * fit) / 2)
+      .setVisible(true);
+  }
+
+  private showReveal(title: string, body: string, duration: number, photo?: string): void {
     this.revealRemaining = duration;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
     this.revealHint.setText(SKIP_PROMPT).setVisible(false);
+    this.showRevealPhoto(photo);
     this.revealTitle.setText(title);
     // An empty title is hidden rather than drawn blank, so the body keeps its
     // own spacing instead of sitting under a gap where a heading would be.
     this.revealTitle.setVisible(title !== '');
     this.revealBody.setText(body);
 
-    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody]);
+    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody, this.revealPhoto]);
     this.revealScrim.setVisible(true).setAlpha(0);
     this.tweens.add({ targets: this.revealScrim, alpha: 0.9, duration: 240 });
 
@@ -2601,7 +2688,8 @@ export class BoardScene extends Scene {
   }
 
   private hideReveal(): void {
-    const parts = [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint];
+    const parts = [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
+      this.revealPhoto];
     this.tweens.killTweensOf(parts);
     this.tweens.add({
       targets: parts,

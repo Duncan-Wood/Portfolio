@@ -38,6 +38,21 @@ export interface MemoryNode {
   /** Two or three words. It is a label on a node, not a heading. */
   title: string;
   body: string;
+  /**
+   * A real photograph of this, in `public/memories/`, without its extension.
+   *
+   * The deliberate split: the game is DRAWN and the memories are REAL.
+   * Everything the player handles — tiles, neurons, the shadow, the brain — is
+   * a baked vector with no asset file behind it. A photograph is the one thing
+   * here that was not invented, which is exactly why it is the payoff: it stops
+   * the memory being a claim and makes it evidence. Two visual languages, on
+   * purpose.
+   *
+   * Optional, and a missing file is not an error — a fragment without one shows
+   * its words alone. That is what lets them arrive one at a time instead of all
+   * four or none.
+   */
+  photo?: string;
 }
 
 export interface Memory {
@@ -76,21 +91,25 @@ export const MEMORIES: Memory[] = [
     nodes: [
       {
         title: 'The Build',
+        photo: 'the-build',
         body:
           'When I was 14 I was fortunate enough to have the opportunity to build a gaming PC.',
       },
       {
         title: 'Bell Work',
+        photo: 'bell-work',
         body:
           'I got frustrated in a tech class because I couldn\'t figure out '
           + 'the Sudoku bell work fast enough.',
       },
       {
         title: 'The Hat',
+        photo: 'the-hat',
         body: 'I auditioned to be a sheriff in a play and wore a cowboy hat.',
       },
       {
         title: 'My Voice',
+        photo: 'my-voice',
         body:
           'I found my voice in performing in Theatre and Speech competitions and '
           + 'discovered how important meaningful connections are. '
