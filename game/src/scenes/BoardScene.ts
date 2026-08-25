@@ -421,6 +421,7 @@ function randomPieceTypes(): [number, number] {
 export class BoardScene extends Scene {
   private simulation: Simulation;
   private cellTiles: Phaser.GameObjects.Image[];
+  private ghostTiles: Phaser.GameObjects.Image[];
   private pairTiles: Phaser.GameObjects.Image[];
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
@@ -891,6 +892,12 @@ export class BoardScene extends Scene {
     this.neuronThread.enableFilters();
     this.neuronThread.filters?.internal.addGlow(TRACK_LIT_COLOR, 2.5, 0, 1, false, 4, 8);
 
+    // Where the piece will come to rest, drawn under the piece itself.
+    this.ghostTiles = [
+      this.add.image(0, 0, tileTexture(null)).setVisible(false),
+      this.add.image(0, 0, tileTexture(null)).setVisible(false),
+    ];
+
     this.pairTiles = [
       this.add.image(0, 0, tileTexture(null)),
       this.add.image(0, 0, tileTexture(null)),
@@ -1259,6 +1266,7 @@ export class BoardScene extends Scene {
       // looked at; nothing here consumes `delta`, so no time is banked.
       this.drawBoard();
       this.drawConnections(0);
+      this.drawGhost();
       this.drawPair();
       this.drawPreview();
       this.refreshChain();
@@ -1333,6 +1341,7 @@ export class BoardScene extends Scene {
     this.surfaceBankedFragment();
     this.drawProgress();
     this.advanceTrackPulses(delta);
+    this.drawGhost();
     this.drawPair();
     this.drawPreview();
     this.refreshChain();
@@ -3164,6 +3173,75 @@ export class BoardScene extends Scene {
    * independently of the cell layout — and later will need to move smoothly
    * between cells, which fixed-position grid cells cannot do.
    */
+  /**
+   * Where the piece will land, drawn faintly under it.
+   *
+   * This was ruled out once, on the grounds that Puyo omits a ghost
+   * deliberately and reading the stack is the skill. That reasoning was for a
+   * real-time game and it did not survive cutting gravity: with no clock the
+   * player is not busy, they are LOOKING, and a board that will not say where a
+   * piece goes is just withholding. "Confusing on what to do next" is the
+   * symptom of a puzzle that hides its own options.
+   *
+   * The resting cells are worked out the way `lock` does it — both halves
+   * settle independently, so a horizontal pair lands in two columns at two
+   * different depths, and a vertical one stacks in the same column.
+   * `landingRow` scans from the TOP down, because neurons are anchors and break
+   * the no-gaps invariant that would otherwise let it scan up from the floor.
+   */
+  private drawGhost(): void {
+    const hide = () => {
+      for (const tile of this.ghostTiles) {
+        tile.setVisible(false);
+      }
+    };
+
+    if (this.simulation.resolving || this.simulation.toppedOut
+      || this.paused || this.storyHolding) {
+      hide();
+      return;
+    }
+
+    const [pivot, satellite] = this.simulation.pair.cells();
+    const vertical = pivot.column === satellite.column;
+    const resting: { cell: typeof pivot; row: number }[] = [];
+
+    if (vertical) {
+      const landing = this.simulation.board.landingRow(pivot.column);
+      if (landing < 0) {
+        hide();
+        return;
+      }
+      // Lower half first: whichever of the two is further down the screen.
+      const lower = pivot.row > satellite.row ? pivot : satellite;
+      const upper = lower === pivot ? satellite : pivot;
+      resting.push({ cell: lower, row: landing }, { cell: upper, row: landing - 1 });
+    } else {
+      for (const cell of [pivot, satellite]) {
+        resting.push({ cell, row: this.simulation.board.landingRow(cell.column) });
+      }
+    }
+
+    for (let index = 0; index < this.ghostTiles.length; index += 1) {
+      const at = resting[index];
+      const tile = this.ghostTiles[index];
+
+      // A half whose rest is off the top has nowhere to be previewed, and the
+      // hidden row is not drawn at all.
+      if (at === undefined || at.row < FIRST_VISIBLE_ROW) {
+        tile.setVisible(false);
+        continue;
+      }
+
+      tile
+        .setVisible(true)
+        .setTexture(tileTexture(at.cell.pieceType))
+        .setPosition(centerOfColumn(at.cell.column), centerOfRow(at.row))
+        .setScale(0.86)
+        .setAlpha(0.3);
+    }
+  }
+
   private drawPair(): void {
     // In both of these states `pair` still points at the pair whose tiles are
     // already part of the board, so drawing it paints a ghost duplicate — and
