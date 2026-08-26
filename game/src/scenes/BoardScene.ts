@@ -40,8 +40,12 @@ import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { MEMORIES } from '../memories';
 import {
   CONNECTION_LOST,
+  REACH_OUT_LINE,
   SHADOW_CLOSING_LINE,
+  SHADOW_OPENING_LINE,
+  STILL_CONNECTED,
   closingLine,
+  recoveredLine,
   shadowLine,
   type UnfinishedBusiness,
 } from '../shadow-voice';
@@ -455,8 +459,10 @@ export class BoardScene extends Scene {
    * last piece landed would never tell the player what happened — they would
    * see a fresh board and assume the game had glitched.
    */
-  private lockFailingIn = 0;
+  private lockEndingIn = 0;
 
+  /**
+   * Whether the board on screen is being lost, as opposed to merely over.
   /** What the piece counter last showed, so the text is only rewritten on a change. */
   private shownPiecesRemaining = -1;
 
@@ -496,6 +502,15 @@ export class BoardScene extends Scene {
   private gameOverLine: Phaser.GameObjects.Text;
 
   private gameOverHint: Phaser.GameObjects.Text;
+
+  /**
+   * The way to reach a person, offered only when a memory has been finished.
+   *
+   * A real link rather than a line of text: the whole premise is a portfolio
+   * you play, and the one moment somebody has spent a few minutes inside
+   * somebody else's life is the moment worth offering it in.
+   */
+  private contactOffer: Phaser.GameObjects.Text;
   private previewTiles: Phaser.GameObjects.Image[];
 
   private piecesText: Phaser.GameObjects.Text;
@@ -621,9 +636,25 @@ export class BoardScene extends Scene {
   /**
    * How this run ended, or `null` while it is still going.
    *
-   * Redrawn only when the count changes — which is a handful of times per run —
-   * so this is a `Graphics` rather than another pool of images.
+   * One field rather than three booleans in three places. `toppedOut` lives on
+   * the simulation, `boardLost` was added when running out of pieces became the
+   * loss, and winning needed a third — and every consumer that knew about one
+   * of them silently ignored the others.
    */
+  private runOver: 'topped-out' | 'out-of-pieces' | 'won' | null = null;
+
+  /**
+   * The readouts that only mean something while a run is going.
+   *
+   * NEXT and PIECES answer "what do I have left to work with", which a finished
+   * run does not have. The memory panel deliberately is NOT in here: it is the
+   * thing that was just filled in, and it should stay up to be looked at.
+   */
+  private runReadouts: Phaser.GameObjects.Text[] = [];
+
+  /** Whether the run's opening line is still up, so the objective can follow it. */
+  private openingHolding = false;
+
   /** The board's edge. Drawn once in `create`; it never changes. */
   private boardFrame: Phaser.GameObjects.Graphics;
 
@@ -978,21 +1009,21 @@ export class BoardScene extends Scene {
       );
     }
 
-    this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y - 46, 'NEXT', {
+    this.runReadouts.push(this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y - 46, 'NEXT', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#8ea3b0',
-    }).setOrigin(0.5, 0.5);
+    }).setOrigin(0.5, 0.5));
 
     // What the board has left to spend, in the gap between the preview and the
     // memory panel. It sat ABOVE the preview first, which put the label at
     // y = -16 — off the top of the canvas entirely, with the number stranded in
     // the corner beside the FPS readout looking like part of the debug overlay.
-    this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 88, 'PIECES', {
+    this.runReadouts.push(this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 88, 'PIECES', {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: '#7a5f96',
-    }).setOrigin(0.5, 0.5);
+    }).setOrigin(0.5, 0.5));
 
     this.piecesText = this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 112, '', {
       fontFamily: 'monospace',
@@ -1148,6 +1179,29 @@ export class BoardScene extends Scene {
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
+    // Under the restart prompt, and only ever up on a win. Interactive, so it
+    // is a way out of the game rather than an instruction to go and find one:
+    // `/#contact` is the portfolio's own contact section, which is where the
+    // mail address and the links already live.
+    this.contactOffer = this.add.text(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      CANVAS_HEIGHT / 2 + 112,
+      REACH_OUT_LINE,
+      {
+        fontFamily: 'monospace',
+        fontSize: '15px',
+        color: '#c98cff',
+        backgroundColor: '#2b1644',
+        padding: { x: 12, y: 6 },
+      },
+    )
+      .setOrigin(0.5, 0.5)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerup', () => {
+        window.location.href = '/#contact';
+      });
+
     // Over the board and the traces, under the words — the ending should be
     // read through the interference, not behind it.
     this.staticOverlay = this.add.tileSprite(
@@ -1266,7 +1320,8 @@ export class BoardScene extends Scene {
     // anyway, and polling on would keep writing `softDropping` to a pair that
     // is already part of the board. Nothing to read while paused either — but
     // the two keys above are still polled, or there would be no way out.
-    if (!this.paused && !this.simulation.toppedOut && !this.storyHolding) {
+    if (!this.paused && !this.simulation.toppedOut && !this.storyHolding
+      && this.runOver !== 'won') {
       this.readInput(delta);
     }
 
@@ -1317,6 +1372,9 @@ export class BoardScene extends Scene {
       // and throwing them away would bank the frozen milliseconds and pay them
       // out in a burst the moment the freeze ended.
       this.hitStopRemaining -= delta;
+    } else if (this.runOver === 'won') {
+      // Held for good. A won run keeps its board on screen exactly as a lost
+      // one does, and R is the only way on.
     } else {
       for (let step = this.timestep.stepsFor(delta); step > 0; step -= 1) {
         this.simulation.update(FIXED_STEP);
@@ -1337,6 +1395,7 @@ export class BoardScene extends Scene {
       }
     }
 
+    this.finishOpening();
     this.playShadowArrival();
     this.playCascadeBeat();
     this.playSounds();
@@ -1494,9 +1553,16 @@ export class BoardScene extends Scene {
     // Undo the losing sequence. It dims the panel, fades two texts in and
     // tweens every lit trace to nothing, and R can land in the middle of all
     // three — a new run must not open holding the last one's ending.
+    //
+    // `runOver` first, because it is what lets the ending's delayed callbacks
+    // know they have been overtaken. Left set, a re-seeded board would still be
+    // treated as ended and print the last board's ending over the new one.
+    this.runOver = null;
     this.tweens.killTweensOf([
-      this.gameOverText, this.gameOverLine, this.gameOverHint, this.memoryPanel,
+      this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
+      this.memoryPanel,
     ]);
+    this.contactOffer.setVisible(false);
     this.gameOverText.setVisible(false);
     this.gameOverLine.setVisible(false);
     this.gameOverHint.setVisible(false);
@@ -1523,6 +1589,15 @@ export class BoardScene extends Scene {
       part.setVisible(false).setAlpha(1);
     }
     this.revealSkippableIn = 0;
+    this.openingHolding = false;
+    // Put back whatever the winning sequence faded out, or a run started from
+    // one opens with no preview, no piece count and no objective.
+    this.tweens.killTweensOf([
+      this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
+    ]);
+    for (const part of [this.piecesText, ...this.runReadouts, ...this.previewTiles]) {
+      part.setAlpha(1);
+    }
     this.awaitingAnswer = false;
     this.answerText = '';
     if (!keepMemory) {
@@ -1570,6 +1645,60 @@ export class BoardScene extends Scene {
     // Drawn here as well as on every change: the panel is otherwise blank until
     // the first pad lights, which is exactly when it has the most to say.
     this.redrawMemoryPanel(0);
+
+    // Last, so the cleanup above cannot hide the thing it just put up. A board
+    // re-seed keeps the memory and does NOT re-open the run — the opening
+    // frames the run, and a player who has already read it is four boards in.
+    if (!keepMemory) {
+      this.openTheRun();
+    }
+  }
+
+  /**
+   * The cold open: the shadow speaks over a board that is not moving yet.
+   *
+   * There was no opening at all. The game began on a board already falling,
+   * which for a portfolio is the worst available first impression — a stranger
+   * clicked "play" and got a wall of pieces and an objective line reading as an
+   * instruction from nowhere. Nothing said what the board was, whose it was, or
+   * why anything was dark.
+   *
+   * Built out of `showReveal` rather than as its own screen, and that is the
+   * whole reason it is four lines: a fragment ALREADY freezes the simulation
+   * without banking the time, dims the board without replacing it, and offers
+   * Space to skip after a grace period. An opening needs exactly those three
+   * things. Nothing pends after it, so `advanceReveal` simply dissolves it and
+   * the first pair falls.
+   */
+  private openTheRun(): void {
+    this.showReveal('', SHADOW_OPENING_LINE, this.holdFor(SHADOW_OPENING_LINE, 1100));
+    // The shadow's colour, not the memory's. It is the only voice that speaks
+    // before a memory exists to be spoken about.
+    this.revealBody.setColor('#b07dff');
+
+    // The objective arrives AFTER the line, because it is the answer to it —
+    // "light every neuron" reads as an instruction from nowhere on its own, and
+    // as a reply to "you stopped here before" when it follows one. It sits
+    // above the board and therefore outside the scrim, so it has to be dimmed
+    // by hand rather than covered.
+    this.openingHolding = true;
+    this.objectiveText.setAlpha(0);
+  }
+
+  /**
+   * Bring the objective in once the opening is over, however it ended.
+   *
+   * Driven from `update` rather than scheduled, because Space skips the opening
+   * and a `delayedCall` would leave the objective dark until the timer it no
+   * longer matches fired.
+   */
+  private finishOpening(): void {
+    if (!this.openingHolding || this.revealRemaining > 0) {
+      return;
+    }
+
+    this.openingHolding = false;
+    this.tweens.add({ targets: this.objectiveText, alpha: 1, duration: 520 });
   }
 
   private readInput(delta: number): void {
@@ -1688,7 +1817,7 @@ export class BoardScene extends Scene {
   private startLock(): void {
     const lock = lockFor(this.nodesRevealed);
     this.lockSolved = false;
-    this.lockFailingIn = 0;
+    this.lockEndingIn = 0;
     this.simulation.pieceBudget = lock.pieces;
     seedLock(this.simulation.board, lock, Math.random);
     this.shownPiecesRemaining = -1;
@@ -1815,6 +1944,13 @@ export class BoardScene extends Scene {
    * memory you have already earned.
    */
   private refreshPieces(delta: number): void {
+    // A won run does not hand over to another board. Losing re-seeds because
+    // the memory is still out there to be earned; winning has nothing left to
+    // seed a board for.
+    if (this.runOver === 'won') {
+      return;
+    }
+
     const remaining = this.simulation.piecesRemaining;
     if (remaining !== this.shownPiecesRemaining) {
       this.shownPiecesRemaining = remaining;
@@ -1823,11 +1959,29 @@ export class BoardScene extends Scene {
       this.piecesText.setColor(remaining <= 2 ? '#e4572e' : '#e9dcff');
     }
 
-    if (this.lockFailingIn > 0) {
-      this.lockFailingIn -= delta;
-      if (this.lockFailingIn <= 0) {
-        this.lockFailingIn = 0;
+    if (this.lockEndingIn > 0) {
+      this.lockEndingIn -= delta;
+      if (this.lockEndingIn <= 0) {
+        this.lockEndingIn = 0;
         this.restart(true);
+      }
+      return;
+    }
+
+    // A SOLVED board hands over, and this was a hard freeze before it did.
+    // Solving with pieces still in hand left the board sitting there until they
+    // ran out — at which point the failure branch below was skipped BECAUSE it
+    // was solved, so nothing ever scheduled the re-seed, while
+    // `simulation.acceptsInput` had already gone false on `outOfPieces`. The
+    // board locked up showing a stale objective and a red 0, and only R got out
+    // of it.
+    //
+    // Waits for the fragment: `revealPending` is set the instant the lock is
+    // solved and consumed when the words surface, so handing over before that
+    // would re-seed the board out from under the thing it just earned.
+    if (this.lockSolved) {
+      if (!this.storyHolding && !this.simulation.resolving && !this.revealPending) {
+        this.lockEndingIn = 900;
       }
       return;
     }
@@ -1835,18 +1989,23 @@ export class BoardScene extends Scene {
     // Not while a cascade is still running: the last piece's chain can light
     // the neuron that solves the board, and calling it failed before that has
     // played out would take a win away on the frame it was won.
-    if (
-      !this.simulation.outOfPieces
-      || this.simulation.resolving
-      || this.lockSolved
-      || this.storyHolding
-    ) {
+    if (!this.simulation.outOfPieces || this.simulation.resolving || this.storyHolding) {
       return;
     }
 
-    this.lockFailingIn = 1600;
+    // Running out of pieces IS the loss now, so the ending plays here.
+    // Everything below — the static, the colour drain, the connections dying
+    // one at a time, and the line naming what you were short of — was wired to
+    // a top-out instead, which a twelve-piece budget on a board seeded with
+    // eleven tiles makes very nearly unreachable. It was ninety lines and six
+    // objects for a state almost nobody would ever see.
+    //
+    // Longer than the old beat, because there is now something to watch.
+    this.lockEndingIn = 2600;
+    this.runOver = 'out-of-pieces';
     this.objectiveText.setText('out of pieces').setAlpha(1);
     this.soundBoard.play(connectionLostVoice(0));
+    this.loseTheBoard();
   }
 
   /**
@@ -2120,10 +2279,16 @@ export class BoardScene extends Scene {
    * in `drawBoard`, or a trace would connect to a tile that has not landed.
    */
   private drawConnections(delta: number): void {
-    // Once the run is lost the traces are no longer a picture of the board —
-    // they are being put out one at a time by `loseTheBoard`. Recomputing them
-    // from board state here would re-light each one the frame after it died.
-    if (this.simulation.toppedOut) {
+    // Once a run is OVER the traces are no longer a picture of the board —
+    // they are being put out one at a time by `loseTheBoard`, or lit one at a
+    // time by `winTheRun`. Recomputing them from board state here would undo
+    // each one the frame after it changed.
+    //
+    // This tested `simulation.toppedOut`, which was the only ending when it was
+    // written. Running out of pieces became the loss and finishing a memory
+    // became a win, and neither sets that flag — so both endings were fighting
+    // this loop for control of the same objects and losing.
+    if (this.runOver !== null) {
       return;
     }
 
@@ -2494,6 +2659,10 @@ export class BoardScene extends Scene {
 
     if (answer === '') {
       this.answerLine.setVisible(false);
+      // Declining still finishes the memory — it keeps the shadows, it does not
+      // withhold the ending. The offer to say something is for someone who got
+      // here, not a reward for typing.
+      this.endRunIfNothingLeft(700);
       return;
     }
 
@@ -2514,6 +2683,32 @@ export class BoardScene extends Scene {
     this.memoryAnswers[this.answeringMemory] = answer;
     this.showAnswerEcho();
     this.driveOffShadow();
+
+    // After the answer has been read and the wave has finished taking the board
+    // back, so the ending lands on a board that is already quiet.
+    this.endRunIfNothingLeft(this.holdFor(answer, 900) + 700);
+  }
+
+  /**
+   * End the run if that question was the last thing the game had to say.
+   *
+   * `locate` returning null is the game's own definition of "nothing left to
+   * surface", so this reads the same counter the brain and the memory panel do
+   * rather than hard-coding how many memories are written. When memory 2
+   * exists, finishing High School will simply not be the end any more, and
+   * nothing here has to change.
+   */
+  private endRunIfNothingLeft(after: number): void {
+    if (this.locate(this.nodesRevealed) !== null) {
+      return;
+    }
+
+    this.time.delayedCall(after, () => {
+      if (this.runOver !== null || this.storyHolding) {
+        return;
+      }
+      this.winTheRun();
+    });
   }
 
   /** The answer, beside the memory it belongs to, for the rest of the run. */
@@ -2619,6 +2814,9 @@ export class BoardScene extends Scene {
   }
 
   private showReveal(title: string, body: string, duration: number, photo?: string): void {
+    // Reset first: `openTheRun` borrows this object for the shadow's voice, and
+    // without this every fragment after the opening would inherit its violet.
+    this.revealBody.setColor(REVEAL_BODY_COLOR);
     this.revealRemaining = duration;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
     this.revealHint.setText(SKIP_PROMPT).setVisible(false);
@@ -2703,6 +2901,7 @@ export class BoardScene extends Scene {
     if (toppedOut !== this.shownToppedOut) {
       this.shownToppedOut = toppedOut;
       if (toppedOut) {
+        this.runOver = 'topped-out';
         this.soundBoard.play(topOutVoice());
         this.loseTheBoard();
       }
@@ -3145,10 +3344,12 @@ export class BoardScene extends Scene {
    * between cells, which fixed-position grid cells cannot do.
    */
   private drawPair(): void {
-    // In both of these states `pair` still points at the pair whose tiles are
+    // In all of these states `pair` still points at the pair whose tiles are
     // already part of the board, so drawing it paints a ghost duplicate — and
     // after a top-out it would hang there at its pre-settle position forever.
-    if (this.simulation.resolving || this.simulation.toppedOut) {
+    // A won run is the same case: the simulation is held rather than stopped,
+    // so the pair kept being drawn, straight over the closing words.
+    if (this.simulation.resolving || this.simulation.toppedOut || this.runOver === 'won') {
       for (const tile of this.pairTiles) {
         tile.setVisible(false);
       }
@@ -3228,10 +3429,17 @@ export class BoardScene extends Scene {
     // Shown by `loseTheBoard` once the connections have finished dying, rather
     // than the instant the run ends — otherwise the words arrive over an ending
     // that has not happened yet. This only ever hides them.
-    if (!this.simulation.toppedOut || this.storyHolding) {
+    // Three ways a run can be over, and this tested one. `toppedOut` was the
+    // only ending when it was written; running out of pieces became the loss
+    // and winning became an ending, and neither sets that flag — so this hid
+    // both of them on the frame after they were shown. The lost board still
+    // composed its closing line naming what the run was short of, correctly,
+    // into a text object that was invisible from the next frame onward.
+    if (this.runOver === null || this.storyHolding) {
       this.gameOverText.setVisible(false);
       this.gameOverLine.setVisible(false);
       this.gameOverHint.setVisible(false);
+      this.contactOffer.setVisible(false);
     }
   }
 
@@ -3296,7 +3504,7 @@ export class BoardScene extends Scene {
     this.time.delayedCall(settled, () => {
       // A restart during the sequence cancels it; the next run must not open
       // with the last one's ending printed over it.
-      if (!this.simulation.toppedOut) {
+      if (this.runOver === null) {
         return;
       }
       // Composed here rather than at creation, because what the run was
@@ -3304,6 +3512,91 @@ export class BoardScene extends Scene {
       this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
 
       for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint]) {
+        text.setVisible(true).setAlpha(0);
+        this.tweens.add({ targets: text, alpha: 1, duration: 420 });
+      }
+    });
+  }
+
+  /**
+   * A memory finished, which until now was silence.
+   *
+   * The exact mirror of `loseTheBoard`, and built as one on purpose. That
+   * sequence was the most atmospheric thing in the game and it was also the
+   * ONLY authored ending: past the last fragment `locate` returned null,
+   * `revealNextNode` returned quietly, and the run went on re-seeding a board
+   * with nothing left on it to earn. A game whose only ending is losing hands
+   * its last word to the shadow by default.
+   *
+   * So everything the loss does, run the other way. The traces light instead
+   * of dying. The pitch CLIMBS a semitone a cell, which is `answerVoice`
+   * forwards — the loss is that voice backwards, so the two endings are
+   * literally the same sound in opposite directions. The memory panel comes up
+   * full instead of dimming. No static and no colour drain: what the shadow
+   * does is degrade the signal, and this is the run where it did not.
+   */
+  private winTheRun(): void {
+    this.runOver = 'won';
+
+    // Everything that answers "what do I have left to work with" goes, along
+    // with the objective — which was still reading "light every neuron — 0 of
+    // 3" over the words saying the memory was finished, because the board it
+    // described was mid-play when the question was answered.
+    this.tweens.add({
+      targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],
+      alpha: 0,
+      duration: 420,
+    });
+
+    // The board's own skeleton, lit one link at a time.
+    //
+    // Every trace between two occupied cells, not only the ones joining a
+    // matching pair — the losing sequence puts out what was lit, and the mirror
+    // of that is the network completing rather than a handful of leftover
+    // couplings brightening. Lighting ALL of the grid instead was the other
+    // option and it reads as a mesh, not as a thing that was built.
+    const built = this.connections.filter((slot) => (
+      isColour(this.settledPieceAt(slot.column, slot.row))
+      && isColour(this.settledPieceAt(slot.toColumn, slot.toRow))
+    ));
+
+    built.forEach((slot, index) => {
+      this.soundBoard.play(answerVoice(index % 24));
+      slot.trace
+        .setVisible(true)
+        .setAlpha(0)
+        .setScale(1)
+        .setTint(TRACK_LIT_COLOR);
+      this.tweens.add({
+        targets: slot.trace,
+        alpha: 1,
+        duration: 260,
+        delay: index * 60,
+      });
+    });
+
+    this.tweens.add({
+      targets: this.memoryPanel,
+      alpha: 1,
+      duration: 900,
+    });
+
+    const settled = built.length * 60 + 520;
+
+    this.time.delayedCall(settled, () => {
+      // A restart during the sequence cancels it, exactly as it does for a
+      // loss: the next run must not open with the last one's ending on it.
+      if (this.runOver !== 'won') {
+        return;
+      }
+
+      // The memory just finished is the one before whatever comes next, and
+      // `nodesRevealed` has already walked past it.
+      const finished = MEMORIES[Math.max(0, this.answeringMemory)];
+      this.gameOverText.setText(STILL_CONNECTED);
+      this.gameOverLine.setText(recoveredLine(finished.title));
+
+      for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer]) {
         text.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: text, alpha: 1, duration: 420 });
       }

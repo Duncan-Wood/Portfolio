@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ARRIVALS_BETWEEN_LINES,
   CONNECTION_LOST,
+  REACH_OUT_LINE,
   SHADOW_CLOSING_LINE,
+  SHADOW_OPENING_LINE,
+  STILL_CONNECTED,
   SHADOW_LINES,
   closingLine,
+  recoveredLine,
   shadowLine,
 } from './shadow-voice';
 
@@ -137,5 +141,45 @@ describe('what a lost run says it lost', () => {
     for (const line of lines) {
       expect(line.toLowerCase()).not.toMatch(/tomorrow|come back|rest|another day|stop now/);
     }
+  });
+});
+
+describe('how a run opens', () => {
+  it('speaks in the same register as the rest of the shadow, not as a tutorial', () => {
+    // It is the first sentence anyone reads. If it explains the controls it is
+    // a manual, and the objective line is already there to say what to do.
+    expect(SHADOW_OPENING_LINE.toLowerCase())
+      .not.toMatch(/press|key|arrow|space|drop|rotate|match|click/);
+  });
+
+  it('obeys the closing line\'s rule, since it is read at the same decision', () => {
+    // Whether to play at all is the same choice as whether to press R, and the
+    // shadow must not be the one giving permission to skip it.
+    expect(SHADOW_OPENING_LINE.toLowerCase())
+      .not.toMatch(/tomorrow|come back|another day|stop now|do not have to/);
+  });
+
+  it('is short enough to read before the first piece falls', () => {
+    expect(SHADOW_OPENING_LINE.length).toBeLessThanOrEqual(48);
+  });
+});
+
+describe('what a finished memory says', () => {
+  it('ends on the title the losing screen spends the whole run contradicting', () => {
+    expect(STILL_CONNECTED).not.toBe(CONNECTION_LOST);
+    expect(STILL_CONNECTED.toLowerCase()).toContain('connected');
+  });
+
+  it('names the memory that was recovered rather than congratulating in general', () => {
+    // The same rule `closingLine` follows: a line equally true of every run
+    // lands like a fortune cookie.
+    expect(recoveredLine('High School')).toContain('High School');
+    expect(recoveredLine('College')).toContain('College');
+  });
+
+  it('offers a way to reach a person without turning into a pitch', () => {
+    expect(REACH_OUT_LINE.length).toBeLessThanOrEqual(32);
+    expect(REACH_OUT_LINE.toLowerCase())
+      .not.toMatch(/hire|resume|cv|recruit|opportunit|available for/);
   });
 });

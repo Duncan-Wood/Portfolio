@@ -99,6 +99,69 @@ export const CONNECTION_LOST = 'CONNECTION LOST';
  */
 export const SHADOW_CLOSING_LINE = 'That is usually where it stops.';
 
+/**
+ * The first thing anyone reads, over a board that is not moving yet.
+ *
+ * The game had no opening at all: a visitor arrived on a board already
+ * falling, with no title, no framing and an objective line that read as an
+ * instruction from nowhere. The shadow speaks first because it is the only
+ * voice here that can make that objective an ANSWER to something — "light
+ * every neuron" means nothing until something has said what went dark.
+ *
+ * It obeys the same rule as every line above: recognition, past tense, no
+ * threat. And it must not be a tutorial. The player learns the controls by
+ * having them; what this buys is a reason to care that they work.
+ *
+ * PLACEHOLDER, like the two below it, and the most load-bearing sentence in
+ * the game — it is the first impression of a portfolio. Duncan's to settle.
+ */
+export const SHADOW_OPENING_LINE = 'You stopped here before.';
+
+/**
+ * What the game says when a memory is finished, and the line under it.
+ *
+ * The mirror of `CONNECTION_LOST`, and the reason that constant's own comment
+ * calls the title "the title the loss screen contradicts": until now, losing
+ * was the ONLY authored ending in the game. Everything after the last fragment
+ * was silence — the run kept re-seeding a board with nothing left to earn — so
+ * the shadow got the last word by default, because it was the only one with a
+ * last word written.
+ *
+ * This is where the title stops being contradicted and starts being earned.
+ * Same three-object shape as the loss, run the other way: the traces light
+ * instead of dying, the pitch climbs instead of falling, and the memory panel
+ * comes up full instead of going dark.
+ */
+export const STILL_CONNECTED = 'STILL CONNECTED';
+
+/**
+ * The line under it, naming what was recovered.
+ *
+ * Specific for the same reason `closingLine` is specific: a thesis is the
+ * weakest thing to end on because it is equally true of every run. The player
+ * just finished High School, and saying so is the difference between an ending
+ * and a screen.
+ *
+ * DRAFT wording. Nothing imports this file, so rewriting it touches nothing.
+ */
+export function recoveredLine(memoryTitle: string): string {
+  return `${memoryTitle} is yours again.`;
+}
+
+/**
+ * The offer that follows it, which is the point of the whole exercise.
+ *
+ * `CLAUDE.md` sets the bar this line exists to clear: the game "has to be good,
+ * and it has to lead to me". A memory finishing is the only moment in a
+ * portfolio-you-play where someone has actually spent a few minutes on
+ * somebody's life and might want to say something about it — so the way to do
+ * that belongs here and nowhere else.
+ *
+ * Not a call to action, and deliberately quiet. It has just been said that
+ * something was recovered; a recruiting pitch on top of that would undo it.
+ */
+export const REACH_OUT_LINE = 'say hello';
+
 /** What the run was reaching for when it ended, if it was reaching for anything. */
 export interface UnfinishedBusiness {
   /** The title of the fragment that was next, or `null` if none was left. */
