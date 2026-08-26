@@ -109,6 +109,8 @@ export function drawBrain(
 ): void {
   graphics.clear();
 
+  const written = writtenNodeCount();
+
   const point = (fraction: { x: number; y: number }) => ({
     x: box.left + fraction.x * box.width,
     y: box.top + fraction.y * box.height,
@@ -136,11 +138,9 @@ export function drawBrain(
   graphics.lineStyle(4, TRACK_COLOR, 0.85);
   graphics.lineBetween(stemTop.x, stemTop.y, stemEnd.x, stemEnd.y);
 
-  const written = writtenNodeCount();
-
   // Wiring, drawn before the nodes so the nodes sit on top of it. A run that is
   // lit stays lit; the rest is the dark shape of what has not been told.
-  for (let index = 1; index < BRAIN_NODE_SLOTS; index += 1) {
+  for (let index = 1; index < Math.min(BRAIN_NODE_SLOTS, written); index += 1) {
     const from = brainNodeAt(index - 1, box);
     const to = brainNodeAt(index, box);
     const earned = index < lit;
@@ -149,7 +149,12 @@ export function drawBrain(
     graphics.lineBetween(from.x, from.y, to.x, to.y);
   }
 
-  for (let index = 0; index < BRAIN_NODE_SLOTS; index += 1) {
+  // Only the nodes that exist. Sixteen slots were drawn regardless, so twelve
+  // of them sat at radius 2.5 and alpha 0.35 in TRACK_COLOR on a ground barely
+  // distinguishable from it — invisible, but still saying "there is more here"
+  // to nobody. The unwritten memories will draw themselves when they are
+  // written.
+  for (let index = 0; index < Math.min(BRAIN_NODE_SLOTS, written); index += 1) {
     const at = brainNodeAt(index, box);
     const earned = index < lit;
     const isArriving = index === lit && arriving > 0;

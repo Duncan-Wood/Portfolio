@@ -19,13 +19,12 @@ import { DEFAULT_TUNING, type Tuning } from '../tuning';
 import {
   GROUND_COLOR,
   TRACE_COLORS,
-  TRACK_COLOR,
   TRACK_LIT_COLOR,
   PIECE_COLORS,
-  SHADOW_COLOR,
   mix,
   SHADOW_EDGE_COLOR,
   SHADOW_EYE_GLOW,
+  TRACK_COLOR,
 } from '../palette';
 import {
   SHADOW_EYES_TEXTURE,
@@ -35,8 +34,7 @@ import {
   shadowBodyTexture,
   tileTexture,
 } from './tile-textures';
-import { TrackPath, mitredRectangle } from '../track-geometry';
-import { drawBrain } from './brain';
+import { brainNodeAt, drawBrain } from './brain';
 import { LOCKS, isSolved, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { MEMORIES } from '../memories';
@@ -92,31 +90,10 @@ const GAP = 4;
 
 const FPS_REFRESH_INTERVAL = 250;
 
-/*
- * The progress track: a circuit that rings the board, divided into pads that
- * light one at a time.
- *
- * Discrete pads and not a smooth bar, because progress you cannot see happen is
- * progress that may as well not exist. The first attempt raised the brightness
- * of the board's traces continuously with cells cleared — arithmetically
- * correct, and invisible: one clear moved the alpha by a hundredth, over a ramp
- * lasting minutes. Eyes register events, not ramps. A pad lighting is an event:
- * it has a moment, a place, a spark and a note.
- *
- * How many pads, and what each costs, are feel dials and live in `tuning.ts`.
- */
-const TRACK_MARGIN = 15;
 
-/** Corner cut. Square corners read as a border; mitred ones read as routing. */
-const TRACK_CHAMFER = 20;
 
-/** How far the little tap stubs branch off the bus at each pad. */
-const TRACK_STUB = 7;
 
-/** Milliseconds for a pulse of current to travel the whole energised run. */
-const PULSE_PERIOD = 2400;
 
-const TRACK_PULSES = 3;
 
 /*
  * The shadow's idle: how far it bobs and leans, how long a breath takes, and
@@ -257,16 +234,43 @@ const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
 const PREVIEW_TOP_Y = ORIGIN_Y + 72;
 
-/** The bus the progress pads sit on, as a mitred rectangle around the board. */
-const trackPath = new TrackPath(
-  mitredRectangle(
-    ORIGIN_X - TRACK_MARGIN,
-    ORIGIN_Y - TRACK_MARGIN,
-    BOARD_WIDTH + TRACK_MARGIN * 2,
-    BOARD_HEIGHT + TRACK_MARGIN * 2,
-    TRACK_CHAMFER,
-  ),
-);
+/*
+ * The board's edge.
+ *
+ * The progress ring used to draw this line as a side effect of being a meter,
+ * and cutting the ring took the board's containment with it — the tiles were
+ * left floating on the substrate with nothing saying where the playfield
+ * stopped. This is the frame on its own: drawn once, measuring nothing.
+ *
+ * Mitred rather than square, which is the one thing kept from the ring. A
+ * square corner reads as a border around a game; a cut one reads as routing
+ * that had to get somewhere, and the whole board is meant to be a circuit.
+ */
+const BOARD_FRAME_MARGIN = 15;
+
+/** What a memory's own words are set in, so the opening can borrow the object. */
+const REVEAL_BODY_COLOR = '#e8eef2';
+const BOARD_FRAME_CHAMFER = 20;
+
+/** The frame's corners, clockwise from the top-left cut. */
+function boardFrameCorners(): { x: number; y: number }[] {
+  const left = ORIGIN_X - BOARD_FRAME_MARGIN;
+  const top = ORIGIN_Y - BOARD_FRAME_MARGIN;
+  const right = left + BOARD_WIDTH + BOARD_FRAME_MARGIN * 2;
+  const bottom = top + BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2;
+  const cut = BOARD_FRAME_CHAMFER;
+
+  return [
+    { x: left + cut, y: top },
+    { x: right - cut, y: top },
+    { x: right, y: top + cut },
+    { x: right, y: bottom - cut },
+    { x: right - cut, y: bottom },
+    { x: left + cut, y: bottom },
+    { x: left, y: bottom - cut },
+    { x: left, y: top + cut },
+  ];
+}
 
 /**
  * A canvas x turned into a stereo position, -1 to 1.
@@ -433,7 +437,6 @@ function randomPieceTypes(): [number, number] {
 export class BoardScene extends Scene {
   private simulation: Simulation;
   private cellTiles: Phaser.GameObjects.Image[];
-  private ghostTiles: Phaser.GameObjects.Image[];
   private pairTiles: Phaser.GameObjects.Image[];
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private fpsText: Phaser.GameObjects.Text;
@@ -476,7 +479,6 @@ export class BoardScene extends Scene {
    * it can be taken off again when it moves or the timer resets.
    */
   private threatenedIndex: number | null = null;
-  private scoreText: Phaser.GameObjects.Text;
   private chainText: Phaser.GameObjects.Text;
   /**
    * The interference laid over the board once the run is lost, and how far it
@@ -500,7 +502,6 @@ export class BoardScene extends Scene {
   private piecesText: Phaser.GameObjects.Text;
   private shownPivotType = -1;
   private shownSatelliteType = -1;
-  private shownScore = -1;
   private shownChain = -1;
   private nextFpsRefresh = 0;
   private timestep: FixedTimestep;
@@ -619,17 +620,19 @@ export class BoardScene extends Scene {
   private connections: ConnectionSlot[];
 
   /**
-   * The progress circuit around the board, and how many of its pads are lit.
+   * How this run ended, or `null` while it is still going.
    *
    * Redrawn only when the count changes — which is a handful of times per run —
    * so this is a `Graphics` rather than another pool of images.
    */
-  private progressTrack: Phaser.GameObjects.Graphics;
+  /** The board's edge. Drawn once in `create`; it never changes. */
+  private boardFrame: Phaser.GameObjects.Graphics;
 
   /** The coming memory's shape, filling in beside the board as it is earned. */
   private memoryPanel: Phaser.GameObjects.Graphics;
 
-  private litPads = 0;
+  /** How many neurons the meter has already announced, so it only fires on a change. */
+  private shownLitNeurons = 0;
 
   /**
    * Fragments of memory surfaced this run, counted across every memory rather
@@ -729,9 +732,7 @@ export class BoardScene extends Scene {
    * A lit circuit that does not move reads as a drawn border. Something
    * travelling it is what says the thing is switched on.
    */
-  private trackPulses: Phaser.GameObjects.Image[];
 
-  private pulsePhase = 0;
 
   /**
    * Visible-cell indices that `drawBoard` must leave empty because a
@@ -835,19 +836,23 @@ export class BoardScene extends Scene {
     // flattened ellipse in perspective, after the playtest.
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
 
-    this.progressTrack = this.add.graphics();
-    this.memoryPanel = this.add.graphics();
+    // Under everything on the board, so a tile in the outermost column sits on
+    // the frame rather than behind it.
+    this.boardFrame = this.add.graphics();
+    const frame = boardFrameCorners();
+    this.boardFrame.lineStyle(2, TRACK_COLOR, 0.9);
+    this.boardFrame.beginPath();
+    this.boardFrame.moveTo(frame[0].x, frame[0].y);
+    for (const corner of frame.slice(1)) {
+      this.boardFrame.lineTo(corner.x, corner.y);
+    }
+    this.boardFrame.closePath();
+    this.boardFrame.strokePath();
 
-    // `filters` is null until filters are enabled. Asserting past it with `!` is
-    // exactly what hid a black screen during the juice pass, so enable first and
-    // then read it as a value.
-    //
-    // Kept as a shader rather than drawn, after trying the other way: stacking
-    // four wide translucent strokes costs no fill rate, but a hard-edged stroke
-    // is a poor gaussian and the halo barely read. Cost is linear in
-    // quality x distance, so those are as low as they go while still blooming.
-    this.progressTrack.enableFilters();
-    this.progressTrack.filters?.internal.addGlow(TRACK_LIT_COLOR, 2.5, 0, 1, false, 4, 8);
+    // Before the cells, so the brain sits behind the board's own column rather
+    // than over it. It used to share this spot with the progress ring; the ring
+    // is gone and the brain is the meter on its own now.
+    this.memoryPanel = this.add.graphics();
 
     // Every texture the board draws with, before the first thing that asks for
     // one. Baking after the fact is how the sparks first shipped as Phaser's
@@ -912,12 +917,6 @@ export class BoardScene extends Scene {
     this.neuronThread.enableFilters();
     this.neuronThread.filters?.internal.addGlow(TRACK_LIT_COLOR, 2.5, 0, 1, false, 4, 8);
 
-    // Where the piece will come to rest, drawn under the piece itself.
-    this.ghostTiles = [
-      this.add.image(0, 0, tileTexture(null)).setVisible(false),
-      this.add.image(0, 0, tileTexture(null)).setVisible(false),
-    ];
-
     this.pairTiles = [
       this.add.image(0, 0, tileTexture(null)),
       this.add.image(0, 0, tileTexture(null)),
@@ -968,16 +967,6 @@ export class BoardScene extends Scene {
       emitting: false,
     });
 
-    this.trackPulses = [];
-    for (let index = 0; index < TRACK_PULSES; index += 1) {
-      this.trackPulses.push(
-        this.add
-          .image(0, 0, SPARK_TEXTURE)
-          .setTint(0xffffff)
-          .setBlendMode(BlendModes.ADD)
-          .setVisible(false),
-      );
-    }
 
     this.scorePopups = [];
     for (let index = 0; index < SCORE_POPUP_POOL; index += 1) {
@@ -1053,11 +1042,6 @@ export class BoardScene extends Scene {
       color: '#8ea3b0',
     }).setVisible(this.showFps);
 
-    this.scoreText = this.add.text(CANVAS_WIDTH - 8, 8, '', {
-      fontFamily: 'monospace',
-      fontSize: '28px',
-      color: '#e8eef2',
-    }).setOrigin(1, 0);
 
     // What this board is asking for, stated in words. A lock the player cannot
     // read is just a board that ends for reasons of its own.
@@ -1067,9 +1051,11 @@ export class BoardScene extends Scene {
       color: '#c98cff',
     }).setOrigin(0.5, 0);
 
-    this.chainText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2, '', {
+    this.chainText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, ORIGIN_Y + 30, '', {
       fontFamily: 'monospace',
-      fontSize: '64px',
+      // 28px near the top edge, not 64px dead centre. At full size over the
+      // middle of the board it covered the tiles it was congratulating you for.
+      fontSize: '28px',
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
@@ -1078,8 +1064,8 @@ export class BoardScene extends Scene {
     this.revealScrim = this.add.rectangle(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2,
-      BOARD_WIDTH + TRACK_MARGIN * 2,
-      BOARD_HEIGHT + TRACK_MARGIN * 2,
+      BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
+      BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
       GROUND_COLOR,
     ).setVisible(false);
 
@@ -1099,7 +1085,7 @@ export class BoardScene extends Scene {
     this.revealBody = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 10, '', {
       fontFamily: 'monospace',
       fontSize: '17px',
-      color: '#e8eef2',
+      color: REVEAL_BODY_COLOR,
       align: 'center',
       wordWrap: { width: BOARD_WIDTH - 56 },
       lineSpacing: 7,
@@ -1168,8 +1154,8 @@ export class BoardScene extends Scene {
     this.staticOverlay = this.add.tileSprite(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2,
-      BOARD_WIDTH + TRACK_MARGIN * 2,
-      BOARD_HEIGHT + TRACK_MARGIN * 2,
+      BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
+      BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
       STATIC_TEXTURE,
     ).setVisible(false).setBlendMode(BlendModes.ADD);
 
@@ -1291,12 +1277,10 @@ export class BoardScene extends Scene {
       // looked at; nothing here consumes `delta`, so no time is banked.
       this.drawBoard();
       this.drawConnections(0);
-      this.drawGhost();
       this.drawPair();
       this.drawPreview();
       this.refreshChain();
-      this.refreshScore();
-      this.refreshAnswerLine(time);
+        this.refreshAnswerLine(time);
       this.refreshGameOver();
       this.refreshFps(time);
       return;
@@ -1365,12 +1349,9 @@ export class BoardScene extends Scene {
     this.drawConnections(delta);
     this.surfaceBankedFragment();
     this.drawProgress();
-    this.advanceTrackPulses(delta);
-    this.drawGhost();
     this.drawPair();
     this.drawPreview();
     this.refreshChain();
-    this.refreshScore();
     this.refreshAnswerLine(time);
     this.refreshStatic();
     this.refreshGameOver();
@@ -1489,6 +1470,16 @@ export class BoardScene extends Scene {
   private resetShownState(keepMemory = false): void {
     this.cellsBeingFilled.clear();
     this.threatenedIndex = null;
+
+    // BEFORE `startLock`, and this is load-bearing: the lock a board seeds is
+    // now derived from how many fragments have been earned, so seeding while
+    // this still held the finished run's count opened a brand new run on the
+    // LAST lock of the memory — ten pieces and four neurons as a tutorial.
+    if (!keepMemory) {
+      this.shownLitNeurons = 0;
+      this.nodesRevealed = 0;
+    }
+
     this.startLock();
 
     // A restart opens on a dark network. Without this the traces keep whatever
@@ -1562,7 +1553,6 @@ export class BoardScene extends Scene {
     this.shownBeats = this.simulation.beatsPlayed;
     this.soundedPiecesLocked = this.simulation.piecesLocked;
     this.slamDistance = null;
-    this.shownScore = -1;
     this.shownChain = -1;
     this.shownPivotType = -1;
     this.shownSatelliteType = -1;
@@ -1571,10 +1561,6 @@ export class BoardScene extends Scene {
     this.hitStopRemaining = 0;
     this.nextScorePopup = 0;
 
-    if (!keepMemory) {
-      this.litPads = 0;
-      this.nodesRevealed = 0;
-    }
     this.revealRemaining = 0;
     this.pendingReveal = null;
     this.revealPending = false;
@@ -1582,7 +1568,6 @@ export class BoardScene extends Scene {
     // and seeding this from `piecesLocked` would make the first fragment wait
     // for a placement it has already been paid for.
     this.lastRevealPiece = -1;
-    this.redrawTrack();
     // Drawn here as well as on every change: the panel is otherwise blank until
     // the first pad lights, which is exactly when it has the most to say.
     this.redrawMemoryPanel(0);
@@ -1922,7 +1907,11 @@ export class BoardScene extends Scene {
     // a UI element; something unsteady reads as alive and impatient.
     const flicker = 0.75 + 0.25 * Math.sin(this.shadowClock / (70 - closeness * 40));
 
-    this.cellTiles[index].setTint(mix(0xffffff, SHADOW_COLOR, closeness * 0.75));
+    // The eyes alone. This used to tint the tile up to 75% toward black as
+    // well, which destroyed the one piece of information the warning exists to
+    // protect: WHICH tile is about to go. A player cannot plan around a cell
+    // whose colour has been taken away to tell them the colour is about to be
+    // taken away.
     this.shadowEyes[index]
       .setVisible(true)
       .setPosition(centerOfColumn(target.column), centerOfRow(target.row))
@@ -2237,53 +2226,53 @@ export class BoardScene extends Scene {
    * happen rather than as a value drifting upward.
    */
   private drawProgress(): void {
-    // Nothing accrues while a fragment is on screen: the track has just been
-    // spent, and a second fragment landing on top of the first would replace it
-    // mid-sentence.
+    // Nothing accrues while a fragment is on screen: a second one landing on
+    // top of the first would replace it mid-sentence.
     if (this.storyHolding) {
       return;
     }
 
-    // The ring measures THE OBJECTIVE now, not connections.
+    // ONE meter. This used to say the same number in five places at once — the
+    // objective line, a ring around the board, the brain, the neuron tiles
+    // themselves, and the thread between them — and two of those were lying.
+    // The ring divided three neurons across six pads, so it could only ever
+    // show 0, 2, 4 or 6 and pads 1, 3 and 5 never lit alone; its "every fifth
+    // pad is bigger" rule made pads 0 and 5 oversized, which on a six-pad loop
+    // are adjacent. It also drew an 850px glowing wall down the right edge that
+    // cut the column off from the board it was supposed to be measuring.
     //
-    // It used to fill with cells cleared, and that was the whole reason the
-    // writing felt bolted on: a meter counting clears can be filling toward
-    // anything, so the fragment it paid out arrived as a reward dispenser going
-    // off rather than as something the board had been about. Driven by the
-    // neurons it says one thing in three places — the node on the board, the
-    // ring around it, the node on the brain — and lighting one moves all three.
-    const pads = this.tuning.progressPads;
+    // The brain is the meter now, which is what `brain.ts` has claimed since it
+    // was written. The board still says it too, because a lit neuron is a
+    // legible thing in its own right — but that is the tile telling you about
+    // itself, not a second gauge.
     const total = neuronsOn(this.simulation.board).length;
-    const progress = total === 0 ? 0 : (total - unlitCount(this.simulation.board)) / total;
-    const lit = Math.floor(progress * pads);
+    const lit = total === 0 ? 0 : total - unlitCount(this.simulation.board);
 
-    if (lit === this.litPads) {
+    if (lit === this.shownLitNeurons) {
       return;
     }
 
-    const gainedFrom = this.litPads;
-    this.litPads = lit;
-    this.redrawTrack();
-    this.redrawMemoryPanel(progress);
+    const gainedFrom = this.shownLitNeurons;
+    this.shownLitNeurons = lit;
+    this.redrawMemoryPanel(total === 0 ? 0 : lit / total);
 
-    // One announcement per pad, not one per frame. A big chain can clear enough
-    // cells to cross two or three boundaries at once, and collapsing those into
-    // a single blip would under-sell exactly the moment that earned the most.
-    // Staggered rather than simultaneous, so a chain that jumps several pads
-    // walks up the track audibly instead of landing as one chord.
+    // One announcement per neuron, staggered, so a cascade that reaches two of
+    // them walks up audibly instead of landing as one chord. The sparks fire at
+    // the brain node that just lit rather than out on the old track, so the
+    // sound and the light finally agree about where progress happened.
     this.sparks.setParticleTint(TRACK_LIT_COLOR);
-    for (let pad = gainedFrom; pad < lit; pad += 1) {
-      const point = trackPath.pointAt(pad / pads);
-      this.sparks.emitParticleAt(point.x, point.y, SPARKS_PER_CELL);
+    for (let node = gainedFrom; node < lit; node += 1) {
+      const at = brainNodeAt(this.nodesRevealed + node, BRAIN_BOX);
+      this.sparks.emitParticleAt(at.x, at.y, SPARKS_PER_CELL);
       this.soundBoard.play({
-        ...nodeVoice(pad, pads),
-        delay: (pad - gainedFrom) * 70,
+        ...nodeVoice(node, Math.max(total, 1)),
+        delay: (node - gainedFrom) * 70,
       });
     }
 
     // Deliberately does NOT bank a fragment. `checkLock` owns that now, and a
-    // full ring is the same instant as a solved lock — asking for the reveal in
-    // both places would surface two fragments for one board.
+    // full meter is the same instant as a solved lock — asking for the reveal
+    // in both places would surface two fragments for one board.
   }
 
   /**
@@ -2382,8 +2371,7 @@ export class BoardScene extends Scene {
     // something, and it re-arms `drawProgress`, which short-circuits whenever
     // the lit count is unchanged — leaving it full meant a player who banked
     // more than one fragment's worth never saw the second.
-    this.litPads = 0;
-    this.redrawTrack();
+    this.shownLitNeurons = 0;
     // With the count already incremented, so the node just earned draws as
     // earned. Without it the panel keeps the half-lit "arriving" styling from
     // the draw before the increment until the next pad crosses — which, on the
@@ -2672,48 +2660,6 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Paint the whole track: the dormant bus, the energised run up to the last lit
-   * pad, then every pad and its tap stub on top.
-   *
-   * Every fifth pad is a square rather than a round one, which divides the loop
-   * into quarters you can count at a glance instead of a uniform ring of dots.
-   */
-  private redrawTrack(): void {
-    const track = this.progressTrack;
-    const pads = this.tuning.progressPads;
-    track.clear();
-
-    this.strokeTrackRun(TRACK_COLOR, 2, 1, 1);
-    if (this.litPads > 0) {
-      this.strokeTrackRun(TRACK_LIT_COLOR, 3, this.litPads / pads, 1);
-    }
-
-    for (let pad = 0; pad < pads; pad += 1) {
-      const point = trackPath.pointAt(pad / pads);
-      const lit = pad < this.litPads;
-      const color = lit ? TRACK_LIT_COLOR : TRACK_COLOR;
-      // Every fifth pad is bigger, dividing the loop into quarters you can
-      // count at a glance rather than a uniform ring of dots.
-      const size = (lit ? 5 : 3.5) * (pad % 5 === 0 ? 1.5 : 1);
-
-      track.lineStyle(lit ? 3 : 2, color, 1);
-      track.lineBetween(
-        point.x,
-        point.y,
-        point.x + point.outX * TRACK_STUB,
-        point.y + point.outY * TRACK_STUB,
-      );
-
-      // Square pads, not round. Phaser's Graphics keeps no retained geometry —
-      // it re-walks its command buffer every frame — and it steps arcs at a
-      // fixed 1/100 turn, so each round pad cost a hundred vertices per frame
-      // however small it was. A rect submits directly.
-      track.fillStyle(color, 1);
-      track.fillRect(point.x - size, point.y - size, size * 2, size * 2);
-    }
-  }
-
-  /**
    * Draw the coming memory as an unlit constellation, lighting one node for
    * each fraction of it the run has earned.
    *
@@ -2723,59 +2669,6 @@ export class BoardScene extends Scene {
    */
   private redrawMemoryPanel(progress: number): void {
     drawBrain(this.memoryPanel, BRAIN_BOX, this.nodesRevealed, progress);
-  }
-
-  /**
-   * Trace the bus from its start to `reached` of the way round.
-   *
-   * Walks the polyline's own corners and stops at the exact point, rather than
-   * sampling it at a fixed resolution — which the first version did 240 times
-   * per stroke, spending about thirty vertices a corner to draw each corner
-   * slightly wrong.
-   */
-  private strokeTrackRun(color: number, width: number, reached: number, alpha: number): void {
-    const track = this.progressTrack;
-    const path = trackPath.pathUpTo(reached);
-
-    track.lineStyle(width, color, alpha);
-    track.beginPath();
-    track.moveTo(path[0].x, path[0].y);
-    for (let index = 1; index < path.length; index += 1) {
-      track.lineTo(path[index].x, path[index].y);
-    }
-    track.strokePath();
-  }
-
-  /**
-   * Run the pulses along the part of the track that has been energised.
-   *
-   * They travel only as far as the circuit reaches, so early in a run they
-   * shuttle round a short arc and late in one they sweep the whole board.
-   */
-  private advanceTrackPulses(delta: number): void {
-    const reached = this.litPads / this.tuning.progressPads;
-
-    if (reached === 0) {
-      for (const pulse of this.trackPulses) {
-        pulse.setVisible(false);
-      }
-      return;
-    }
-
-    this.pulsePhase = (this.pulsePhase + delta / PULSE_PERIOD) % 1;
-
-    for (let index = 0; index < this.trackPulses.length; index += 1) {
-      const along = (this.pulsePhase + index / this.trackPulses.length) % 1;
-      const point = trackPath.pointAt(along * reached);
-      // Brightest in the middle of its run and faint at either end, so a pulse
-      // arrives and leaves rather than blinking into existence at the corner.
-      const fade = Math.sin(along * Math.PI);
-      this.trackPulses[index]
-        .setVisible(true)
-        .setPosition(point.x, point.y)
-        .setAlpha(0.35 + 0.65 * fade)
-        .setScale(0.5 + 0.7 * fade);
-    }
   }
 
   /** The piece in a cell, treating one mid-animation as not yet arrived. */
@@ -3252,75 +3145,6 @@ export class BoardScene extends Scene {
    * independently of the cell layout — and later will need to move smoothly
    * between cells, which fixed-position grid cells cannot do.
    */
-  /**
-   * Where the piece will land, drawn faintly under it.
-   *
-   * This was ruled out once, on the grounds that Puyo omits a ghost
-   * deliberately and reading the stack is the skill. That reasoning was for a
-   * real-time game and it did not survive cutting gravity: with no clock the
-   * player is not busy, they are LOOKING, and a board that will not say where a
-   * piece goes is just withholding. "Confusing on what to do next" is the
-   * symptom of a puzzle that hides its own options.
-   *
-   * The resting cells are worked out the way `lock` does it — both halves
-   * settle independently, so a horizontal pair lands in two columns at two
-   * different depths, and a vertical one stacks in the same column.
-   * `landingRow` scans from the TOP down, because neurons are anchors and break
-   * the no-gaps invariant that would otherwise let it scan up from the floor.
-   */
-  private drawGhost(): void {
-    const hide = () => {
-      for (const tile of this.ghostTiles) {
-        tile.setVisible(false);
-      }
-    };
-
-    if (this.simulation.resolving || this.simulation.toppedOut
-      || this.paused || this.storyHolding) {
-      hide();
-      return;
-    }
-
-    const [pivot, satellite] = this.simulation.pair.cells();
-    const vertical = pivot.column === satellite.column;
-    const resting: { cell: typeof pivot; row: number }[] = [];
-
-    if (vertical) {
-      const landing = this.simulation.board.landingRow(pivot.column);
-      if (landing < 0) {
-        hide();
-        return;
-      }
-      // Lower half first: whichever of the two is further down the screen.
-      const lower = pivot.row > satellite.row ? pivot : satellite;
-      const upper = lower === pivot ? satellite : pivot;
-      resting.push({ cell: lower, row: landing }, { cell: upper, row: landing - 1 });
-    } else {
-      for (const cell of [pivot, satellite]) {
-        resting.push({ cell, row: this.simulation.board.landingRow(cell.column) });
-      }
-    }
-
-    for (let index = 0; index < this.ghostTiles.length; index += 1) {
-      const at = resting[index];
-      const tile = this.ghostTiles[index];
-
-      // A half whose rest is off the top has nowhere to be previewed, and the
-      // hidden row is not drawn at all.
-      if (at === undefined || at.row < FIRST_VISIBLE_ROW) {
-        tile.setVisible(false);
-        continue;
-      }
-
-      tile
-        .setVisible(true)
-        .setTexture(tileTexture(at.cell.pieceType))
-        .setPosition(centerOfColumn(at.cell.column), centerOfRow(at.row))
-        .setScale(0.86)
-        .setAlpha(0.3);
-    }
-  }
-
   private drawPair(): void {
     // In both of these states `pair` still points at the pair whose tiles are
     // already part of the board, so drawing it paints a ghost duplicate — and
@@ -3390,15 +3214,6 @@ export class BoardScene extends Scene {
       this.shownChain = chainLength;
       this.chainText.setText(`${chainLength} CHAIN`);
     }
-  }
-
-  private refreshScore(): void {
-    if (this.simulation.score === this.shownScore) {
-      return;
-    }
-
-    this.shownScore = this.simulation.score;
-    this.scoreText.setText(`${this.shownScore}`);
   }
 
   /**

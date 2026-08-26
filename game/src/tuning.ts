@@ -88,23 +88,7 @@ export interface Tuning {
    */
   readingPerCharacter: number;
 
-  /**
-   * How many pads the progress track around the board is divided into.
-   *
-   * It measures the LOCK now — neurons lit out of neurons on the board — not
-   * cells cleared. An escalating `connectionsPerNode` schedule used to live
-   * here beside it, and it is gone with the meter it drove: what a fragment
-   * costs is the board it is behind, which is level design and lives on the
-   * `Lock`.
-   *
-   * Small on purpose. Against a three-neuron board, six pads means lighting one
-   * neuron lights two pads — enough that the ring visibly moves, few enough
-   * that it never fires a dozen staggered blips on the busiest frame in the
-   * game.
-   */
-  progressPads: number;
-
-  /**
+    /**
    * Milliseconds per row of normal gravity. Lower = faster falling.
    *
    * 800 meant a piece took nearly ten seconds to cross the board, which read as
@@ -240,7 +224,6 @@ export const DEFAULT_TUNING: Tuning = {
   fragmentDuration: 1400,
   questionDuration: 3000,
   readingPerCharacter: 48,
-  progressPads: 6,
   gravityEnabled: true,
   fallInterval: 400,
   softDropInterval: 50,
