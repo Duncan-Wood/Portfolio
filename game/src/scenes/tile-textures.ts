@@ -1,4 +1,5 @@
 import { Math as PhaserMath } from 'phaser';
+import { MEMORY_ART, type MemoryArt } from '../memory-art';
 import { MAX_SHADOW_STRENGTH, PIECE_TYPE_COUNT, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   EMPTY_COLOR,
@@ -349,6 +350,78 @@ function bakeOne(
  * against a texture that does not exist yet renders as Phaser's missing-texture
  * placeholder and never recovers, which is how the spark texture first shipped.
  */
+/** The texture key a memory's picture is baked under. */
+export function memoryArtTexture(key: string): string {
+  return `memory-art-${key}`;
+}
+
+/**
+ * How wide a memory picture is baked, in pixels.
+ *
+ * Sized to the box it is shown in rather than to the grid, so the cell size
+ * falls out of how many cells there are: one 16-wide portrait gets fat cells
+ * with room for a figure, and a 54-wide crowd gets small ones that read as a
+ * mass of people. Baked at twice the display width so it stays sharp on a
+ * retina screen without shipping anything.
+ */
+const MEMORY_ART_WIDTH = 660;
+
+/**
+ * Bake a memory's picture out of the game's own tiles.
+ *
+ * The payoff for doing it this way rather than loading a photograph: a memory
+ * is visibly made of the same material as the board, which is the one thing an
+ * actual photo could not say. It also keeps the rule this file opens with —
+ * art is baked, not loaded — and it is why no image ships at all.
+ *
+ * Panes and leading only, no figures. `drawShape` centres on a single
+ * coordinate and cannot be offset into a cell, and at the sizes these come out
+ * at — a 54-wide crowd lands near twelve pixels a cell — a pad and a via are
+ * the same four dots anyway. The colour is doing the work; a figure would be
+ * noise on top of it.
+ */
+function bakeMemoryArt(
+  graphics: Phaser.GameObjects.Graphics,
+  key: string,
+  art: MemoryArt,
+): void {
+  const cell = Math.max(3, Math.floor(MEMORY_ART_WIDTH / art.columns));
+  // A hairline of leading, once a cell is big enough to show one. Below that
+  // the gap eats the colour and the picture goes muddy.
+  const inset = cell >= 10 ? 1 : 0;
+
+  graphics.clear();
+
+  for (let row = 0; row < art.rows.length; row += 1) {
+    const line = art.rows[row];
+    for (let column = 0; column < art.columns; column += 1) {
+      const mark = line[column];
+      // '.' is the ground showing through. Left undrawn rather than filled, so
+      // the gutters between faces are the page rather than a colour.
+      if (mark === undefined || mark === '.') {
+        continue;
+      }
+
+      const pieceType = Number(mark);
+      if (!Number.isInteger(pieceType) || pieceType >= PIECE_TYPE_COUNT) {
+        continue;
+      }
+
+      const x = column * cell;
+      const y = row * cell;
+      const colour = PIECE_COLORS[pieceType];
+
+      graphics.fillStyle(mix(colour, 0x000000, 0.62), 1);
+      graphics.fillRect(x, y, cell, cell);
+      graphics.fillStyle(colour, 1);
+      graphics.fillRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2);
+
+    }
+  }
+
+  graphics.generateTexture(memoryArtTexture(key), art.columns * cell, art.rows.length * cell);
+}
+
 export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number): void {
   const graphics = scene.add.graphics();
 
@@ -373,6 +446,10 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
     bakeShadow(graphics, size, strength);
   }
   bakeShadowEyes(graphics, size);
+
+  for (const [key, art] of Object.entries(MEMORY_ART)) {
+    bakeMemoryArt(graphics, key, art);
+  }
 
   bakeTrace(graphics, gap);
 

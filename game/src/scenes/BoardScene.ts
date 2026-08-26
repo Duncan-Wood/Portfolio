@@ -31,6 +31,7 @@ import {
   SHADOW_EYES_TEXTURE,
   TRACE_TEXTURE,
   bakeTileTextures,
+  memoryArtTexture,
   shadowBodyTexture,
   tileTexture,
 } from './tile-textures';
@@ -353,11 +354,6 @@ function isVisibleRow(row: number): boolean {
  * Where a board cell sits in `cellRectangles`, which is indexed from
  * `FIRST_VISIBLE_ROW` because the hidden row gets no rectangle.
  */
-/** The texture key for a memory's photograph. */
-function photoKey(photo: string): string {
-  return `memory-photo-${photo}`;
-}
-
 function visibleCellIndex(column: number, row: number): number {
   return (row - FIRST_VISIBLE_ROW) * COLUMNS + column;
 }
@@ -584,9 +580,6 @@ export class BoardScene extends Scene {
    */
   private pulsingCells = new Set<number>();
 
-  /** Photo keys the loader could not find, so nothing tries to draw them. */
-  private missingPhotos = new Set<string>();
-
   private revealPhoto: Phaser.GameObjects.Image;
 
   private shadowArrival: { cellIndex: number; age: number } | null = null;
@@ -800,34 +793,6 @@ export class BoardScene extends Scene {
    * allocation-free: `drawPair` builds a fresh cells array each frame. It is
    * tiny and short-lived.
    */
-  /**
-   * Load the photographs, if any are there.
-   *
-   * A missing file is deliberately not an error. The four fragments each name a
-   * photo, and they will arrive one at a time as Duncan picks them — a run must
-   * play perfectly with none of them present, showing the words alone, or the
-   * game would be broken for every state except the finished one.
-   *
-   * Paths are relative, so they resolve against the page at `/game/` and land
-   * on `public/memories/`, which Vite serves verbatim.
-   */
-  preload(): void {
-    this.load.on('loaderror', (file: { key: string }) => {
-      // Swallowed on purpose. `showReveal` asks the texture manager whether the
-      // image actually exists before drawing it, so a fragment whose photo has
-      // not been chosen yet simply has none.
-      this.missingPhotos.add(file.key);
-    });
-
-    for (const memory of MEMORIES) {
-      for (const node of memory.nodes) {
-        if (node.photo !== undefined) {
-          this.load.image(photoKey(node.photo), `memories/${node.photo}.jpg`);
-        }
-      }
-    }
-  }
-
   create(): void {
     // A COPY of the defaults, so mutating this scene's tuning at runtime cannot
     // corrupt the shared defaults that the engine tests rely on.
@@ -2636,16 +2601,19 @@ export class BoardScene extends Scene {
 
   /** Hold the board and put a line over it. */
   /**
-   * Fit the photograph above the words, if there is one.
+   * Fit a memory's picture above the words, if it has one.
    *
-   * Scaled DOWN only. An image smaller than the box is left alone rather than
-   * blown up, because a stretched photograph of somebody's life looks like a
-   * mistake, and the whole reason a photo is here is that it is the one thing
-   * in this game that is real.
+   * Baked out of the game's own tiles rather than loaded, so there is no file
+   * to be missing and nothing to fetch — a memory with no picture simply has no
+   * entry in `MEMORY_ART`.
+   *
+   * Scaled DOWN only. A picture smaller than the box is left alone rather than
+   * blown up, because enlarging a grid of tiles just makes the grid the
+   * subject.
    */
-  private showRevealPhoto(photo?: string): void {
-    const key = photo === undefined ? null : photoKey(photo);
-    if (key === null || this.missingPhotos.has(key) || !this.textures.exists(key)) {
+  private showRevealPicture(picture?: string): void {
+    const key = picture === undefined ? null : memoryArtTexture(picture);
+    if (key === null || !this.textures.exists(key)) {
       this.revealPhoto.setVisible(false);
       return;
     }
@@ -2667,7 +2635,7 @@ export class BoardScene extends Scene {
     this.revealRemaining = duration;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
     this.revealHint.setText(SKIP_PROMPT).setVisible(false);
-    this.showRevealPhoto(photo);
+    this.showRevealPicture(photo);
     this.revealTitle.setText(title);
     // An empty title is hidden rather than drawn blank, so the body keeps its
     // own spacing instead of sitting under a gap where a heading would be.
