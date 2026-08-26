@@ -35,7 +35,7 @@ import {
   tileTexture,
 } from './tile-textures';
 import { brainNodeAt, drawBrain } from './brain';
-import { LOCKS, isSolved, seedLock } from '../engine/locks';
+import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { MEMORIES } from '../memories';
 import {
@@ -444,7 +444,6 @@ export class BoardScene extends Scene {
   private objectiveText: Phaser.GameObjects.Text;
 
   /** Which lock this board is posing, and whether it has been solved yet. */
-  private lockIndex = 0;
   private lockSolved = false;
 
   /**
@@ -1687,7 +1686,7 @@ export class BoardScene extends Scene {
    * something to survive.
    */
   private startLock(): void {
-    const lock = LOCKS[Math.min(this.lockIndex, LOCKS.length - 1)];
+    const lock = lockFor(this.nodesRevealed);
     this.lockSolved = false;
     this.lockFailingIn = 0;
     this.simulation.pieceBudget = lock.pieces;
@@ -1706,7 +1705,7 @@ export class BoardScene extends Scene {
    * read their position can tell whether the last thing they did helped.
    */
   private refreshObjective(): void {
-    const lock = LOCKS[Math.min(this.lockIndex, LOCKS.length - 1)];
+    const lock = lockFor(this.nodesRevealed);
     const total = neuronsOn(this.simulation.board).length;
     const lit = total - unlitCount(this.simulation.board);
 
@@ -1726,7 +1725,7 @@ export class BoardScene extends Scene {
       return;
     }
 
-    const lock = LOCKS[Math.min(this.lockIndex, LOCKS.length - 1)];
+    const lock = lockFor(this.nodesRevealed);
     if (!isSolved(lock, this.simulation.board)) {
       return;
     }

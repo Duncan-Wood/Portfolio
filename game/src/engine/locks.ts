@@ -77,12 +77,24 @@ export interface Lock {
 const SEED_ROWS = 3;
 
 /**
- * The locks, in the order a run meets them.
+ * The locks, in the order a run meets them: one per fragment of the memory
+ * being unlocked.
  *
- * One, for now, deliberately: this is a prototype of the STRUCTURE, and the
- * question it exists to answer is whether a single board with a stated goal is
- * more fun than an endless one. Writing eight before playing one would be
- * answering it by assertion.
+ * There was one, and that was a prototype of the STRUCTURE — the question it
+ * existed to answer was whether a single board with a stated goal beats an
+ * endless one. It does, so the run now has a shape as well: the board that
+ * earns the last fragment of a memory used to be byte-for-byte the board that
+ * earned the first, which is four tutorials in a row rather than a middle.
+ *
+ * What escalates is not speed. It is the budget PER NEURON — how much room
+ * there is to work each one out — which falls from four pieces to two and a
+ * half across the four. That is difficulty as design rather than as reflex,
+ * which is the only kind that produces an "aha", and it is the reason the
+ * fourth board can ask for a cascade that the first would be cruel to.
+ *
+ * `tiles + shadows + neurons` must fit the floor `seedLock` will lay them on
+ * (COLUMNS x SEED_ROWS = 18). Overflow is silent: the seeder simply stops, and
+ * a board with fewer neurons than its objective counts cannot be solved.
  */
 export const LOCKS: readonly Lock[] = [
   {
@@ -100,7 +112,51 @@ export const LOCKS: readonly Lock[] = [
     // and it should be beaten; the dial tightens on the locks after it.
     pieces: 12,
   },
+  {
+    // A second shadow, and one piece less. The first board teaches that a
+    // shadow beside a neuron is an opportunity; this one puts that reading
+    // under mild pressure without changing what is being asked.
+    objective: 'light every neuron',
+    neurons: 3,
+    shadows: 2,
+    tiles: 11,
+    pieces: 11,
+  },
+  {
+    // A fourth neuron. The budget goes UP by one and the room per neuron still
+    // falls, which is the point: more to reach, not less time to think.
+    objective: 'light every neuron',
+    neurons: 4,
+    shadows: 2,
+    tiles: 10,
+    pieces: 12,
+  },
+  {
+    // The last board of the memory, and the only one where a single clear per
+    // neuron will not cover it: ten pieces against four neurons means one
+    // cascade has to reach two of them. That is the board asking for the skill
+    // the first three taught, on the fragment that ends with the question.
+    objective: 'light every neuron',
+    neurons: 4,
+    shadows: 2,
+    tiles: 10,
+    pieces: 10,
+  },
 ];
+
+/**
+ * The lock for the fragment currently being earned.
+ *
+ * Clamped at both ends. The scene spelled this out at three call sites with a
+ * `Math.min` each, against a `lockIndex` field that was declared, read three
+ * times and never once incremented — which is what made every board of a run
+ * the same board. Deriving it from the fragments already earned removes the
+ * field, and with it the possibility of the two drifting apart.
+ */
+export function lockFor(fragmentsEarned: number): Lock {
+  const index = Math.max(0, Math.min(fragmentsEarned, LOCKS.length - 1));
+  return LOCKS[index];
+}
 
 /**
  * Whether this lock's board has been solved: every neuron on it is lit.

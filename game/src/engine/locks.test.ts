@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isColour, isNeuron, isShadow } from './grid';
 import { lightAdjacent, neuronsOn, unlitCount } from './neurons';
 import { Board } from './board';
-import { LOCKS, isSolved, seedLock } from './locks';
+import { LOCKS, isSolved, lockFor, seedLock } from './locks';
+import { MEMORIES } from '../memories';
 
 /** A deterministic "random" so a seeded board is the same board every time. */
 const fixed = (values: number[]) => {
@@ -208,5 +209,65 @@ describe('a seeded lock is always solvable', () => {
       }
       expect(neurons).toBe(LOCKS[0].neurons);
     }
+  });
+});
+
+describe('the run escalates across the memory it is unlocking', () => {
+  it('has a lock for every fragment, so no board is ever played twice', () => {
+    // The four boards used to be one board. `LOCKS` held a single entry and
+    // the scene clamped to it, so the board that earned the last fragment of a
+    // memory was identical to the board that earned the first.
+    expect(LOCKS.length).toBeGreaterThanOrEqual(MEMORIES[0].nodes.length);
+  });
+
+  it('never eases the pressure as the memory fills in', () => {
+    // Pieces alone is the wrong measure — a board asking for a fourth neuron
+    // needs more of them. What has to fall is the budget PER neuron, which is
+    // how much room the player has to work each one out.
+    const roomPerNeuron = LOCKS.map((lock) => lock.pieces / lock.neurons);
+
+    for (let index = 1; index < roomPerNeuron.length; index += 1) {
+      expect(roomPerNeuron[index]).toBeLessThan(roomPerNeuron[index - 1]);
+    }
+  });
+
+  it('asks for a board that fits, so nothing it seeds is silently dropped', () => {
+    // `seedLock` fills at most SEED_ROWS deep across the columns and simply
+    // stops when it runs out of floor. A lock whose numbers overflow that
+    // seeds fewer neurons than its objective counts, which is unwinnable.
+    for (const lock of LOCKS) {
+      expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * 3);
+    }
+  });
+
+  it('seeds every neuron and shadow of every lock, not just the first', () => {
+    for (const lock of LOCKS) {
+      const board = new Board();
+      seedLock(board, lock, fixed([0.1, 0.4, 0.7, 0.2, 0.9, 0.5]));
+      const cells = cellsOn(board);
+
+      expect(cells.filter((cell) => isNeuron(cell.piece))).toHaveLength(lock.neurons);
+      expect(cells.filter((cell) => isShadow(cell.piece))).toHaveLength(lock.shadows);
+      expect(isSolved(lock, board)).toBe(false);
+    }
+  });
+});
+
+describe('lockFor picks the board for the fragment being earned', () => {
+  it('walks the locks in order as fragments are earned', () => {
+    for (let earned = 0; earned < LOCKS.length; earned += 1) {
+      expect(lockFor(earned)).toBe(LOCKS[earned]);
+    }
+  });
+
+  it('holds on the last lock rather than running off the end', () => {
+    // A run that outlasts the written locks keeps playing the hardest one. The
+    // scene used to spell this clamp out at all three of its call sites.
+    expect(lockFor(LOCKS.length)).toBe(LOCKS[LOCKS.length - 1]);
+    expect(lockFor(LOCKS.length + 99)).toBe(LOCKS[LOCKS.length - 1]);
+  });
+
+  it('holds on the first lock if it is ever asked for a nonsense fragment', () => {
+    expect(lockFor(-1)).toBe(LOCKS[0]);
   });
 });
