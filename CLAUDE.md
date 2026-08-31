@@ -1,13 +1,8 @@
-# Still Connected
+# Connected
 
 This repo holds two things:
 - the React portfolio at `/` — stable, and the crawlable default. Keep it that way.
 - the game in `game/` — served at `/game`, and the active work.
-
-The matcher is the core of a larger narrative game; build and validate the matcher first.
-
-Current stage + open questions: @docs/PROGRESS.md
-Visual + thematic direction: @docs/ART-DIRECTION.md
 
 ## Stack
 - `game/` is a self-contained Vite package: Phaser 4 + TypeScript. Browser only.
@@ -54,10 +49,6 @@ prominent alternate route, linked from the hero and both nav menus, with a way b
 the storyboard's own wording. It carries no obligation to list experience. It has to be
 good, and it has to lead to me.
 
-**Current ship bar: one memory, start to finish.** A stranger opens it, learns the
-controls without being told, plays a few minutes, completes High School, answers its
-question, and is offered a way to reach me. Memories 2–4 are out of scope until that
-works.
 
 ## Working style
 - I'm an experienced engineer but new to game dev. Explain game-dev-specific
@@ -73,3 +64,36 @@ works.
   me with no Claude attribution. Split large work into commits I can actually review;
   one enormous diff means I stop understanding my own codebase.
 - Slow down. I would rather build something good than something fast.
+
+## Comments
+One or two sentences, and only where the code cannot say it itself. A comment must
+read the same in ten years: no war stories, no "this used to be X", no bug
+post-mortems, no citations of design docs or other games, no measurements from a
+session that is over. Keep one where it names a trap or a cross-file invariant a
+reader would otherwise trip over.
+
+## Traps
+- **Chrome renders zero frames in a hidden tab.** It pauses `requestAnimationFrame`
+  entirely, so timing measured from a backgrounded window is meaningless. The window
+  must be visible and frontmost.
+- **A frame that throws kills the game until reload.** An exception escaping
+  `BoardScene.update` propagates out of Phaser's `TimeStep.step` and the rAF chain is
+  never re-requested. It reads exactly like the hidden-tab problem — the tab still
+  reports visible and focused, and the FPS readout freezes on its last value. Tell
+  them apart by checking whether `game.loop.frame` advances, then read the console.
+  `Board.place` throws on an occupied write, so scripting the board from the console
+  is the likely way to trip it.
+- **`public/_redirects` is a bare `/*  /index.html  200` catch-all.** Real files beat
+  it on Netlify, but whether a *directory* request resolves before it does is
+  unproven. If `/game` ever serves the portfolio, add `/game/*  /game/:splat  200`
+  above the catch-all.
+
+## Open questions
+Decisions not yet made, all beyond the current ship bar.
+- **Newcomer onramp** — ship a gentler mode, strong onboarding, or accept the curve.
+- **Earth** — "pushes the player 1 block deeper" is the least legible special piece.
+  Warned bottom-row insertion, garbage-style?
+- **A 30-second timer** — a hard guillotine is off-genre for a chain-planning game.
+  Pacing dial, soft pressure, or cut?
+- **Fire and Rain as light and dark** — tidy under the art direction, but it may
+  collapse two distinct pieces onto one axis.

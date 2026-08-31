@@ -140,6 +140,27 @@ const PHOTO_MAX_HEIGHT = 250;
 const REVEAL_SKIP_GRACE = 420;
 
 /**
+ * How long a solved board waits before it hands over to the next one.
+ *
+ * Two numbers because there are two ways to hand over. BEHIND_REVEAL is the
+ * one that matters: the re-seed happens under the fragment the board just
+ * earned, so the player never watches a board they solved being taken apart.
+ * It is longer than the scrim's 240ms fade-in, so the swap is under a cover
+ * that is already fully up, and shorter than `REVEAL_SKIP_GRACE`, so it cannot
+ * race a player who skips the fragment the first instant Space is offered.
+ *
+ * IN_THE_OPEN is the fallback for a board with nothing to hide behind — the
+ * one a memory's question leaves behind it, and the one a lost board takes.
+ *
+ * DIM is what the objective and the piece count take on the way out, and it is
+ * the scrim's own fade-in: they go dark as the cover comes up, rather than
+ * blinking off beside a fragment that is already being read.
+ */
+const HANDOVER_BEHIND_REVEAL = 300;
+const HANDOVER_IN_THE_OPEN = 900;
+const HANDOVER_DIM = 240;
+
+/**
  * The most an answer may be, and how fast its caret blinks.
  *
  * Capped because the answer lives on the memory panel for the rest of the run
@@ -652,8 +673,15 @@ export class BoardScene extends Scene {
    */
   private runReadouts: Phaser.GameObjects.Text[] = [];
 
-  /** Whether the run's opening line is still up, so the objective can follow it. */
-  private openingHolding = false;
+  /**
+   * Whether the objective and piece count are held dark until whatever is
+   * covering the board lifts.
+   *
+   * Two callers. The run's opening line holds them so the objective arrives as
+   * the ANSWER to it, and a board handing over holds them so the next lock's
+   * numbers do not appear over the fragment the last one just earned.
+   */
+  private objectiveHeld = false;
 
   /** The board's edge. Drawn once in `create`; it never changes. */
   private boardFrame: Phaser.GameObjects.Graphics;
@@ -1395,7 +1423,7 @@ export class BoardScene extends Scene {
       }
     }
 
-    this.finishOpening();
+    this.releaseObjective();
     this.playShadowArrival();
     this.playCascadeBeat();
     this.playSounds();
@@ -1493,7 +1521,7 @@ export class BoardScene extends Scene {
    * out of pieces does: a lost board costs you the board. R, which is the
    * player asking for a new run, does not pass it and loses everything.
    */
-  private restart(keepMemory = false): void {
+  private restart(keepMemory = false, keepStory = false): void {
     // A held game that restarts is a running game: leaving the flag set would
     // start the new run frozen behind an overlay the player just dismissed.
     this.setPaused(false);
@@ -1514,7 +1542,7 @@ export class BoardScene extends Scene {
       popup.setVisible(false);
     }
 
-    this.resetShownState(keepMemory);
+    this.resetShownState(keepMemory, keepStory);
   }
 
   /**
@@ -1525,7 +1553,7 @@ export class BoardScene extends Scene {
    * are seeded from the engine rather than zeroed, so a restart cannot sound a
    * landing or replay a beat that belonged to the run before it.
    */
-  private resetShownState(keepMemory = false): void {
+  private resetShownState(keepMemory = false, keepStory = false): void {
     this.cellsBeingFilled.clear();
     this.threatenedIndex = null;
 
@@ -1584,28 +1612,51 @@ export class BoardScene extends Scene {
     // to 0 directly, so nothing was left to reach it and a fragment the player
     // restarted out of stayed on screen over the new run for the rest of the
     // session.
-    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]);
-    for (const part of [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]) {
-      part.setVisible(false).setAlpha(1);
+    //
+    // ALL of it skipped when the story is holding the board, because that is
+    // the case where the re-seed is deliberately happening behind a fragment
+    // that must survive it. Clearing `pendingReveal` there would also swallow
+    // the question waiting behind a memory's last fragment.
+    if (!keepStory) {
+      this.tweens.killTweensOf([
+        this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
+      ]);
+      for (const part of [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]) {
+        part.setVisible(false).setAlpha(1);
+      }
+      this.revealSkippableIn = 0;
     }
-    this.revealSkippableIn = 0;
-    this.openingHolding = false;
     // Put back whatever the winning sequence faded out, or a run started from
-    // one opens with no preview, no piece count and no objective.
-    this.tweens.killTweensOf([
-      this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
-    ]);
-    for (const part of [this.piecesText, ...this.runReadouts, ...this.previewTiles]) {
-      part.setAlpha(1);
+    // one opens with no preview, no piece count and no objective. `startLock`
+    // used to bring the objective back itself, which is why it is in the list
+    // now: a handover re-seeds the board from in here, and a lock that lit its
+    // own objective line would have written the next board's count over the
+    // fragment this one earned.
+    //
+    // Skipped entirely under `keepStory`, for that same reason — the hold is
+    // already on, put there by the handover on its way out, and releasing it
+    // is `releaseObjective`'s job once the fragment lifts.
+    if (!keepStory) {
+      this.objectiveHeld = false;
+      this.tweens.killTweensOf([
+        this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
+      ]);
+      for (const part of [
+        this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
+      ]) {
+        part.setAlpha(1);
+      }
     }
-    this.awaitingAnswer = false;
-    this.answerText = '';
+    if (!keepStory) {
+      this.awaitingAnswer = false;
+      this.answerText = '';
+      this.tweens.killTweensOf([this.answerLine, this.answerEcho]);
+      this.answerLine.setVisible(false);
+      this.answerEcho.setVisible(false);
+    }
     if (!keepMemory) {
       this.memoryAnswers = [];
     }
-    this.tweens.killTweensOf([this.answerLine, this.answerEcho]);
-    this.answerLine.setVisible(false);
-    this.answerEcho.setVisible(false);
 
     // EVERY cell, not only the ones a shadow was standing on. `killAll` above
     // stops any tween mid-flight, and a cell left part-way through the flare a
@@ -1635,9 +1686,11 @@ export class BoardScene extends Scene {
     this.hitStopRemaining = 0;
     this.nextScorePopup = 0;
 
-    this.revealRemaining = 0;
-    this.pendingReveal = null;
-    this.revealPending = false;
+    if (!keepStory) {
+      this.revealRemaining = 0;
+      this.pendingReveal = null;
+      this.revealPending = false;
+    }
     // Back to -1, not to the engine's count: the new run has locked nothing,
     // and seeding this from `piecesLocked` would make the first fragment wait
     // for a placement it has already been paid for.
@@ -1681,24 +1734,59 @@ export class BoardScene extends Scene {
     // as a reply to "you stopped here before" when it follows one. It sits
     // above the board and therefore outside the scrim, so it has to be dimmed
     // by hand rather than covered.
-    this.openingHolding = true;
-    this.objectiveText.setAlpha(0);
+    // Cut to dark rather than faded: nothing has been on screen yet, so there
+    // is nothing to fade FROM. A handover is the other case and it fades.
+    this.holdObjective(0);
   }
 
   /**
-   * Bring the objective in once the opening is over, however it ended.
+   * Hold the objective and the piece count dark until the board is uncovered.
    *
-   * Driven from `update` rather than scheduled, because Space skips the opening
-   * and a `delayedCall` would leave the objective dark until the timer it no
-   * longer matches fired.
+   * `fade` is 0 for the opening and a duration for a handover, and the
+   * difference is the whole reason it is a parameter. The opening holds them
+   * before either has ever been drawn, so it cuts; a handover dims them out
+   * from under the player's eye while the fragment is going up, and cutting
+   * two lit readouts to nothing on one frame reads as a flicker.
    */
-  private finishOpening(): void {
-    if (!this.openingHolding || this.revealRemaining > 0) {
+  private holdObjective(fade: number): void {
+    const held = [this.objectiveText, this.piecesText];
+    this.objectiveHeld = true;
+    this.tweens.killTweensOf(held);
+
+    if (fade === 0) {
+      for (const part of held) {
+        part.setAlpha(0);
+      }
       return;
     }
 
-    this.openingHolding = false;
-    this.tweens.add({ targets: this.objectiveText, alpha: 1, duration: 520 });
+    this.tweens.add({ targets: held, alpha: 0, duration: fade });
+  }
+
+  /**
+   * Bring them back once whatever was covering the board lifts.
+   *
+   * Driven from `update` rather than scheduled, because Space skips a fragment
+   * and a `delayedCall` would leave the objective dark until the timer it no
+   * longer matches fired. That was written for the opening and it is the same
+   * reason the handover needs it: both are held by something the player is
+   * allowed to cut short.
+   *
+   * Tests `storyHolding` rather than the countdown, so a fragment that hands
+   * over to a QUESTION does not uncover the next lock's numbers in the gap
+   * between the two.
+   */
+  private releaseObjective(): void {
+    if (!this.objectiveHeld || this.storyHolding) {
+      return;
+    }
+
+    this.objectiveHeld = false;
+    this.tweens.add({
+      targets: [this.objectiveText, this.piecesText],
+      alpha: 1,
+      duration: 520,
+    });
   }
 
   private readInput(delta: number): void {
@@ -1823,7 +1911,6 @@ export class BoardScene extends Scene {
     this.shownPiecesRemaining = -1;
     this.litNeurons = [];
     this.refreshObjective();
-    this.objectiveText.setAlpha(1);
   }
 
   /**
@@ -1963,7 +2050,10 @@ export class BoardScene extends Scene {
       this.lockEndingIn -= delta;
       if (this.lockEndingIn <= 0) {
         this.lockEndingIn = 0;
-        this.restart(true);
+        // Read now rather than remembered from when the countdown was set: a
+        // fragment can be skipped inside it, and a board that re-seeds as if
+        // it were still covered would keep a dissolved fragment's state.
+        this.restart(true, this.storyHolding);
       }
       return;
     }
@@ -1975,14 +2065,37 @@ export class BoardScene extends Scene {
     // `simulation.acceptsInput` had already gone false on `outOfPieces`. The
     // board locked up showing a stale objective and a red 0, and only R got out
     // of it.
-    //
-    // Waits for the fragment: `revealPending` is set the instant the lock is
-    // solved and consumed when the words surface, so handing over before that
-    // would re-seed the board out from under the thing it just earned.
     if (this.lockSolved) {
-      if (!this.storyHolding && !this.simulation.resolving && !this.revealPending) {
-        this.lockEndingIn = 900;
+      // Not yet: the cascade is still running, or the fragment it earned has
+      // not surfaced. `revealPending` is set the instant the lock is solved and
+      // consumed when the words go up, so handing over before that would
+      // re-seed the board out from under the thing it just earned.
+      if (this.simulation.resolving || this.revealPending) {
+        return;
       }
+
+      // Nor while a question is coming or on screen. `pendingReveal` is the
+      // one waiting behind a memory's last fragment, and the answer to it
+      // drives every shadow off THIS board — the one that earned the question.
+      // Re-seeding behind it would pay that out on a board nobody has played.
+      if (this.pendingReveal !== null || this.awaitingAnswer) {
+        return;
+      }
+
+      // Behind the fragment when there is one to hide behind, which is nearly
+      // always. The board the player solved is left standing until the words
+      // cover it, swaps underneath them, and the fragment lifts onto a fresh
+      // one — so a solved board is never taken apart in front of the person
+      // who solved it. The objective and the count go with it, dimming as the
+      // scrim comes up; `releaseObjective` brings them back with the new
+      // numbers once the fragment is gone.
+      if (this.revealRemaining > 0) {
+        this.holdObjective(HANDOVER_DIM);
+        this.lockEndingIn = HANDOVER_BEHIND_REVEAL;
+        return;
+      }
+
+      this.lockEndingIn = HANDOVER_IN_THE_OPEN;
       return;
     }
 

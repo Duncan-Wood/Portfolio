@@ -5,19 +5,10 @@ import { findGroups } from './matching';
 import { type CascadeBeat, Simulation } from './simulation';
 import { DEFAULT_TUNING } from '../tuning';
 
-/*
- * These drive the pair by letting it FALL, so they ask for gravity explicitly.
- * The shipped game has it off — see `gravityEnabled` in `tuning.ts` — because
- * the game is an escape room made of boards and a piece descending while you
- * read one is a clock. What is being tested here is still real: hard drop,
- * lock delay and the cascade all behave the same either way, and the
- * deliberate-placement rules have their own block in `simulation.test.ts`.
- */
-const FALLING = { ...DEFAULT_TUNING, gravityEnabled: true };
 
 const RED = 0;
 const BLUE = 1;
-const simulation = () => new Simulation(() => [RED, BLUE], FALLING);
+const simulation = () => new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
 
 /** Lock whatever is falling and run the cascade it starts to the end. */
 const settle = (game: Simulation) => {

@@ -15,28 +15,18 @@ import {
  * The match rule and the cascade: what counts as a group, what clearing does,
  * and how a chain scores.
  *
- * The rule is Puyo's: four or more same-coloured tiles touching orthogonally,
- * in ANY shape. Not lines. That was chosen over match-3 lines because the art
- * direction's core image is a network — chains lighting the leading between
- * tiles should read as a signal crossing a graph, and a connected blob is a
- * graph while a row of three is not. This accepts the design plan's warning
- * that Puyo-style chain-building is hard for newcomers.
- *
  * Everything here is pure: functions take a `Board`, mutate it, and return
  * plain data. No Phaser, no timers, no randomness — which is why the whole rule
  * set is testable from ASCII pictures of boards.
  */
 
 /**
- * How many connected tiles are needed to clear. Four is Puyo standard.
- * Lowering it to three makes clears far more frequent and setups shallower.
+ * How many connected tiles are needed to clear.
  */
-export const MATCH_SIZE = 4;
+const MATCH_SIZE = 4;
 
 /**
- * The four orthogonal neighbours. Diagonals are deliberately absent — tiles
- * touching corner-to-corner do NOT connect, which is what makes group shapes
- * readable at a glance.
+ * The four orthogonal neighbours.
  */
 const NEIGHBOURS = [
   { column: 0, row: -1 },
@@ -112,8 +102,7 @@ export function findGroups(board: Board): Group[] {
   const groups: Group[] = [];
 
   // Starts at the first VISIBLE row: a tile resting in the hidden field is
-  // inert. It neither forms a group of its own nor joins one below it, so the
-  // player never sees tiles vanish because of something they cannot see.
+  // inert.
   for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
     for (let column = 0; column < COLUMNS; column += 1) {
       const pieceType = board.pieceAt(column, row);

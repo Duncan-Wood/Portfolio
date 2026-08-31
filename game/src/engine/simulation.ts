@@ -60,7 +60,7 @@ export const SPAWN_ROW = FIRST_VISIBLE_ROW;
  * a fixed or scripted sequence. Every engine test is therefore deterministic
  * without needing a seeded RNG.
  */
-export type PieceTypeSupplier = () => [number, number];
+type PieceTypeSupplier = () => [number, number];
 
 /**
  * One beat of a cascade, tagged with which kind it was.
@@ -347,32 +347,11 @@ export class Simulation {
       }
     }
 
-    // Nothing moves or commits itself while gravity is off and the piece is
-    // still IN THE AIR. That is the point of cutting gravity: a board can be
-    // thought about for as long as it takes, and no clock takes the decision
-    // away while the piece is somewhere the player has not chosen yet.
-    //
-    // A piece that has LANDED is a different case, and this used to get it
-    // wrong. It held the lock timer at zero there too, so the only thing that
-    // could ever commit a piece was `hardDrop` — every single placement in the
-    // game cost a press of space after the piece was already exactly where the
-    // player wanted it. That is not a decision, it is a keystroke tax, and it
-    // broke the flow of the one action the game is made of. A landed piece
-    // settles on the lock delay, like it does in every game in this genre, and
-    // the delay still resets on a move so it can be slid along the floor.
-    if (!this.tuning.gravityEnabled && !this.softDropping && this.pair.canFall(this.board)) {
-      this.lockTimer = 0;
-      return;
-    }
-
     if (!this.pair.canFall(this.board)) {
       // LOCK DELAY: a grace period between touching down and being committed.
       // Without it a landed piece freezes instantly and you can never slide it
       // into a gap at the last moment, which feels punishing.
       //
-      // It runs with gravity off too. It used to return here instead, which is
-      // what made space the only way to commit anything — see the note above
-      // the airborne guard.
       this.lockTimer += delta;
 
       if (this.lockTimer >= this.tuning.lockDelay) {

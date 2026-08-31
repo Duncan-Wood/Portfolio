@@ -30,7 +30,7 @@ import { EMPTY_COLOR, SHADOW_EYE_GLOW, TRACK_COLOR, TRACK_LIT_COLOR, mix } from 
  */
 
 /** How many node slots the brain has room for, written or not. */
-export const BRAIN_NODE_SLOTS = 16;
+const BRAIN_NODE_SLOTS = 16;
 
 /**
  * Where each node sits, as a fraction of the brain's box.
@@ -49,12 +49,12 @@ const NODE_SLOTS: readonly { x: number; y: number }[] = [
 ];
 
 /** The node slot for a fragment index, wrapping if the game ever outgrows the brain. */
-export function brainNode(index: number): { x: number; y: number } {
+function brainNode(index: number): { x: number; y: number } {
   return NODE_SLOTS[index % NODE_SLOTS.length];
 }
 
 /** How many fragments every written memory adds up to. */
-export function writtenNodeCount(): number {
+function writtenNodeCount(): number {
   return MEMORIES.reduce((total, memory) => total + memory.nodes.length, 0);
 }
 
@@ -79,7 +79,7 @@ const OUTLINE: readonly { x: number; y: number }[] = [
   { x: 0.08, y: 0.31 }, { x: 0.17, y: 0.23 }, { x: 0.24, y: 0.11 }, { x: 0.37, y: 0.06 },
 ];
 
-export interface BrainBox {
+interface BrainBox {
   left: number;
   top: number;
   width: number;

@@ -9,7 +9,7 @@
  * `sound-board.ts` is the half that knows how to play one.
  */
 
-export type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
+type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 /** One note: sweep from `startFrequency` to `endFrequency` over `duration` ms. */
 export interface Voice {
@@ -23,8 +23,7 @@ export interface Voice {
   /**
    * Where in the stereo field, -1 hard left to 1 hard right. Omitted is centred.
    *
-   * Every sound in this game was dead centre, which is why a board six columns
-   * wide sounded like one point. A pop that comes from where you cleared makes
+   * Every sound in this game was dead center. A pop that comes from where you cleared makes
    * the board a place rather than a picture.
    *
    * Optional so every existing voice, and every test that asserts on one, is
@@ -37,21 +36,18 @@ export interface Voice {
 export const BASE_POP_FREQUENCY = 440;
 
 /**
- * How much higher each further link pops. Roughly a semitone, so a chain walks
- * up a scale rather than jumping — the escalation should feel like counting,
- * not like an alarm.
+ * How much higher each further link pops. Roughly a semitone.
  */
-export const POP_RATIO = 1.06;
+const POP_RATIO = 1.06;
 
 /**
  * Two octaves above the base, where the climb stops.
  *
- * Chains have no theoretical ceiling. Without a cap a long enough one walks out
- * of the hearing range, which would make the payoff quieter the better you play.
+ * Chains have no theoretical ceiling. 
  */
 export const MAX_POP_FREQUENCY = BASE_POP_FREQUENCY * 4;
 
-/** A group vanishing. `linkIndex` is 0-based, so the first link pops at A4. */
+/** A group vanishing. */
 export function popVoice(linkIndex: number): Voice {
   const climbed = BASE_POP_FREQUENCY * POP_RATIO ** linkIndex;
   const frequency = Math.min(climbed, MAX_POP_FREQUENCY);
@@ -66,7 +62,7 @@ export function popVoice(linkIndex: number): Voice {
   };
 }
 
-/** A pair settling onto the stack. Low and short, so it never competes. */
+/** A pair settling onto the stack. */
 export function landVoice(): Voice {
   return {
     waveform: 'sine',
@@ -79,8 +75,7 @@ export function landVoice(): Voice {
 }
 
 /**
- * A slam. Louder and lower the further it fell, because the scene scales its
- * screen shake the same way and the two should agree about how hard that was.
+ * A slam. Louder and lower the further it fell, like the screen shake.
  */
 export function hardDropVoice(distance: number): Voice {
   const weight = Math.min(distance, 12) / 12;

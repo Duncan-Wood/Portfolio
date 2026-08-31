@@ -16,7 +16,7 @@
 export type HorizontalDirection = -1 | 1;
 
 /** The two dials this module owns. Structurally a subset of `Tuning`. */
-export interface InputTuning {
+interface InputTuning {
   autoShiftDelay: number;
   autoRepeatInterval: number;
 }
@@ -36,7 +36,7 @@ export interface InputFrame {
  * needs the outcome, not just to fire and forget, so it can stop pushing
  * against a wall.
  */
-export type ShiftAttempt = (direction: HorizontalDirection) => boolean;
+type ShiftAttempt = (direction: HorizontalDirection) => boolean;
 
 export class InputTranslator {
   private heldDirection: HorizontalDirection | null = null;
