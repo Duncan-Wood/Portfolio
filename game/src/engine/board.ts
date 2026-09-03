@@ -2,22 +2,18 @@ import { COLUMNS, ROWS, isAnchored } from './grid';
 
 /*
  * The settled contents of the playfield. It knows nothing about the falling
- * pair, matching, scoring, or time — everything above it reads and writes the
- * board, but the board has no opinion about the rules.
+ * pair, matching, scoring or time.
  */
 
 /**
- * `null` rather than `0` or `undefined`, so "no piece" cannot be confused with
- * piece type `0`, which is a real colour. A falsy check like `if (!pieceAt())`
- * would treat colour 0 as empty; comparing against `null` cannot.
+ * `null`, not `0`: piece type 0 is a real colour, so `if (!pieceAt())` would
+ * treat it as empty.
  */
 const EMPTY = null;
 
 /**
- * One tile's journey during a settle. `settle` returns these so the scene can
- * animate the drop: the board itself is already in its final state by the time
- * anything renders, so without a record of where each tile came from the fall
- * can only be drawn as a teleport.
+ * One tile's journey during a settle. The board is in its final state by the
+ * time anything renders, so without this a fall can only be drawn as a teleport.
  */
 export interface TileMove {
   column: number;
@@ -26,18 +22,14 @@ export interface TileMove {
 }
 
 export class Board {
-  /**
-   * Flat rather than 2D, indexed `row * COLUMNS + column`. Private so the
-   * storage layout can change without breaking callers, who only ever use
-   * `(column, row)`.
-   */
+  /** Flat rather than 2D, indexed `row * COLUMNS + column`. */
   private cells: (number | null)[] = new Array(COLUMNS * ROWS).fill(EMPTY);
 
   isInside(column: number, row: number): boolean {
     return column >= 0 && column < COLUMNS && row >= 0 && row < ROWS;
   }
 
-  /** Total over all coordinates: reading off-board returns `EMPTY`, not a throw. */
+  /** Total: reading off-board returns `EMPTY` rather than throwing. */
   pieceAt(column: number, row: number): number | null {
     return this.isInside(column, row) ? this.cells[row * COLUMNS + column] : EMPTY;
   }
@@ -47,21 +39,16 @@ export class Board {
   }
 
   /**
-   * Anything off the board or already occupied blocks a move. No exemption for
-   * cells above the board: one used to exist so a pair could spawn with its
-   * satellite at row -1, and the hidden row replaced it. Keeping it would let
-   * the ceiling silently stop blocking, which is exactly what the topping-out
-   * rule depends on.
+   * No exemption for cells above the board: the topping-out rule depends on the
+   * ceiling blocking.
    */
   isBlocked(column: number, row: number): boolean {
     return !this.isInside(column, row) || !this.isEmpty(column, row);
   }
 
   /**
-   * Throws rather than ignoring an off-board or on-top-of-something write, since
-   * a caller placing outside the board or over a tile the player built with has
-   * a bug, and quiet failure would hide it — an overwrite destroys a tile with
-   * no error and no failing test. Callers ask first: `FallingPair` via `fits`,
+   * Throws rather than ignoring a bad write: an overwrite destroys a tile the
+   * player built with, silently. Callers ask first — `FallingPair` via `fits`,
    * the simulation via the topping-out rule.
    */
   place(column: number, row: number, pieceType: number): void {
@@ -83,24 +70,14 @@ export class Board {
   }
 
   /**
-   * Gravity for already-placed tiles: each column compacted downward, closing
-   * gaps. A tile never changes column.
+   * Gravity for already-placed tiles: each column compacted downward. A tile
+   * never changes column.
    *
-   * The scan runs bottom-up, moving each tile found to the lowest free slot.
-   * Because it reads upward and writes downward it can never overwrite a tile
-   * it has not yet visited, so no temporary copy is needed.
+   * The scan runs bottom-up, reading upward and writing downward, so it can
+   * never overwrite a tile it has not yet visited and needs no temporary copy.
    *
-   * An ANCHORED cell — a neuron — is the exception, and it is what makes a
-   * board a designed puzzle instead of a stack. It stays exactly where it was
-   * placed and nothing falls past it, so the tiles above it come to rest ON it
-   * while the ones below compact among themselves. Dr. Mario's viruses work
-   * this way for the same reason: geometry that rearranges itself under you
-   * cannot be planned around, and planning is the whole satisfaction here.
-   *
-   * Two runtime callers: `FallingPair.lock` (which is what lets the two halves
-   * come to rest at different heights and SPLIT APART — Puyo behaviour, where a
-   * Tetris piece stays rigid) and the cascade's settle beat. `resolveStep` is a
-   * third caller, reached only from the test-only `resolveChain`.
+   * An ANCHORED cell stays put and nothing falls past it: tiles above come to
+   * rest ON it while the ones below compact among themselves.
    */
   settle(): TileMove[] {
     const moves: TileMove[] = [];
@@ -114,16 +91,14 @@ export class Board {
           continue;
         }
 
-        // It does not move, and it is the floor for everything above it. The
-        // scan is bottom-up, so `target` is never below `row` by the time this
-        // runs and the tiles already packed underneath are left alone.
+        // The floor for everything above it. The scan is bottom-up, so `target`
+        // is never below `row` here and the tiles beneath are left alone.
         if (isAnchored(pieceType)) {
           target = row - 1;
           continue;
         }
 
-        // A tile already resting on the packed floor has not moved, and
-        // reporting it would make the scene animate a zero-length drop.
+        // Reporting a tile that has not moved would animate a zero-length drop.
         if (row !== target) {
           moves.push({ column, fromRow: row, toRow: target });
         }
@@ -138,18 +113,12 @@ export class Board {
   }
 
   /**
-   * The row a tile dropped down this column would come to rest in, or `-1` if
-   * nothing can enter the column at all.
+   * Where a tile dropped down this column comes to rest, or `-1` if nothing can
+   * enter it.
    *
-   * Scanned from the TOP down, stopping at the first thing in the way. It used
-   * to scan up from the floor and return the deepest empty cell, which was only
-   * correct while `settle` guaranteed a column had no floating gaps. Anchored
-   * cells break that guarantee on purpose: clear the tiles beneath a neuron and
-   * the pocket under it is empty and unreachable, and a piece dropped into that
-   * column has to land on the neuron rather than teleport underneath it.
-   *
-   * Here rather than in whatever wants it because it is gravity's inverse, and
-   * gravity is this module's business.
+   * From the TOP down. Scanning up from the floor for the deepest empty cell is
+   * only correct if a column has no floating gaps, and anchored cells break
+   * that: the pocket under a neuron is unreachable, and a piece must land ON it.
    */
   landingRow(column: number): number {
     let landing = -1;
@@ -164,7 +133,6 @@ export class Board {
     return landing;
   }
 
-  /** Empty every cell, for a restart. */
   reset(): void {
     this.cells.fill(EMPTY);
   }

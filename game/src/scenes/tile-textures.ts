@@ -20,30 +20,19 @@ import {
 /*
  * What a tile looks like, baked once into a texture per piece type.
  *
- * Drawn at runtime with `Graphics.generateTexture` rather than loaded from
- * files, for the same reason the audio is synthesised: the game ships no art,
- * no loader step and no licences, and a colour change is one hex literal rather
- * than five exported PNGs that can fall out of step with each other.
+ * Drawn at runtime rather than loaded, so the game ships no art, no loader step
+ * and no licences.
  *
- * Baked ONCE, in `create`, and never again — a texture is uploaded to the GPU
- * on first use, so drawing one per tile per frame would be the most expensive
- * thing in the game. After baking, a cell changes type by swapping a texture
- * key, which costs nothing.
- *
- * The look follows ART-DIRECTION: a jewel-toned pane, the leading around it
- * drawn dark, and the figure inside drawn in that same lead. The figure is not
- * decoration — see `PIECE_SHAPES` for why colour alone will not do, and why
- * these four are circuit parts rather than arbitrary shapes.
+ * Baked ONCE, in `create`: a texture uploads to the GPU on first use, so baking
+ * per tile per frame would be the most expensive thing in the game. Afterwards a
+ * cell changes type by swapping a key, which costs nothing.
  */
 
 const EMPTY_TILE_TEXTURE = 'tile-empty';
 
 /**
- * The trace that runs between two matching tiles: a segment with a pad at each
- * end, baked white so one texture can be tinted to any piece colour.
- *
- * Drawn horizontally and rotated for the vertical case, because a trace is
- * symmetrical and a second bake would be a second thing to keep in step.
+ * Baked white so one texture tints to any piece colour, and horizontally so the
+ * vertical case is a rotation rather than a second bake to keep in step.
  */
 export const TRACE_TEXTURE = 'trace';
 
@@ -51,37 +40,24 @@ export const TRACE_TEXTURE = 'trace';
 const TRACE_OVERLAP = 11;
 
 /**
- * The shadow's eyes, baked apart from its body so the scene can blink them,
- * flare them as one arrives, and add them over the top of whatever they are
- * sitting on.
- *
- * A dim pair is baked into the body as well. The overlay is only drawn for a
- * shadow that is settled and idling, so without them a shadow in mid-fall — or
- * one being blown off the board — would go briefly, and visibly, blind.
+ * Apart from the body so the scene can blink and flare them. A dim pair is baked
+ * into the BODY as well, because this overlay is only drawn for a settled
+ * shadow — without them one in mid-fall would go visibly blind.
  */
 export const SHADOW_EYES_TEXTURE = 'shadow-eyes';
 
 /**
- * The creature on its own, one texture per strength, to be laid OVER the tile
- * it has taken.
- *
- * A layer rather than a replacement, because the shadow possesses a tile now
- * and the player has to be able to see which one. The pit behind it is drawn
- * part-transparent so the colour and figure underneath still read, and the
- * creature itself stays opaque so it keeps its silhouette against any of the
- * four. Freeing it is then just this layer coming off, and the tile that was
- * always underneath is revealed — which is exactly what the mechanic does.
+ * One texture per strength, laid OVER the tile it has taken so the player can
+ * see WHICH tile is possessed. The pit is part-transparent so the colour
+ * underneath still reads; the creature stays opaque so it keeps its silhouette.
  */
 export function shadowBodyTexture(strength: number): string {
   return `shadow-body-${Math.min(Math.max(strength, 1), MAX_SHADOW_STRENGTH)}`;
 }
 
 /**
- * How much of the possessed tile shows through the pit.
- *
- * Tuned against the two jobs it has to do at once: dark enough that the
- * creature reads as a silhouette on top of a bright yellow tile, light enough
- * that the colour underneath is still nameable at a glance on a violet one.
+ * Dark enough that the creature is a silhouette over a bright tile, light enough
+ * that the colour under a dark one is still nameable.
  */
 const PIT_OPACITY = 0.8;
 
@@ -93,13 +69,7 @@ const EYE_ROW = 0.48;
 const EYE_WIDTH = 0.115;
 const EYE_HEIGHT = 0.105;
 
-/**
- * The border every tile leaves around itself, and the roundness of its corner.
- *
- * Shared rather than written once per bake: the shadow's pit has to sit on the
- * same rectangle as the panes for the grid to stay readable at speed, and that
- * is an invariant two copies of a magic number cannot keep.
- */
+/** The shadow's pit must sit on the same rectangle as the panes. */
 const TILE_INSET = 2;
 
 function tileCornerRadius(size: number): number {
@@ -109,7 +79,7 @@ function tileCornerRadius(size: number): number {
 const NEURON_TEXTURE = 'neuron';
 const NEURON_LIT_TEXTURE = 'neuron-lit';
 
-/** The texture key for a piece type. Bake before any of these are used. */
+/** Bake before any of these are used. */
 export function tileTexture(pieceType: number | null): string {
   if (pieceType === null) {
     return EMPTY_TILE_TEXTURE;
@@ -124,25 +94,14 @@ export function tileTexture(pieceType: number | null): string {
 }
 
 /**
- * A neuron: a socket set into the board, with a terminal at the centre of it.
+ * A socket set into the board, with a terminal at the centre.
  *
- * The FIRST version of this was invisible, and the way it failed is worth
- * keeping. It was drawn from the same two primitives the empty cell is drawn
- * from — a cross of dormant runs and a drilled via — in a slightly lighter
- * violet. On paper that made it part of the vocabulary. On the board it made it
- * indistinguishable from a hole, so tiles resting on one looked like tiles
- * floating in mid-air and the whole board read as a settling bug.
+ * What separates an OCCUPIED cell from an empty one is an EDGE: a tile has its
+ * leading, a possessed cell has the rim of its pit, an empty cell has none. A
+ * neuron is occupied, so it gets one — without it the cell reads as a hole and
+ * the tiles resting on it look like they are floating.
  *
- * What separates every OCCUPIED cell in this game from an empty one is an EDGE:
- * a tile has its leading stroked around it, a possessed cell has the dark rim of
- * its pit. An empty cell has no edge at all. A neuron is occupied — things rest
- * on it, nothing falls past it — so it gets an edge, and that single change is
- * what makes the board legible.
- *
- * Unlit it is a dark socket with a dull violet bezel: findable, obviously a
- * fixture, and still quiet enough that the tiles win the eye. Lit it is the same
- * socket with the bezel and the terminal burning in the game's own violet. It
- * does not become a different object when you reach it; it turns on.
+ * Lit is the same socket burning: it turns on rather than becoming something else.
  */
 function bakeNeuron(graphics: Phaser.GameObjects.Graphics, size: number, lit: boolean): void {
   const middle = size / 2;
@@ -208,21 +167,12 @@ function bakeNeuron(graphics: Phaser.GameObjects.Graphics, size: number, lit: bo
 }
 
 /**
- * An empty cell: bare substrate with dormant routing printed on it.
+ * Bare substrate with dormant routing, so the wiring is present before any of it
+ * carries anything. The runs REACH THE EDGE: two neighbouring cells line their
+ * stubs up across the gap and read as one continuous route.
  *
- * The board used to be flat rectangles until something landed on it, which
- * meant the network only existed at the moment of a match — tiles that briefly
- * sprouted connectors rather than a circuit that was already there. Unlit runs
- * to all four edges and a via at the centre make the wiring visibly present
- * before any of it carries anything.
- *
- * The runs REACH THE EDGE deliberately. Two neighbouring empty cells line their
- * stubs up across the gap and read as one continuous route, so the dormant
- * network crosses the whole board instead of stopping at every cell boundary.
- *
- * Everything here sits a hair above the ground colour. It has to survive being
- * looked past: a substrate that competes with the tiles is worse than none,
- * because the tiles are what gets read under time pressure.
+ * A hair above the ground colour — it has to survive being looked past, and a
+ * substrate that competes with the tiles is worse than none.
  */
 function bakeEmpty(graphics: Phaser.GameObjects.Graphics, size: number): void {
   const inset = TILE_INSET;
@@ -258,13 +208,9 @@ function bakeEmpty(graphics: Phaser.GameObjects.Graphics, size: number): void {
 }
 
 /**
- * One figure from the circuit vocabulary, centred in the tile.
- *
- * Every one of these is built from the same two primitives the traces between
- * tiles use — a straight run and a round pad — so a tile reads as a piece of
- * the same network rather than as an icon sitting on top of one. They are
- * deliberately blunt: at 64px, travelling, the silhouette is all the player
- * gets, and ART-DIRECTION puts readability above ornament.
+ * Built from the same two primitives the traces use, so a tile reads as part of
+ * the network rather than an icon on top of one. Deliberately blunt: at this
+ * size, travelling, the silhouette is all the player gets.
  */
 function drawShape(
   graphics: Phaser.GameObjects.Graphics,
@@ -344,41 +290,26 @@ function bakeOne(
 }
 
 /**
- * Draw every tile texture the board will ask for, at `size` pixels square.
- *
- * Must run before anything that references a key — an emitter or image built
- * against a texture that does not exist yet renders as Phaser's missing-texture
- * placeholder and never recovers, which is how the spark texture first shipped.
+ * Must run before anything that references a key: an emitter or image built
+ * against a missing texture renders as a placeholder and never recovers.
  */
-/** The texture key a memory's picture is baked under. */
 export function memoryArtTexture(key: string): string {
   return `memory-art-${key}`;
 }
 
 /**
- * How wide a memory picture is baked, in pixels.
- *
- * Sized to the box it is shown in rather than to the grid, so the cell size
- * falls out of how many cells there are: one 16-wide portrait gets fat cells
- * with room for a figure, and a 54-wide crowd gets small ones that read as a
- * mass of people. Baked at twice the display width so it stays sharp on a
- * retina screen without shipping anything.
+ * Sized to the box rather than the grid, so cell size falls out of how many
+ * cells there are: a 16-wide portrait gets fat cells, a 54-wide crowd gets small
+ * ones that read as a mass of people. Twice the display width, for retina.
  */
 const MEMORY_ART_WIDTH = 660;
 
 /**
- * Bake a memory's picture out of the game's own tiles.
+ * Baked out of the game's own tiles, so a memory is visibly made of the same
+ * material as the board — the one thing a photograph could not say.
  *
- * The payoff for doing it this way rather than loading a photograph: a memory
- * is visibly made of the same material as the board, which is the one thing an
- * actual photo could not say. It also keeps the rule this file opens with —
- * art is baked, not loaded — and it is why no image ships at all.
- *
- * Panes and leading only, no figures. `drawShape` centres on a single
- * coordinate and cannot be offset into a cell, and at the sizes these come out
- * at — a 54-wide crowd lands near twelve pixels a cell — a pad and a via are
- * the same four dots anyway. The colour is doing the work; a figure would be
- * noise on top of it.
+ * Panes and leading only: `drawShape` centres on a single coordinate and cannot
+ * be offset into a cell, and at this size a pad and a via are the same four dots.
  */
 function bakeMemoryArt(
   graphics: Phaser.GameObjects.Graphics,
@@ -457,24 +388,14 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
 }
 
 /**
- * The creature that has taken a cell, drawn to sit on top of that cell's tile.
+ * A pit with something crouching in it, not a tile with the colour taken out.
  *
- * Not a tile with the colour taken out — a pit, with something crouching in it.
- * Drawn from a pencil study rather than invented: a jagged crown springing from
- * both sides of the head,
- * big round eyes under a spiked fringe, a wide mouth of zigzag teeth, and a
- * body that is a fan of long torn strokes rather than a solid shape.
+ * The rule at this size: NOTHING on it is smooth, because a silhouette with no
+ * sharp edge reads as cute. The crown and the teeth survive at speed, so they
+ * are the largest things on it.
  *
- * The rule the drawings set, and the one that matters at 64 pixels: NOTHING on
- * it is smooth. The pass before this one was built from circles and two thin
- * curled antennae, and a silhouette with no sharp edge in it reads as cute — a
- * rabbit, at the size the player actually sees. The crown is the largest thing
- * on the creature in the reference, so it is the largest thing here; it and the
- * teeth are what survive at speed.
- *
- * It is drawn out to the very edge of the texture and past the inset the tiles
- * respect, so a run of them merges across the gaps into one mass rather than
- * lining up as a tidy row of blocks.
+ * Drawn past the inset the tiles respect, so a run of them merges across the
+ * gaps into one mass rather than a tidy row of blocks.
  */
 function bakeShadow(
   graphics: Phaser.GameObjects.Graphics,
@@ -533,10 +454,8 @@ function bakeShadow(
   drawFringe(graphics, size);
   drawMouth(graphics, size);
 
-  // The light on it, in three separate catches rather than one contour: the
-  // crown on each side, and a short skim off the crown of the head. Rim light,
-  // not an outline — an unbroken outline is what made the first version look
-  // like a box someone had forgotten to fill in.
+  // Rim light rather than an outline: separate catches off the crown of the
+  // head, because an unbroken contour reads as a box left unfilled.
   for (const light of [
     { x: 0.5, y: HEAD_ROW, radius: HEAD_RADIUS, from: 1.2, to: 1.62, alpha: 0.5 + menace * 0.45 },
   ]) {
@@ -561,12 +480,9 @@ function bakeShadow(
 }
 
 /**
- * The lit eyes on their own, over a violet halo, sized to the tile so the scene
- * can drop one straight onto a cell centre.
- *
- * Baked in their final colours rather than white-and-tinted, because the halo
- * and the core are two different colours and a tint would flatten them into
- * one. The scene brightens them by alpha and scale instead.
+ * Baked in final colours rather than white-and-tinted: the halo and the core are
+ * different colours, and a tint flattens them into one. The scene brightens them
+ * by alpha and scale.
  */
 function bakeShadowEyes(graphics: Phaser.GameObjects.Graphics, size: number): void {
   graphics.clear();
@@ -587,12 +503,8 @@ function bakeShadowEyes(graphics: Phaser.GameObjects.Graphics, size: number): vo
 }
 
 /**
- * Two wide eyes, tipped very slightly so they are not a matched pair.
- *
- * Round rather than the narrow slanted almonds this had first: the reference
- * draws them as big open ovals, and the menace in it comes from the crown, the
- * fringe and the teeth. Angry eyes on top of all three was one idea too many,
- * and narrow eyes are the first thing to disappear at 64 pixels.
+ * Tipped slightly, so they are not a matched pair. Round rather than narrow:
+ * narrow eyes are the first thing to disappear at this size.
  */
 function drawEyes(graphics: Phaser.GameObjects.Graphics, size: number, color: number): void {
   graphics.fillStyle(color, 1);
@@ -623,12 +535,8 @@ function drawFringe(graphics: Phaser.GameObjects.Graphics, size: number): void {
 }
 
 /**
- * A wide mouth of zigzag teeth.
- *
- * The cavity is the pit's own colour — a hole in the creature rather than paint
- * on it — and the teeth are lit, because at this size a dark tooth inside a
- * dark mouth is a smudge. It is the second thing after the crown that survives
- * being 64 pixels across, so it is worth the six triangles.
+ * The cavity is the pit's own colour — a hole rather than paint — and the teeth
+ * are lit, because a dark tooth in a dark mouth is a smudge at this size.
  */
 function drawMouth(graphics: Phaser.GameObjects.Graphics, size: number): void {
   const left = 0.33;
@@ -657,19 +565,15 @@ function drawMouth(graphics: Phaser.GameObjects.Graphics, size: number): void {
 }
 
 /**
- * The crest at each strength, weakest first.
+ * The crest at each strength, weakest first — the only axis the tiers are told
+ * apart on, because it is the only one that survives at this size.
  *
- * The one axis the tiers are told apart on, because at 64 pixels it is the
- * only one that survives: the crest is the biggest thing on the silhouette, so
- * a stubby four-tip ridge and a tall eight-tip one are separable across the
- * board at a glance where a colour shift or an extra pixel of outline is not.
- *
- * Tips never go negative: `generateTexture` crops at the texture edge, so a
+ * Tips must never go negative: `generateTexture` crops at the texture edge, so a
  * spike given a negative y is silently flattened rather than drawn taller. A
- * taller tier has to buy its height from a lower base and valley instead.
+ * taller tier buys its height from a lower base and valley.
  *
- * One entry per strength, so this array and `MAX_SHADOW_STRENGTH` have to stay
- * the same length — `drawCrown` indexes straight into it.
+ * This array and `MAX_SHADOW_STRENGTH` must stay the same length — `drawCrown`
+ * indexes straight into it.
  */
 const CROWNS = [
   {
@@ -685,17 +589,10 @@ const CROWNS = [
 ] as const;
 
 /**
- * The crown: a torn crest of spikes rising off the top of the head.
- *
- * A crest rather than the two radial antler-fans this was built as first. Those
- * followed the portrait in `shadow 1.jpg` closely and were the right shape at
- * the wrong size — at 64 pixels each fan collapsed into a smooth lobe and the
- * creature grew two leaves. A jagged ridge is the half of the reference that
- * survives being a tile, and it is what `shadow 2.jpg` draws anyway.
- *
- * One polygon, not a row of triangles, so the spikes share a base and read as
- * one torn mass. The tips are uneven and the tallest is off centre: an even
- * crest is a crown, and this is meant to look broken.
+ * A jagged ridge rather than radial fans, which collapse into smooth lobes at
+ * this size. One polygon rather than a row of triangles, so the spikes share a
+ * base and read as one torn mass — uneven and off centre, because an even crest
+ * is a crown and this is meant to look broken.
  */
 function drawCrown(graphics: Phaser.GameObjects.Graphics, size: number, strength: number): void {
   const { tips, base, valley } = CROWNS[Math.min(strength, MAX_SHADOW_STRENGTH) - 1];
@@ -712,17 +609,14 @@ function drawCrown(graphics: Phaser.GameObjects.Graphics, size: number, strength
   graphics.fillPoints(points, true);
 }
 
-/** A point at a fraction of the tile, for the shapes built out of polygons. */
+/** A point at a fraction of the tile. */
 function point(size: number, x: number, y: number): PhaserMath.Vector2 {
   return new PhaserMath.Vector2(size * x, size * y);
 }
 
 /**
- * The connector drawn between two matching neighbours.
- *
- * White, so one texture tints to any of the four colours. Long enough to span
- * the gap and reach `TRACE_OVERLAP` onto the tile at each end, which is what
- * makes it look soldered to both rather than floating between them.
+ * White, so one texture tints to any colour, and long enough to reach
+ * `TRACE_OVERLAP` onto each tile so it looks soldered rather than floating.
  */
 function bakeTrace(graphics: Phaser.GameObjects.Graphics, gap: number): void {
   const length = gap + TRACE_OVERLAP * 2;

@@ -21,62 +21,33 @@ import {
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
 /*
- * The game's clock and state machine. It owns the board and the falling pair,
- * and drives everything that happens over time: gravity, the lock delay, and
- * the cascade.
+ * The game's clock and state machine: gravity, the lock delay, the cascade, and
+ * the shadow's patience. What drives the shadow OFF belongs to `matching.ts`,
+ * because that is what clearing does.
  *
- * It also owns the shadow: how long the player may hesitate before it takes a
- * cell, and where it takes one. What drives it OFF the board is not here — that
- * is what clearing does, and `matching.ts` owns that.
- *
- * It has NO notion of frames, rendering, or keyboards. It is advanced by
- * `update(delta)` where delta is milliseconds, and the caller decides where
- * that time comes from. That is what lets the entire game be tested without a
- * browser: a test calls `update(800)` and asserts the pair moved one row.
+ * No notion of frames, rendering or keyboards — advanced by `update(delta)` in
+ * milliseconds, which is what lets the game be tested without a browser.
  */
 
-/**
- * The column a pair spawns in. `floor((6 - 1) / 2)` = 2, so on a 6-wide board
- * this is the left of the two middle columns — an even width has no single
- * centre column, and biasing left is arbitrary but consistent.
- */
+/** The left of the two middle columns: an even width has no single centre. */
 export const SPAWN_COLUMN = Math.floor((COLUMNS - 1) / 2);
 
 /**
- * The row the pivot spawns on: the topmost VISIBLE row, which puts the
- * satellite one row above it, in the hidden field.
- *
- * That is the whole point of the hidden row. Spawning the pivot at row 0 left
- * the satellite at row -1, off the board entirely, where `lock()` silently
- * discarded it. Now both halves are inside the board from the moment they
- * appear.
+ * The topmost VISIBLE row, putting the satellite in the hidden field above it,
+ * so both halves are inside the board from the moment they appear.
  */
 export const SPAWN_ROW = FIRST_VISIBLE_ROW;
 
 /**
- * Where new piece colours come from. Injected rather than called directly so
- * the engine contains no randomness: the scene passes a supplier backed by
- * `Math.random`, tests pass
- * a fixed or scripted sequence. Every engine test is therefore deterministic
- * without needing a seeded RNG.
+ * Injected so the engine contains no randomness: tests pass a scripted sequence
+ * and stay deterministic without a seeded RNG.
  */
 type PieceTypeSupplier = () => [number, number];
 
 /**
- * One beat of a cascade, tagged with which kind it was.
- *
- * A discriminated union rather than two independent fields, because the scene's
- * question is "what happened this beat?" and that has exactly one answer. It
- * used to be a `lastLink` and a `lastSettle` that the scene told apart by
- * checking which object had been reallocated — the same fragile identity
- * comparison that `piecesSpawned` exists to avoid, and one that would have
- * broken silently the day `settle` started returning a shared empty array for
- * the no-move case.
- *
- * `connections` rides along on a clear because the engine is the only thing
- * that knows what this link alone earned; the running total cannot be
- * differenced without the reader keeping its own copy of the previous value.
- * What the link cleared, and what it drove off the board, are on the `link`.
+ * One beat of a cascade. `connections` rides along on a clear because the engine
+ * is the only thing that knows what this link ALONE earned — the running total
+ * cannot be differenced without the reader keeping its own previous value.
  */
 export type CascadeBeat =
   | { kind: 'clear'; link: ChainLink; connections: number }
@@ -90,83 +61,45 @@ export class Simulation {
   softDropping = false;
 
   /**
-   * Monotonic count of pairs spawned, including the first.
-   *
-   * Exists so the scene can detect "a piece locked and a new one spawned"
-   * by comparing counts. It previously compared `FallingPair` object identity,
-   * which worked but was fragile: the engine never promised to allocate a fresh
-   * pair per spawn, so a future change to pool or reuse the object would have
-   * silently broken the detection with no failing test. The engine owns the
-   * lock-to-spawn transition, so it owns the signal.
+   * Compared rather than `FallingPair` identity: the engine promises the number
+   * ticks, never that the object is reallocated.
    */
   piecesSpawned = 0;
 
   score = 0;
 
-  /**
-   * True while a cascade is playing out. The scene uses it to hide the pair,
-   * and input is refused while it is set.
-   */
+  /** The scene hides the pair while this is set, and input is refused. */
   resolving = false;
 
   /**
-   * True once a pair had nowhere to spawn. The game is over: nothing advances
-   * and input is refused, so the final board stays on screen instead of the
-   * stack silently overwriting itself.
+   * A pair had nowhere to spawn. Nothing advances and input is refused, so the
+   * final board stays on screen rather than overwriting itself.
    */
   toppedOut = false;
 
   /**
    * How many pieces this board gives you, or `0` for no limit.
    *
-   * The constraint that makes a board a puzzle rather than a sandbox. Gravity
-   * used to be the only thing making a placement a commitment; with it cut and
-   * pieces unlimited, every board fell to brute force — place until four touch.
-   * A budget restores the commitment without putting a clock back in front of a
-   * puzzle you were meant to think about, which is the trade cutting gravity
-   * was for.
-   *
-   * A COUNT, not a timer, and that distinction is the whole design. A timer
-   * punishes thinking; a count prices it at nothing and prices ACTION instead,
-   * which is what makes one cascade reaching two neurons worth more than two
-   * clears reaching two — same result, half the board's resources.
-   *
-   * `0` means unlimited, and it is the default so nothing that does not set a
-   * budget has to know this exists: every test written before it, and the
-   * endless board itself, behave exactly as they did.
+   * A COUNT, not a timer: a timer punishes thinking, where a count prices
+   * thinking at nothing and prices ACTION instead. That is what makes one
+   * cascade reaching two neurons worth more than two clears reaching the same.
    */
   pieceBudget = 0;
 
   chainLength = 0;
 
   /**
-   * The antagonist, stated as a rule: it arrives when the player stops
-   * connecting things, it matches nothing, and it only leaves when something
-   * clears beside it. The part of you that stops without finishing takes more
-   * of the board the longer you hesitate, and light is what pushes it back.
-   *
-   * How many cells the shadow has taken this run, and the last one it took.
-   *
-   * The counter is what the scene watches, for the reason `piecesSpawned`
-   * exists: the engine promises the number ticks, not that anything is
-   * reallocated. Without it an arrival is invisible — the shadow simply is
-   * where it was not, with no moment to react to and nothing to sound.
-   *
-   * Only a landed arrival counts. When there is nowhere left to put one the run
-   * is over instead, and announcing an arrival there would have the scene
-   * animating a creature into a cell it never reached.
+   * The counter is what the scene watches for an arrival to react to. Only a
+   * landed arrival counts, so the scene never animates a creature into a cell it
+   * never reached.
    */
   shadowTaken = 0;
 
   lastShadowCell: GroupCell | null = null;
 
   /**
-   * Cells the shadow currently holds.
-   *
-   * COUNTED from the board rather than tracked alongside it. A running tally
-   * was one line shorter and immediately went wrong: anything that put shadow
-   * on the board by another route left the two disagreeing, and a test passed
-   * because a shadow tile had merely fallen rather than been pushed back.
+   * COUNTED from the board rather than tracked alongside it: a running tally
+   * disagrees the moment anything puts shadow on the board by another route.
    */
   get shadowOnBoard(): number {
     let held = 0;
@@ -183,93 +116,63 @@ export class Simulation {
   }
 
   /**
-   * Milliseconds since anything last cleared. Not since the last input — a
-   * player can shuffle a piece back and forth all day and still be stalling.
+   * Since anything last CLEARED, not since the last input: a player can shuffle
+   * a piece back and forth all day and still be stalling.
    */
   private stallTimer = 0;
 
   /**
-   * Connections made this run: cells cleared, each weighted by how deep into a
-   * cascade its link was.
+   * Cells cleared, weighted by link depth. This, not `score`, is what
+   * progression is measured in.
    *
-   * The weight is the whole point. Counting raw cells paid a four-link chain
-   * exactly what four separate clears paid, so the cheapest way to fill the
-   * meter was to clear greedily — and deliberately NOT clearing, to stack a
-   * chain, is the entire skill of this genre. A meter that ignores it teaches
-   * players to avoid the good part of the game.
+   * The weight is the point: raw cells would pay a four-link chain what four
+   * separate clears pay, making greedy clearing the cheapest way to fill the
+   * meter — and NOT clearing, to stack a chain, is the skill of the genre.
    *
-   * Linear in depth (x1, x2, x3...) rather than exponential like `score`. The
-   * score can afford to be showy; this drives a meter the player is meant to
-   * predict, and something that doubles every link lurches out of reach.
-   *
-   * This is what progression is measured in — see PROGRESS.md, "the score is
-   * not the progression".
+   * Linear in depth rather than exponential like `score`, so the meter is
+   * predictable rather than lurching.
    */
   connectionsMade = 0;
 
   /**
-   * What the most recent cascade beat did, and a counter that ticks once per
-   * beat so the scene can notice a new one.
-   *
-   * The board is already in its post-beat state by the time a frame renders, so
-   * the scene cannot see what popped or what fell by looking at it. Rather than
-   * have the engine call into the scene, the engine leaves the last beat's
-   * result here and the scene watches `beatsPlayed` — the same shape as
-   * `piecesSpawned`, and it keeps the engine free of callbacks.
+   * The board is in its post-beat state by the time a frame renders, so the
+   * scene cannot see what popped by looking. The engine leaves the result here
+   * rather than calling into the scene, which keeps it free of callbacks.
    */
   beatsPlayed = 0;
 
   lastBeat: CascadeBeat | null = null;
 
   /**
-   * Pairs committed to the board, and where the halves of the last one came to
-   * rest after settling.
-   *
-   * Separate from `piecesSpawned` because they are different events: a lock
-   * that starts a cascade, and a lock that tops the board out, both commit a
-   * pair without spawning another. Inferring "a pair landed" from the spawn
-   * counter therefore misses exactly the landings that matter most.
+   * Separate from `piecesSpawned`: a lock that starts a cascade and one that
+   * tops the board out both commit a pair without spawning another, so a landing
+   * inferred from the spawn counter misses the ones that matter most.
    */
   piecesLocked = 0;
 
   lastLanded: readonly PairCell[] = [];
 
   /**
-   * The colours of the NEXT pair, drawn one piece ahead so the scene can show a
-   * preview. This is what makes chain-building plannable — a satellite spawns
-   * off-screen at row -1, so without a preview the only way to learn its colour
-   * was to rotate the piece.
-   *
-   * The preview does not move the satellite on screen; you simply learn its
-   * colour a piece earlier, which is how Puyo does it. Puyo shows TWO pairs of
-   * lookahead — going deeper is a change to this queue's depth.
+   * Drawn one piece ahead so the scene can preview it. The satellite spawns in
+   * the hidden row, so without this the only way to learn its colour is to
+   * rotate the piece — which is what makes chain-building plannable.
    */
   upcoming!: [number, number];
 
   /**
-   * Progress toward the next row, as a FRACTION of the current interval (0 to
-   * 1), not as elapsed milliseconds.
+   * A FRACTION of the current interval, never elapsed milliseconds. Banking
+   * milliseconds lets a rate change re-price the bank: time accumulated against
+   * a slow gravity step, spent at the soft-drop rate, is several rows of fall in
+   * one frame. A fraction cannot burst, so `fallInterval` is safe to change
+   * mid-fall.
    *
-   * This distinction fixed a real bug. Banking milliseconds meant that pressing
-   * soft drop mid-fall spent the bank at the new, much faster rate: 750ms
-   * accumulated against an 800ms gravity step became 750/50 = 15 rows' worth of
-   * fall in a single frame, bounded in practice only by the floor (a test
-   * measured 11 rows), teleporting the pair to the bottom. Storing a
-   * fraction means a rate change preserves HOW FAR you are toward the next row
-   * rather than re-pricing banked time, so switching rates can never burst. It
-   * also makes changing `fallInterval` live, mid-fall, safe.
-   *
-   * Public because the scene draws the pair at `row + fallProgress`, which is
-   * what makes gravity look like falling rather than stepping.
+   * Public because the scene draws the pair at `row + fallProgress`.
    */
   fallProgress = 0;
 
   private resolveTimer = 0;
 
-  /**
-   * Whether the next cascade beat is a settle (tiles fall) rather than a clear.
-   * The cascade alternates: clear, settle, clear, settle...
-   */
+  /** The cascade alternates: clear, settle, clear, settle... */
   private settlePending = false;
 
   private lockTimer = 0;
@@ -277,34 +180,26 @@ export class Simulation {
   constructor(
     private nextPieceTypes: PieceTypeSupplier,
     /**
-     * Timings are injected rather than imported as constants so the scene can
-     * hand in a live object and mutate it at runtime (`window.tuning`), and so
-     * tests are insulated from whatever the scene is doing. Every read is
-     * `this.tuning.x` at the moment it is needed — never destructured into a
-     * local at construction, or live tuning would silently stop working.
+     * Read as `this.tuning.x` at the moment needed, never destructured into a
+     * local, or live tuning stops working.
      */
     private tuning: Tuning = DEFAULT_TUNING,
   ) {
-    // A new simulation and a restarted one are the same thing, so there is one
-    // description of what a fresh game looks like rather than two that a
-    // compiler will never reconcile. `pair` and `upcoming` carry definite
-    // assignment assertions because TypeScript cannot see through the call.
+    // `pair` and `upcoming` carry definite assignment assertions because
+    // TypeScript cannot see through this call.
     this.restart();
   }
 
   /**
-   * Advance the game by `delta` milliseconds.
-   *
-   * There are three mutually exclusive states, checked in this order:
+   * Three mutually exclusive states, in this order:
    *   1. resolving a cascade — nothing else happens
    *   2. the pair has landed  — count down the lock delay
    *   3. the pair is falling  — apply gravity
    *
-   * The shadow's patience runs alongside 2 and 3, but never during 1: time
-   * spent watching a cascade is not time spent hesitating.
+   * The shadow's patience runs alongside 2 and 3, never during 1: time spent
+   * watching a cascade is not time spent hesitating.
    *
-   * The engine deliberately does NOT clamp `delta`; it trusts its caller. The
-   * caller's job is to bound it, which `FixedTimestep` does.
+   * Does NOT clamp `delta`. Bounding it is the caller's job — `FixedTimestep`.
    */
   update(delta: number): void {
     if (this.toppedOut) {
@@ -312,18 +207,13 @@ export class Simulation {
     }
 
     if (this.resolving) {
-      // Time spent watching a cascade is not time spent hesitating, so the
-      // shadow's patience does not run while the board is still resolving.
       this.advanceChain(delta);
       return;
     }
 
-    // A spent board is finished, whatever it looks like. The cascade from the
-    // last piece was allowed to play out above — `outOfPieces` goes true inside
-    // `lockPair`, before the chain it started has resolved — but nothing may
-    // accrue on a board the player can no longer act on. A shadow arriving
-    // after the last piece is a punishment for a decision nobody was allowed to
-    // make.
+    // The cascade from the last piece still plays out above, but nothing may
+    // accrue on a board the player cannot act on: a shadow arriving after the
+    // last piece punishes a decision nobody was allowed to make.
     if (this.outOfPieces) {
       return;
     }
@@ -332,26 +222,10 @@ export class Simulation {
     if (this.stallTimer >= this.tuning.shadowInterval) {
       this.stallTimer = 0;
       this.encroach();
-
-      // Kept as a guard rather than deleted, though `encroach` can no longer
-      // reach it: it used to end the run when the shadow had nowhere to land,
-      // and possessing a tile has no such failure. The RULE it encodes is
-      // still real and costs one comparison — nothing after an arrival may run
-      // on a board the run has already lost. Without it, back when this could
-      // fire, the falling pair committed anyway: its halves were written to a
-      // lost board, a landing sounded after the game was over, and a group
-      // completed by that phantom lock started a cascade that could never
-      // resolve, because every later update returns at the top on `toppedOut`.
-      if (this.toppedOut) {
-        return;
-      }
     }
 
     if (!this.pair.canFall(this.board)) {
-      // LOCK DELAY: a grace period between touching down and being committed.
-      // Without it a landed piece freezes instantly and you can never slide it
-      // into a gap at the last moment, which feels punishing.
-      //
+      // A grace period so a landed piece can still be slid into a gap.
       this.lockTimer += delta;
 
       if (this.lockTimer >= this.tuning.lockDelay) {
@@ -360,26 +234,24 @@ export class Simulation {
       return;
     }
 
-    // Still falling, so any lock-delay progress is void — this is what lets a
-    // player slide a piece sideways off a ledge and have it keep falling.
+    // Lock-delay progress is void while falling, which is what lets a piece be
+    // slid sideways off a ledge and keep falling.
     this.lockTimer = 0;
 
-    // Soft drop SWAPS the interval rather than multiplying it, so the drop
-    // speed is one predictable number rather than a product of two dials.
+    // Soft drop SWAPS the interval rather than multiplying it, so drop speed is
+    // one number rather than a product of two dials.
     const interval = this.softDropping
       ? this.tuning.softDropInterval
       : this.tuning.fallInterval;
 
     this.fallProgress += delta / interval;
 
-    // A loop, not an `if`, because one delta can span several rows when the
-    // interval is short. Bounded in practice by the board height, since `fall`
-    // returns false once the pair lands.
+    // A loop, because one delta can span several rows when the interval is
+    // short. Bounded by the board height, since `fall` fails once it lands.
     while (this.fallProgress >= 1) {
       if (!this.pair.fall(this.board)) {
-        // Blocked mid-loop. Discard the banked progress, otherwise it stays
-        // above 1 and the pair would drop a row instantly the moment it can
-        // move again — for instance after sliding sideways over a gap.
+        // Discard the banked progress, or the pair drops a row instantly the
+        // moment it can move again — after sliding sideways over a gap, say.
         this.fallProgress = 0;
         break;
       }
@@ -388,11 +260,8 @@ export class Simulation {
   }
 
   /**
-   * Start a new game on the same simulation, from any state.
-   *
-   * Works mid-run as well as after a top-out: a run you can already tell is
-   * lost is a run you want to abandon, and needing to reach the top first would
-   * make playtesting slower than the game.
+   * Works mid-run as well as after a top-out: a run you can already tell is lost
+   * is one you want to abandon.
    */
   restart(): void {
     this.board.reset();
@@ -415,18 +284,17 @@ export class Simulation {
     this.lastShadowCell = null;
 
     this.piecesSpawned = 0;
-    // Seed the preview before the first spawn consumes it.
+    // Before the first spawn consumes it.
     this.upcoming = this.nextPieceTypes();
     this.pair = this.spawn();
   }
 
   /**
-   * Player input. Each returns whether the move actually happened.
+   * Each returns whether the move actually happened.
    *
-   * All three refuse while a cascade resolves or after a top-out, for the same
-   * reason: in both states `pair` still points at the pair now sitting on the
-   * board, and no replacement has spawned. Moving it then would write those
-   * tiles a second time and corrupt the board.
+   * All three refuse while a cascade resolves or after a top-out: in both states
+   * `pair` still points at tiles now sitting on the board, so moving it would
+   * write them a second time.
    */
   moveLeft(): boolean {
     return this.acceptsInput ? this.afterInput(this.pair.moveLeft(this.board)) : false;
@@ -441,12 +309,9 @@ export class Simulation {
   }
 
   /**
-   * Slam the pair down and commit it immediately, skipping the lock delay.
-   * Returns how far it fell, which the scene scales its screen shake by — a
-   * drop from the top should land harder than a drop of one row.
-   *
-   * Deliberately not routed through `afterInput`: that resets the lock timer to
-   * give the player more time, and this is the input that says the opposite.
+   * Returns how far it fell, which the scene scales its shake by. Deliberately
+   * not routed through `afterInput`: that resets the lock timer to give the
+   * player more time, and this is the input that says the opposite.
    */
   hardDrop(): number {
     if (!this.acceptsInput) {
@@ -462,16 +327,7 @@ export class Simulation {
     return distance;
   }
 
-  /**
-   * One home for the refusal rule, so a fourth input method cannot be added
-   * that honours only half of it.
-   */
-  /**
-   * Pieces left before the board is spent, or `Infinity` when unbudgeted.
-   *
-   * Floored at zero rather than allowed to go negative: the number is drawn on
-   * screen, and "-1 pieces" is a bug the player reads before anyone else does.
-   */
+  /** `Infinity` when unbudgeted, and floored at zero because it is drawn. */
   get piecesRemaining(): number {
     return this.pieceBudget === 0
       ? Infinity
@@ -479,34 +335,25 @@ export class Simulation {
   }
 
   /**
-   * True once the budget is spent. Input is refused from here, the same as
-   * after a top-out and for the same reason: the board is final, and it stays
-   * on screen so the player can see the position they ran out in.
-   *
-   * What HAPPENS next is not this file's business. A spent board is a board
-   * that failed its lock, and the run structure above decides whether that
-   * means re-seeding the same lock or something else.
+   * Input is refused from here as after a top-out, so the final board stays on
+   * screen. What happens next is the run structure's business, not this file's.
    */
   get outOfPieces(): boolean {
     return this.pieceBudget !== 0 && this.piecesLocked >= this.pieceBudget;
   }
 
+  /** One home for the refusal rule, so a new input cannot honour half of it. */
   private get acceptsInput(): boolean {
     return !this.resolving && !this.toppedOut && !this.outOfPieces;
   }
 
   /**
-   * Play one beat of a cascade. Beats alternate between clearing and settling
-   * so the player can see cause and effect as two separate moments:
+   * Beats alternate so cause and effect are two separate moments:
    *
    *   clear  -> a group vanishes, leaving a hole with tiles hanging over it
    *   settle -> those tiles drop into the hole
    *   clear  -> whatever that landing completed vanishes in turn
    *   ...    -> until a clear finds nothing, and the next pair spawns
-   *
-   * The two beats have separate durations because they are doing different
-   * jobs: `chainLinkDelay` holds a completed group on screen before it pops,
-   * and `settleDelay` holds the resulting hole open before tiles drop in.
    */
   private advanceChain(delta: number): void {
     const beat = this.settlePending ? this.tuning.settleDelay : this.tuning.chainLinkDelay;
@@ -523,21 +370,16 @@ export class Simulation {
       return;
     }
 
-    // The depth this link lands at is also what it damages shadow by, so the
-    // same 0-based index that doubles the score is what decides whether the
-    // clear kills what it is touching or only dents it.
+    // The same 0-based index that doubles the score is what decides whether the
+    // clear kills what it touches or only dents it.
     const link = clearStep(this.board, this.chainLength);
     if (link === null) {
-      // Not a beat: the cascade is simply over, and nothing moved to show.
+      // Not a beat: the cascade is over and nothing moved to show.
       this.resolving = false;
       this.spawnOrTopOut();
       return;
     }
 
-    // `chainLength` is the 0-based index of this link, so the first link of a
-    // cascade scores at 1x and each subsequent one doubles.
-    // `clearStep` has already driven back whatever shadow was touching this
-    // link — the rule lives with the clearing, in `matching.ts`.
     this.stallTimer = 0;
 
     const connections = link.cellsCleared * (this.chainLength + 1);
@@ -550,23 +392,13 @@ export class Simulation {
   }
 
   /**
-   * The player answered the question: drive every shadow off the board at once.
+   * Drive every shadow off the board at once.
    *
-   * The single most powerful thing in the game, and the only one the player
-   * spends rather than earns — a question can be declined, and declining keeps
-   * every cell the shadow took. That is the thesis stated as a rule instead of
-   * as a line of narration: a connection is what pushes the dark back, so
-   * making one has to be what pushes it back.
+   * WHAT was typed never reaches here and must not: the engine is told THAT an
+   * answer happened, never what it said.
    *
-   * WHAT was typed never reaches here, and must not. The engine is told that an
-   * answer happened, never what it said; nothing scores it, branches on it or
-   * stores it. The act is the mechanic, and the words belong to whoever typed
-   * them.
-   *
-   * Returns the cells it took, deepest first, so the scene can play the wave
-   * rising out of the stack. Ordered here rather than scene-side because the
-   * board is empty by the time anything renders — the same reason a link
-   * reports its own push-back.
+   * Returns the cells deepest first, so the scene can play the wave rising out
+   * of the stack — the board is empty by the time anything renders.
    */
   answerQuestion(): { driven: readonly ShadowHit[]; settled: readonly TileMove[] } {
     const driven: ShadowHit[] = [];
@@ -576,75 +408,21 @@ export class Simulation {
         const cell = this.board.pieceAt(column, row);
         if (isShadow(cell)) {
           this.board.clear(column, row);
-          // Reported so the wave can blow off the creature that was actually
-          // standing there, over the tile it was holding. Answering ignores
-          // the tier — it is the one thing in the game that does.
+          // Answering ignores the tier — the one thing in the game that does.
           driven.push({ column, row, strength: 1, turnedTo: shadowHolding(cell) });
         }
       }
     }
 
-    // SETTLE. Driving the shadow off empties cells in the middle of the stack,
-    // and without this every tile that was resting on one hung in mid-air until
-    // the next lock snapped it down with no animation — the strongest moment in
-    // the game followed immediately by the board glitching.
-    //
-    // The moves are handed back for the same reason a cascade's are: by the
-    // time anything renders, the board is already settled, so where a tile fell
-    // FROM is not recoverable by looking at it.
+    // Emptying cells mid-stack means the tiles on them have to come down. The
+    // moves are handed back because the board is settled before anything renders.
     return { driven, settled: this.board.settle() };
   }
 
   /**
-   * Take the topmost tile of the emptiest column that has one.
-   *
-   * It POSSESSES a tile rather than filling an empty cell, and that changes
-   * what the antagonist is. It no longer drops junk on the board to crowd the
-   * player out; it takes something they already made and switches it off, so
-   * it genuinely severs the connections between whatever it sits between. The
-   * threat stops being "you will run out of room" and becomes "the board you
-   * built stops working" — which is the one this game is actually about.
-   *
-   * The emptiest column, still, and for the reason it always was: the cruel
-   * choice would be to pile on where the player is already in trouble, but the
-   * shadow is not trying to kill them, it is trying to make the board less
-   * connected. Spreading it costs them reach everywhere instead of ending the
-   * run in one place. The TOPMOST tile of that column, because a tile buried
-   * under six others is not one they were about to use.
-   *
-   * NO column is off limits, including the one the falling pair is in. That
-   * skip was load-bearing when the shadow dropped into an empty cell — the
-   * pair is not on the board until it locks, so a column scan looked straight
-   * through it and the shadow could take the very cell the pair was about to
-   * occupy, and locking then wrote a tile over a tile and threw. Possession
-   * cannot do that: it only ever takes a cell that is ALREADY occupied, and
-   * the pair only ever locks into empty ones, so occupancy is unchanged and
-   * there is nothing to collide with.
-   *
-   * Deleting it also closed a hole the smoke test found. A player who never
-   * moves the piece stacks everything in the spawn column, and with that
-   * column skipped there was no tile anywhere the shadow was allowed to touch
-   * — so doing nothing at all, the one thing this antagonist exists to
-   * punish, went completely unpunished for a whole run.
-   *
-   * If there is nothing to take, nothing happens. That is deliberate and it is
-   * a change: this used to end the run when the shadow had nowhere to land,
-   * which no longer means anything now that it needs a tile rather than a
-   * space. A board with no tiles on it is a board the player has just cleared,
-   * and the antagonist of "you stopped before you finished" has no business
-   * winning there. Topping out is `spawnOrTopOut`'s job alone now.
-   */
-  /**
-   * The tile the shadow would take if it arrived right now, or `null`.
-   *
-   * Split out of `encroach` and made public so the scene can point at it
-   * BEFORE it happens. The six seconds of hesitation this game runs on were
-   * completely invisible — nothing on screen represented the clock, and a
-   * creature simply appeared on a tile with no warning and no way to read what
-   * was coming. A threat you cannot see coming is not pressure, it is an
-   * interruption.
-   *
-   * Pure: it reads the board and chooses, and changes nothing.
+   * The tile the shadow would take if it arrived right now, or `null`. Public so
+   * the scene can point at it BEFORE it happens: a threat you cannot see coming
+   * is an interruption rather than pressure. Pure.
    */
   get threatenedCell(): GroupCell | null {
     let chosenColumn = -1;
@@ -656,8 +434,7 @@ export class Simulation {
       let topmost = -1;
 
       for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
-        // Only a real colour can be possessed. A cell the shadow already holds
-        // is not a foothold it can take twice.
+        // A cell the shadow already holds is not a foothold it can take twice.
         if (isColour(this.board.pieceAt(column, row))) {
           tiles += 1;
           if (topmost === -1) {
@@ -676,17 +453,25 @@ export class Simulation {
     return chosenColumn === -1 ? null : { column: chosenColumn, row: chosenRow };
   }
 
-  /**
-   * How close the next arrival is, 0 to 1.
-   *
-   * The counter-play is the same verb the whole game is about, so this has to
-   * be watchable: it fills while nothing connects and drops to nothing the
-   * moment something does.
-   */
+  /** Fills while nothing connects, and drops the moment something does. */
   get stallProgress(): number {
     return Math.min(this.stallTimer / this.tuning.shadowInterval, 1);
   }
 
+  /**
+   * Take the topmost tile of the emptiest column that has one.
+   *
+   * It POSSESSES a tile rather than filling an empty cell, so the threat is not
+   * "you will run out of room" but "the board you built stops working".
+   *
+   * The emptiest column, because spreading it costs reach everywhere rather than
+   * ending the run in one place; the topmost tile, because one buried under six
+   * others was not about to be used.
+   *
+   * No column is off limits, the falling pair's included: possession only takes
+   * an occupied cell and the pair only locks into empty ones. If there is
+   * nothing to take, nothing happens — topping out is `spawnOrTopOut`'s job.
+   */
   private encroach(): void {
     const target = this.threatenedCell;
     if (target === null) {
@@ -695,10 +480,8 @@ export class Simulation {
 
     const { column: chosenColumn, row: chosenRow } = target;
 
-    // Strength escalates with how many arrivals this run has already had, so
-    // the first few are freed by an ordinary clear and the late ones are not.
-    // `shadowTaken` is still 0 here for the first arrival, which is what makes
-    // the opening tier the weakest one.
+    // The first few are freed by an ordinary clear and the late ones are not.
+    // `shadowTaken` is still 0 here, which makes the opening tier the weakest.
     const strength = Math.min(
       1 + Math.floor(this.shadowTaken / this.tuning.arrivalsPerShadowStrength),
       MAX_SHADOW_STRENGTH,
@@ -718,15 +501,9 @@ export class Simulation {
   }
 
   /**
-   * Commit the pair to the board and decide what happens next.
-   *
-   * Peek before committing to a cascade: if the lock matched nothing, the next
-   * pair spawns immediately. Otherwise every ordinary piece would pay a
-   * chain-link delay it did not earn, and the game would stutter.
-   *
-   * Shared by the lock delay and by `hardDrop`, which is the whole reason it is
-   * a method — two callers deciding separately what a lock means is how the two
-   * paths drift apart.
+   * Peek before committing to a cascade: if the lock matched nothing the next
+   * pair spawns immediately, or every ordinary piece pays a chain-link delay it
+   * did not earn. Shared by the lock delay and `hardDrop`, so they cannot drift.
    */
   private lockPair(): void {
     this.lastLanded = this.pair.lock(this.board);
@@ -744,16 +521,12 @@ export class Simulation {
   }
 
   /**
-   * Spawn the next pair, or declare the game over if it has nowhere to go.
+   * The candidate is built and asked whether it fits rather than testing the
+   * spawn cells by hand: `FallingPair` owns where a satellite sits at each
+   * orientation, and a second copy of that geometry would check the wrong cells
+   * if the spawn shape or `HIDDEN_ROWS` changed.
    *
-   * The candidate is built and asked whether it fits, rather than testing the
-   * spawn cells by hand: `FallingPair` already owns where a satellite sits at
-   * each orientation, and a second copy of that geometry here would quietly
-   * check the wrong cells if the spawn shape or `HIDDEN_ROWS` ever changed.
-   *
-   * Asking before committing is what keeps `place` able to throw on an occupied
-   * cell — a pair spawning into occupied cells is the one path that would
-   * otherwise destroy tiles the player built with.
+   * Asking first is what keeps `place` able to throw on an occupied cell.
    */
   private spawnOrTopOut(): void {
     if (!this.nextPair().fitsOn(this.board)) {
@@ -765,13 +538,9 @@ export class Simulation {
   }
 
   /**
-   * LOCK DELAY RESET. A successful move or rotate restarts the countdown; a
-   * blocked one does not.
-   *
-   * That asymmetry is deliberate — if blocked moves also reset it, you could
-   * stall forever by mashing into a wall. There is deliberately NO cap on how
-   * many times a successful move may reset it: that is Puyo behaviour, where
-   * Tetris uses a move-reset limit. Revisit when tuning feel.
+   * A successful move restarts the countdown; a blocked one does not, or a
+   * player could stall forever against a wall. No cap on how many times, which
+   * is worth revisiting if a piece ever feels un-committable.
    */
   private afterInput(moved: boolean): boolean {
     if (moved) {
@@ -781,11 +550,8 @@ export class Simulation {
   }
 
   /**
-   * Take the previewed pair, draw a replacement preview, and reset the per-piece
-   * timers.
-   *
-   * Resetting `fallProgress` here is what stops soft-drop progress leaking
-   * across a lock into the next piece.
+   * Resetting `fallProgress` is what stops soft-drop progress leaking across a
+   * lock into the next piece.
    */
   private spawn(): FallingPair {
     const next = this.nextPair();
@@ -799,12 +565,8 @@ export class Simulation {
   }
 
   /**
-   * The pair the preview is promising, positioned where it would spawn. Built
-   * without side effects, so `spawnOrTopOut` can ask whether it fits before
-   * anything commits to it.
-   *
-   * Orientation 0 puts the satellite directly above the pivot — in the hidden
-   * row, so it is on the board but not drawn.
+   * Built without side effects, so `spawnOrTopOut` can ask whether it fits first.
+   * Orientation 0 puts the satellite in the hidden row above the pivot.
    */
   private nextPair(): FallingPair {
     const [pivotType, satelliteType] = this.upcoming;

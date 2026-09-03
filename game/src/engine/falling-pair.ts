@@ -1,25 +1,17 @@
 import { Board } from './board';
 
 /*
- * The piece the player controls: two tiles that move together.
+ * The piece the player controls: a PIVOT that rotation swings the SATELLITE
+ * around, so the pair rotates predictably rather than drifting.
  *
- * One tile is the PIVOT and the other is the SATELLITE. Rotation swings the
- * satellite around the pivot, which stays put — this is why the pair rotates
- * predictably rather than drifting, and it is the standard model for
- * Puyo-style two-tile pieces.
- *
- * Every method that could move the pair takes the `Board` and returns a boolean
- * saying whether the move actually happened. Returning success rather than
- * throwing lets callers make decisions from it: the lock delay only resets on a
- * move that succeeded, and auto-repeat stops pushing when it hits a wall.
+ * Every method that could move the pair returns whether it actually did, and
+ * callers decide from that: the lock delay only resets on a successful move,
+ * and auto-repeat stops pushing at a wall.
  */
 
 /**
- * Which of the four rotational positions the satellite occupies.
- *
- * A union of literal numbers rather than a plain `number`, so the compiler
- * rejects an out-of-range orientation outright. Without it, an orientation of
- * `4` would silently index past `SATELLITE_OFFSETS` and yield `undefined`.
+ * A literal union rather than `number`, so an out-of-range orientation is a
+ * compile error rather than an `undefined` read past `SATELLITE_OFFSETS`.
  */
 export type Orientation = 0 | 1 | 2 | 3;
 
@@ -30,12 +22,8 @@ export interface PairCell {
 }
 
 /**
- * Where the satellite sits relative to the pivot, indexed by orientation:
- * 0 = above, 1 = right, 2 = below, 3 = left.
- *
- * Clockwise order, so rotating is just `(orientation + 1) % 4` — no switch
- * statement and no trigonometry. Remember row increases DOWNWARD, which is why
- * "above" is `row: -1`.
+ * Clockwise from above, so rotating is `(orientation + 1) % 4`. Row increases
+ * DOWNWARD, which is why "above" is `row: -1`.
  */
 const SATELLITE_OFFSETS = [
   { column: 0, row: -1 },
@@ -53,13 +41,7 @@ export class FallingPair {
     public satelliteType: number,
   ) {}
 
-  /**
-   * The two absolute cells this pair currently occupies, pivot first.
-   *
-   * Position is stored as one coordinate plus an orientation rather than two
-   * coordinates, so the two halves cannot drift apart or disagree. The pair of
-   * cells is derived on demand here instead.
-   */
+  /** Pivot first. Derived rather than stored, so the halves cannot disagree. */
   cells(): [PairCell, PairCell] {
     const offset = SATELLITE_OFFSETS[this.orientation];
     return [
@@ -81,22 +63,12 @@ export class FallingPair {
   }
 
   /**
-   * Rotate the satellite one step clockwise, with a WALL KICK.
+   * Rotate clockwise, with a WALL KICK: if the satellite would land inside a
+   * wall, retry shifted one column away from it, or rotating while flush against
+   * a wall refuses and the button appears broken.
    *
-   * A wall kick is the standard fix for a frustration: if you are flush against
-   * the right wall and rotate so the satellite would land inside the wall, a
-   * naive implementation just refuses and the button appears broken. Instead
-   * this retries the same rotation shifted one column away from the wall.
-   *
-   * The kick direction is derived from where the satellite is going: if it is
-   * heading right (`offset.column` = +1) we shift left by 1, and vice versa.
-   * For vertical orientations `offset.column` is 0, so the kick is 0 and the
-   * second attempt is identical to the first — harmless, because a vertical
-   * rotation can only be blocked by a piece above or below, which shifting
-   * sideways would not fix anyway.
-   *
-   * Only if BOTH the in-place rotation and the kicked rotation are blocked does
-   * this fail.
+   * For vertical orientations the kick is 0 and the second attempt repeats the
+   * first — harmless, since shifting sideways would not clear something above.
    */
   rotateClockwise(board: Board): boolean {
     const rotated = ((this.orientation + 1) % 4) as Orientation;
@@ -117,29 +89,19 @@ export class FallingPair {
   }
 
   /**
-   * Whether this pair's current position is legal. Asked by the simulation
-   * before a spawn, so the topping-out rule reads the pair's real cells rather
-   * than re-deriving where a satellite sits at orientation 0.
+   * Asked before a spawn, so the topping-out rule reads the pair's real cells
+   * rather than re-deriving where a satellite sits at orientation 0.
    */
   fitsOn(board: Board): boolean {
     return this.fits(board, this.column, this.row, this.orientation);
   }
 
   /**
-   * Commit both halves onto the board and report where they came to rest.
+   * Commit both halves and report where they came to rest.
    *
-   * Writes unconditionally. Both halves are always on the board: the pivot
-   * spawns in the topmost visible row with the satellite in the hidden row
-   * above it, and a pair only ever moves down or sideways. This used to guard
-   * with `isInside` and silently discard a half at row -1, which the hidden row
-   * removed the need for — a bad write now throws out of `place` instead.
-   *
-   * `settle()` is what makes the two halves independent: if the pivot lands on
+   * The `settle()` is what makes the halves independent: if the pivot lands on
    * the stack while the satellite is over a hole, the satellite keeps falling
-   * on its own. Tetris pieces stay rigid; Puyo pairs split. That one call is
-   * that entire design decision — and it is also why the resting cells have to
-   * be returned rather than assumed, since either half may have moved after it
-   * was placed.
+   * alone. That is why the resting cells are returned rather than assumed.
    */
   lock(board: Board): PairCell[] {
     const placed = this.cells();
@@ -158,12 +120,7 @@ export class FallingPair {
     });
   }
 
-  /**
-   * The single mutation point: validate a candidate position and adopt it only
-   * if it fits. Every move, rotation and fall funnels through here, so there is
-   * exactly one place where the pair can end up somewhere illegal — and it
-   * cannot, because the check happens before the write.
-   */
+  /** The single mutation point: the check happens before the write. */
   private moveTo(board: Board, column: number, row: number, orientation: Orientation): boolean {
     if (!this.fits(board, column, row, orientation)) {
       return false;

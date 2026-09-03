@@ -1,93 +1,67 @@
 /**
- * Every "feel" dial in the game, in one place.
+ * Every "feel" dial in the game. Pure data with no imports, so the engine and
+ * the scene can both depend on it.
  *
- * Pure data with no imports, so both the engine and the Phaser scene can depend
- * on it without either depending on the other. `Simulation` and
- * `InputTranslator` are each handed this object and re-read it every frame, and
- * dev builds expose the scene's copy as `window.tuning` — so a value changed in
- * the console takes effect on the next frame, with no reload.
+ * `Simulation` and `InputTranslator` re-read this object every frame, and dev
+ * builds expose the scene's copy as `window.tuning`, so a value changed in the
+ * console takes effect on the next frame.
  */
 export interface Tuning {
-  /**
-   * How long the player may go without connecting anything before a shadow
-   * takes a cell. 
-   */
+  /** How long the player may go without connecting before a shadow takes a cell. */
   shadowInterval: number;
 
-  /**
-   * How many arrivals the shadow spends at one strength before the next comes
-   * in a tier harder. A run that keeps connecting never advances it.
-   */
+  /** Arrivals at one strength before the next comes a tier harder. */
   arrivalsPerShadowStrength: number;
 
   /**
-   * How long a fragment holds the board, before the reading time that
-   * `readingPerCharacter` adds on top. A question has no duration — it waits on
-   * the player pressing Enter.
+   * A floor, before the reading time `readingPerCharacter` adds on top. A
+   * question has no duration — it waits on the player pressing Enter.
    */
   fragmentDuration: number;
 
-  /** Reading time added per character of the line being held. */
   readingPerCharacter: number;
 
   /** Milliseconds per row of normal gravity. Lower falls faster. */
   fallInterval: number;
 
-  /** Milliseconds per row while the player holds Down. */
   softDropInterval: number;
 
-  /**
-   * Grace period between a pair landing and being committed to the board.
-   * Resets on a successful move or rotate.
-   */
+  /** Grace period before a landed pair commits. Resets on a successful move. */
   lockDelay: number;
 
   /**
-   * DAS — Delayed Auto Shift. How long a direction key must be held before it
-   * starts repeating; one press moves exactly one column.
-   *
-   * It cannot go below a natural tap duration (roughly 50-100ms), or a quick tap
-   * starts moving two columns and precise placement becomes impossible.
+   * DAS — how long a direction key is held before it starts repeating. Cannot go
+   * below a natural tap duration (roughly 50-100ms), or a quick tap moves two
+   * columns and precise placement becomes impossible.
    */
   autoShiftDelay: number;
 
-  /**
-   * ARR — Auto Repeat Rate. Milliseconds between repeats once DAS has elapsed.
-   * `0` is legal and means "slide until you hit something, within one frame".
-   */
+  /** ARR — repeat interval after DAS. `0` means slide to the wall in one frame. */
   autoRepeatInterval: number;
 
-  /** Milliseconds a completed group stays on screen before it pops. */
+  /** How long a completed group is held on screen before it pops. */
   chainLinkDelay: number;
 
-  /** Milliseconds the hole left by a pop stays open before tiles drop into it. */
+  /** How long the hole a pop leaves stays open before tiles drop in. */
   settleDelay: number;
 
   /**
-   * How long a cleared tile takes to shrink away, and a settled tile to fall
-   * into its hole. Both are drawn over a board the engine has already updated,
-   * so neither changes any rule.
-   *
-   * Keep each under its beat (`chainLinkDelay`, `settleDelay`) or the motion is
-   * still running when the next beat starts.
+   * The animations over those two beats. Keep each under its beat, or the motion
+   * is still running when the next beat starts.
    */
   popDuration: number;
 
   fallDuration: number;
 
-  /**
-   * How long the simulation freezes when a group clears while the scene keeps
-   * drawing, so the moment of impact is held rather than passed through.
-   */
+  /** How long the simulation freezes on a clear while the scene keeps drawing. */
   hitStopDuration: number;
 
-  /** How long a landed pair squashes for. */
   landingBounceDuration: number;
 
   /**
    * Camera kick on a clear: shake as a fraction of the viewport, roll in
-   * degrees. Both scale with the chain's length. The roll is the half that
-   * reads as force — pure translation reads as a glitch.
+   * degrees, both scaled by chain length. The roll is what reads as force —
+   * pure translation reads as a glitch.
    */
   shakeIntensity: number;
 

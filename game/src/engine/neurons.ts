@@ -2,34 +2,14 @@ import { COLUMNS, ROWS, isNeuron, isNeuronLit, neuronCell } from './grid';
 import { Board } from './board';
 
 /*
- * The neuron: what it is to reach one, and how to read them off a board.
- *
- * `game-pieces-1.jpg` gives the rule in one sentence — neurons are "activated
- * by popping an adjacent block" — and that sentence is the whole reason this
- * module exists. It makes the objective a PLACE rather than a total. Every
- * version of the progression before this one measured something (score, then
- * connections, then pads on a ring) and a measure can be filling toward
- * anything, which is why the writing it paid out always felt bolted on. You
- * cannot plan a route to a number.
- *
- * It is also the first thing in the game that makes a chain worth BUILDING
- * rather than worth points. One cascade can reach three neurons where three
- * separate clears reach three, but the cascade costs one piece instead of
- * three — and the budget is what turns that into a real decision.
- *
- * Pure, like the rest of `engine/`: functions take a `Board`, mutate it, and
- * return plain data.
+ * The neuron: lit by popping a block beside it, which makes the objective a
+ * PLACE rather than a total. One cascade can reach three for the price of one
+ * piece, which is what makes a chain worth building rather than worth points.
  */
 
 /**
- * Where a neuron looks for a clear that reaches it.
- *
- * The same four the match rule uses, and deliberately not a copy of them by
- * import: `matching.ts` depends on this module, so borrowing its constant back
- * would make the two mutually dependent to share four vectors. Diagonals are
- * absent for the reason they are absent from matching — corner contact is not
- * something a player reads at a glance, so a neuron lighting from a diagonal
- * would look like it lit for no reason.
+ * Deliberately not imported from `matching.ts`, which depends on this module:
+ * borrowing the constant back would make the two mutually dependent.
  */
 const NEIGHBOURS = [
   { column: 0, row: -1 },
@@ -38,7 +18,6 @@ const NEIGHBOURS = [
   { column: -1, row: 0 },
 ];
 
-/** A neuron's place on the board. */
 export interface NeuronSite {
   column: number;
   row: number;
@@ -47,15 +26,11 @@ export interface NeuronSite {
 /**
  * Light every unlit neuron touching one of `cleared`, and report which.
  *
- * ONE entry per neuron however many of the cleared cells were beside it, which
- * is the same rule `damageShadow` holds itself to and for the same reason: a
- * fat clear in a pocket must not out-earn a chain, or the mechanic argues
- * against the thing it exists to reward.
+ * ONE entry per neuron however many cleared cells were beside it, the same rule
+ * `damageShadow` holds to: a fat clear in a pocket must not out-earn a chain.
  *
- * `cleared` is a flat list of coordinates rather than the `Group[]` the caller
- * has, so this module needs nothing from `matching.ts` — the dependency runs
- * one way, and these functions stay callable from a test that has never built
- * a group.
+ * `cleared` is a flat list rather than the `Group[]` the caller holds, so the
+ * dependency on `matching.ts` runs one way only.
  */
 export function lightAdjacent(board: Board, cleared: readonly NeuronSite[]): NeuronSite[] {
   const reached = new Map<number, NeuronSite>();
@@ -103,13 +78,9 @@ export function unlitCount(board: Board): number {
 }
 
 /**
- * Whether this board has been solved.
- *
- * A board with NO neurons on it is not solved, and that is a deliberate
- * asymmetry rather than an oversight. "Every neuron is lit" is vacuously true
- * of an empty board, so the naive predicate would report the objective
- * complete the instant a board was reset and before it had been seeded — a
- * failure that would surface as a memory paying out for nothing.
+ * Whether this board has been solved. A board with NO neurons is deliberately
+ * not solved: "every neuron is lit" is vacuously true of an empty one, which
+ * would report the objective complete between a reset and its seeding.
  */
 export function allLit(board: Board): boolean {
   const neurons = neuronsOn(board);

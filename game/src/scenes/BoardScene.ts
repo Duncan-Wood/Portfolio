@@ -67,31 +67,22 @@ import {
 } from '../audio/voices';
 
 /*
- * The only file where Phaser and game logic meet. (`main.ts` also imports
- * Phaser, but only to build the config object.)
+ * The only file where Phaser and game logic meet: read the keyboard, drive the
+ * clock, draw whatever the engine says is true. Every rule lives in a
+ * Phaser-free module elsewhere, so logic accumulating here is in the wrong place.
  *
- * Its job is deliberately narrow: read the keyboard, drive the clock, and draw
- * whatever the engine says is true. Every rule — gravity, matching, DAS, the
- * cascade — lives in a Phaser-free module elsewhere, so it can be tested
- * without a browser. If logic starts accumulating here, it is in the wrong
- * place.
- *
- * The scene is a pure function of engine state: `drawBoard` reads the board
- * every frame and paints it. There is no separate copy of the game to keep in
- * sync, which is the class of bug that would otherwise dominate.
+ * A pure function of engine state — `drawBoard` repaints from the board every
+ * frame — so there is no second copy of the game to keep in sync.
  */
 
 const CELL_SIZE = 64;
 const GAP = 4;
 
-/*
- * How often the FPS readout is rewritten. Phaser's `Text` rasterises glyphs to
- * an offscreen canvas and uploads them whenever the string CHANGES (`setText`
- * short-circuits on an unchanged one), and `Math.round(actualFps)` changes
- * often enough to be worth throttling — it also stops the readout flickering.
+/**
+ * How often the FPS readout is rewritten. Phaser rasterises glyphs whenever the
+ * string changes, and a rounded frame rate changes often enough to be worth
+ * throttling — it also stops the readout flickering.
  */
-/** How often the hum is re-levelled. Per frame is pointless; it moves slowly. */
-
 const FPS_REFRESH_INTERVAL = 250;
 
 
@@ -100,18 +91,9 @@ const FPS_REFRESH_INTERVAL = 250;
 
 
 /*
- * The shadow's idle: how far it bobs and leans, how long a breath takes, and
- * how long one takes to climb out of the board when it arrives.
- *
- * All of it is computed per frame from one clock rather than tweened. A tween
- * per shadow cell would fight `drawBoard`, which writes every cell's texture
- * every frame and would have to learn which cells it is not allowed to touch;
- * and the shadow moves on the board — it settles, it falls — so the tween would
- * have to be caught and rebuilt every time a cell changed hands.
- *
- * Nothing here is a `tuning.ts` dial. Those are the numbers that change how the
- * game PLAYS; these only change how it looks, and adding them would make the
- * live-tuning object something you have to read past.
+ * The shadow's idle. Computed per frame from one clock rather than tweened: a
+ * tween would fight `drawBoard`, which rewrites every cell every frame, and
+ * would have to be rebuilt each time a shadow changed cell.
  */
 const SHADOW_BOB_PIXELS = 2.4;
 const SHADOW_LEAN_DEGREES = 3.2;
@@ -119,61 +101,44 @@ const SHADOW_BREATH = 0.045;
 const SHADOW_ARRIVAL_DURATION = 340;
 
 /**
- * How long a fragment is on screen before Space will skip it.
- *
- * Not zero, for two reasons. The text is still fading in for the first 500ms,
- * so before that there is nothing to have read yet. And a fragment surfaces
- * moments after a clear — which is moments after the player was very possibly
- * hitting Space to hard-drop — so an instant skip would let the reward for a
- * whole minute of play be thrown away by a reflex.
- */
-/**
- * The box a memory's photograph is fitted into.
- *
- * Narrower than the board so the tiles either side of it stay visible: a
- * fragment DIMS the run it interrupts rather than replacing it, and that only
- * holds if the board is still there behind the picture.
+ * The box a memory's photograph is fitted into. Narrower than the board so the
+ * tiles either side stay visible: a fragment DIMS the run it interrupts rather
+ * than replacing it, which only holds if the board is still behind the picture.
  */
 const PHOTO_MAX_WIDTH = 330;
 const PHOTO_MAX_HEIGHT = 250;
 
+/**
+ * Not zero: a fragment surfaces moments after a clear, so moments after the
+ * player may have been hitting Space to hard-drop, and an instant skip would let
+ * a reflex throw away the reward for a whole minute.
+ */
 const REVEAL_SKIP_GRACE = 420;
 
 /**
- * How long a solved board waits before it hands over to the next one.
+ * How long a solved board waits before handing over, so the player never watches
+ * a board they solved being taken apart.
  *
- * Two numbers because there are two ways to hand over. BEHIND_REVEAL is the
- * one that matters: the re-seed happens under the fragment the board just
- * earned, so the player never watches a board they solved being taken apart.
- * It is longer than the scrim's 240ms fade-in, so the swap is under a cover
- * that is already fully up, and shorter than `REVEAL_SKIP_GRACE`, so it cannot
- * race a player who skips the fragment the first instant Space is offered.
- *
- * IN_THE_OPEN is the fallback for a board with nothing to hide behind — the
- * one a memory's question leaves behind it, and the one a lost board takes.
- *
- * DIM is what the objective and the piece count take on the way out, and it is
- * the scrim's own fade-in: they go dark as the cover comes up, rather than
- * blinking off beside a fragment that is already being read.
+ * BEHIND_REVEAL must stay longer than the scrim's fade-in, so the swap is under
+ * a cover already fully up, and shorter than `REVEAL_SKIP_GRACE`, so it cannot
+ * race a player who skips the fragment. IN_THE_OPEN is for a board with nothing
+ * to hide behind; DIM matches the scrim's fade-in.
  */
 const HANDOVER_BEHIND_REVEAL = 300;
 const HANDOVER_IN_THE_OPEN = 900;
 const HANDOVER_DIM = 240;
 
 /**
- * The most an answer may be, and how fast its caret blinks.
- *
- * Capped because the answer lives on the memory panel for the rest of the run
- * and the panel is 128 pixels wide. It is not a diary — it is the length of a
- * thing you would say out loud.
+ * The most an answer may be, and how fast its caret blinks. Capped because the
+ * answer lives on the memory panel for the rest of the run, and because it is
+ * the length of a thing you would say out loud rather than a diary.
  */
 const ANSWER_LIMIT = 48;
 
 /**
  * The two prompts a held board can show. Named because they share one text
- * object: `askQuestion` used to set its own and nothing set it back, so every
- * fragment after the first question told the player to type an answer at a
- * screen that was not listening.
+ * object, and whichever is set last stays set — a fragment shown after a
+ * question must put the skip prompt back or it invites an answer nothing reads.
  */
 const SKIP_PROMPT = 'space';
 const ANSWER_PROMPT = 'type an answer   ·   enter';
@@ -186,11 +151,9 @@ const BLINK_INTERVAL = 2300;
 const SPARK_TEXTURE = 'spark';
 
 /**
- * The noise the board dissolves into when the run is lost.
- *
- * Baked once like everything else here — a square of random grey pixels, tiled
- * over the board and jittered per frame. Grain alone reads as film; grain that
- * MOVES reads as a signal failing, which is the thing being described.
+ * The noise the board dissolves into when the run is lost: a square of random
+ * grey pixels, tiled over the board and jittered per frame. Still grain reads as
+ * film, where grain that MOVES reads as a signal failing.
  */
 const STATIC_TEXTURE = 'static';
 const STATIC_SIZE = 96;
@@ -204,25 +167,16 @@ export const CANVAS_WIDTH = 620;
 export const CANVAS_HEIGHT = 900;
 
 /**
- * Top-left corner of the board in canvas pixels.
- *
- * The board is left-aligned rather than centred because the preview panel needs
- * room beside it: a 404px board in the original 480px canvas left only 38px of
- * margin. The canvas was widened to 620 and the board pinned left.
+ * Top-left corner of the board in canvas pixels. Left-aligned rather than
+ * centred because the preview and brain need the column beside it.
  */
 const ORIGIN_X = 40;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE + (VISIBLE_ROWS - 1) * GAP;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 
 /*
- * The box beside the board where the memory being earned takes shape.
- *
- * This space has been empty since Stage 1 — ART-DIRECTION earmarked it for the
- * watching brain and nothing ever filled it. What goes there is the SHAPE of
- * the coming memory, dark, with a node lighting each time the run earns one, so
- * a player can see what they are working toward filling in rather than being
- * handed a surprise at the end. The nodes are silhouettes and carry no words:
- * the point is to know how much is left, not what it says.
+ * Where the coming memory takes shape, a node lighting per fragment earned. The
+ * nodes carry no words: the point is how much is left, not what it says.
  */
 const MEMORY_PANEL_TOP = 300;
 const MEMORY_PANEL_HEIGHT = 450;
@@ -231,22 +185,15 @@ const MEMORY_PANEL_HEIGHT = 450;
 const MEMORY_PANEL_LEFT = 476;
 
 /**
- * Where the kept answer starts. Further left than the memory panel on purpose:
- * it is the only prose in the right-hand column, and it gets the whole width of
- * it rather than the narrow strip the nodes are drawn in.
+ * The only prose in the right-hand column, so it gets the whole width. Must stay
+ * clear of the board's right edge, or a long answer renders across the game.
  */
-// Inside the memory panel's column. It was 432, which overlapped the board
-// (which ends at 444) and the progress ring outside it, so a long answer
-// rendered across the game and clipped off the canvas edge.
 const ANSWER_ECHO_LEFT = MEMORY_PANEL_LEFT;
 
 /**
- * The brain's box, filling the right-hand column under the preview.
- *
- * Wider than the constellation panel it replaces, because it is now the
- * progress meter for the whole game rather than an outline of the next memory,
- * and a brain squeezed into 128px reads as a blob. It takes every pixel the
- * column has between the preview and the answer echo.
+ * The brain's box, filling the right-hand column under the preview. It takes
+ * every pixel between the preview and the answer echo: it is the progress meter
+ * for the whole game, and a brain squeezed narrower reads as a blob.
  */
 const BRAIN_BOX = {
   left: ORIGIN_X + BOARD_WIDTH + 14,
@@ -260,16 +207,9 @@ const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
 const PREVIEW_TOP_Y = ORIGIN_Y + 72;
 
 /*
- * The board's edge.
- *
- * The progress ring used to draw this line as a side effect of being a meter,
- * and cutting the ring took the board's containment with it — the tiles were
- * left floating on the substrate with nothing saying where the playfield
- * stopped. This is the frame on its own: drawn once, measuring nothing.
- *
- * Mitred rather than square, which is the one thing kept from the ring. A
- * square corner reads as a border around a game; a cut one reads as routing
- * that had to get somewhere, and the whole board is meant to be a circuit.
+ * Drawn once, measuring nothing — without it the tiles float with nothing saying
+ * where the playfield stops. Mitred rather than square: a square corner reads as
+ * a border around a game, a cut one as routing that had to get somewhere.
  */
 const BOARD_FRAME_MARGIN = 15;
 
@@ -298,11 +238,9 @@ function boardFrameCorners(): { x: number; y: number }[] {
 }
 
 /**
- * A canvas x turned into a stereo position, -1 to 1.
- *
- * Deliberately narrower than the full field: hard-panning a puzzle board is
- * disorienting on headphones, and the point is only to say WHERE, not to throw
- * the sound across the room.
+ * A canvas x turned into a stereo position, -1 to 1. Narrower than the full
+ * field: the point is to say WHERE, not to throw the sound across the room, and
+ * hard-panning a puzzle board is disorienting on headphones.
  */
 function panForX(x: number): number {
   const across = (x - ORIGIN_X) / BOARD_WIDTH;
@@ -322,22 +260,11 @@ function centerOfRow(row: number): number {
 }
 
 /**
- * Draw a tile at `centerY`, showing only the part of it inside the board.
+ * Show only the part of a tile inside the board, so a pair spawning half in the
+ * hidden row emerges a sliver at a time.
  *
- * A pair spawns with one half in the hidden row above the field, so without
- * this that half either has to be skipped — which made a new piece arrive as a
- * lone block whose partner popped in a whole row later — or drawn floating
- * above the board's top edge. Clipping gives the third answer: it emerges from
- * under the edge a sliver at a time, the way it should.
- *
- * NOT a mask: Phaser 4 folded masks into its filter pipeline and the old
- * `setMask` is inert — it compiles, runs, and leaves the tile drawn in full.
- *
- * `setCrop` rather than the resize this used to do. Both hid the right number
- * of pixels while a tile was a flat colour, but resizing squashes the texture,
- * so a half-hidden tile would show a whole squat star instead of the bottom of
- * a tall one. Cropping cuts the texture and leaves the rest where it was, which
- * is what an edge does.
+ * NOT a mask: Phaser 4's `setMask` compiles, runs, and leaves the tile drawn in
+ * full. `setCrop` rather than a resize, which squashes the texture.
  */
 function drawClippedToBoard(
   tile: Phaser.GameObjects.Image,
@@ -359,13 +286,9 @@ function drawClippedToBoard(
 }
 
 /**
- * Overshoot and settle back. `1.7` is the usual constant for a back ease; it is
- * what makes something arrive as though it had weight instead of sliding into
- * position.
- *
- * Written out rather than taken from Phaser's easing table because the shadow's
- * arrival is computed per frame from a clock rather than run as a tween — see
- * `animateShadow` for why it cannot be one.
+ * Overshoot and settle back, so something arrives as though it had weight rather
+ * than sliding into position. Written out rather than taken from Phaser's easing
+ * table because the shadow's arrival is computed per frame, not tweened.
  */
 function easeOutBack(progress: number): number {
   const overshoot = 1.7;
@@ -388,18 +311,9 @@ function visibleCellIndex(column: number, row: number): number {
 }
 
 /**
- * One drawable link between two neighbouring cells.
- *
- * Every slot the board could ever light is built once, at a fixed position,
- * and then only ever shown or hidden. A connection has nowhere else to be, so
- * there is nothing to move and nothing to allocate mid-cascade.
- */
-/**
- * How far into the wait before the shadow's next target starts to show.
- *
- * Not from zero: a warning that is always on is wallpaper, and the player
- * should get a stretch of quiet to place pieces in. Late enough to be a
- * warning, early enough that a clear can still answer it.
+ * How far into the wait before the shadow's next target starts to show. Not from
+ * zero: a warning that is always on is wallpaper. Late enough to be a warning,
+ * early enough that a clear can still answer it.
  */
 const THREAT_VISIBLE_FROM = 0.45;
 
@@ -411,14 +325,16 @@ const TRACE_FADE_OUT = 220;
 const TRACE_CHARGE_DECAY = 260;
 
 /**
- * The delay on a trace with one foot outside the group that just cleared.
- *
- * This is the whole "a cascade is a signal crossing the network" idea in one
- * number: the traces inside the group fire together, and the ones leading out
- * of it fire a beat later, so the charge visibly leaves where it started.
+ * The delay on a trace with one foot outside the group that just cleared. The
+ * traces inside the group fire together and the ones leading out of it fire a
+ * beat later, so the charge visibly leaves where it started.
  */
 const TRACE_SIGNAL_STEP = 70;
 
+/**
+ * Every slot the board could light is built once at a fixed position and then
+ * only shown or hidden, so nothing is allocated mid-cascade.
+ */
 interface ConnectionSlot {
   trace: Phaser.GameObjects.Image;
   column: number;
@@ -426,11 +342,9 @@ interface ConnectionSlot {
   toColumn: number;
   toRow: number;
   /**
-   * How lit this trace is, 0..1, eased toward whether its two cells match.
-   *
-   * A number rather than the `setVisible` this replaced. Traces that snap on
-   * and off make the board read as tiles that briefly sprout connectors; a
-   * network that fades up and lingers on the way out reads as wiring.
+   * 0..1, eased toward whether its two cells match. A number rather than
+   * visibility: traces that snap on and off read as tiles sprouting connectors,
+   * where a network that fades up and lingers reads as wiring.
    */
   lit: number;
   /** Signal brightness, 0..1, set by a clear and decaying to nothing. */
@@ -442,14 +356,9 @@ interface ConnectionSlot {
 }
 
 /**
- * Randomness lives here, in the scene, NOT in the engine. The engine takes a
- * supplier function instead, which is what keeps it deterministic and its tests
- * seedless.
- *
- * A module-level function rather than an arrow defined inside the scene: an
- * arrow would capture `this`, and handing that to the long-lived `Simulation`
- * would keep the entire scene — and every object it owns — alive for as long as
- * the simulation existed.
+ * Randomness lives in the scene, NOT the engine. Module-level rather than an
+ * arrow inside the class: an arrow captures `this`, and handing that to the
+ * long-lived `Simulation` would keep the entire scene alive with it.
  */
 function randomPieceType(): number {
   return Math.floor(Math.random() * PIECE_TYPE_COUNT);
@@ -472,29 +381,19 @@ export class BoardScene extends Scene {
   private lockSolved = false;
 
   /**
-   * Counts down while a spent board is being shown to the player before it is
-   * re-seeded. Zero when nothing is failing.
-   *
-   * A beat rather than an instant reset. Running out of pieces on an unsolved
-   * board is the only way to lose one, and a board that vanished the frame the
-   * last piece landed would never tell the player what happened — they would
-   * see a fresh board and assume the game had glitched.
+   * Counts down while a spent board is shown before it is re-seeded. Zero when
+   * nothing is failing. A board that vanished the frame the last piece landed
+   * would never tell the player what happened.
    */
   private lockEndingIn = 0;
 
-  /**
-   * Whether the board on screen is being lost, as opposed to merely over.
   /** What the piece counter last showed, so the text is only rewritten on a change. */
   private shownPiecesRemaining = -1;
 
   /**
-   * The neurons this board has lit, in the order they went.
-   *
-   * Order is the whole reason this is kept here rather than read off the board:
-   * the board knows WHICH are lit, but the thread is drawn between them in the
-   * sequence the player reached them, and that sequence is a fact about the run
-   * rather than about the position. It is the memory map from the storyboard
-   * being drawn by the play instead of handed over finished.
+   * In the order they went. The board knows WHICH are lit, but the thread is
+   * drawn in the sequence the player reached them, which is a fact about the run
+   * rather than the position.
    */
   private litNeurons: NeuronSite[] = [];
 
@@ -507,12 +406,9 @@ export class BoardScene extends Scene {
   private threatenedIndex: number | null = null;
   private chainText: Phaser.GameObjects.Text;
   /**
-   * The interference laid over the board once the run is lost, and how far it
-   * has come up.
-   *
-   * A TileSprite rather than a stretched image so the grain stays the size it
-   * was baked at whatever the board's dimensions are — a scaled noise texture
-   * is blurry, and blurry noise reads as fog rather than as static.
+   * The interference laid over the board once the run is lost, and how far it has
+   * come up. A TileSprite rather than a stretched image so the grain stays the
+   * size it was baked at — scaled noise is blurry, and blurry noise reads as fog.
    */
   private staticOverlay: Phaser.GameObjects.TileSprite;
 
@@ -525,11 +421,9 @@ export class BoardScene extends Scene {
   private gameOverHint: Phaser.GameObjects.Text;
 
   /**
-   * The way to reach a person, offered only when a memory has been finished.
-   *
-   * A real link rather than a line of text: the whole premise is a portfolio
-   * you play, and the one moment somebody has spent a few minutes inside
-   * somebody else's life is the moment worth offering it in.
+   * The way to reach a person, offered only when a memory has been finished. A
+   * real link rather than a line of text: this is the one moment somebody has
+   * spent a few minutes inside somebody else's life.
    */
   private contactOffer: Phaser.GameObjects.Text;
   private previewTiles: Phaser.GameObjects.Image[];
@@ -551,11 +445,9 @@ export class BoardScene extends Scene {
   private pauseKey: Phaser.Input.Keyboard.Key;
 
   /**
-   * Held by the player rather than by the game.
-   *
-   * Deliberately a flag of our own instead of Phaser's `scene.pause()`: that
-   * stops the scene's `update` altogether, which is also what reads the
-   * keyboard — so the key that paused it would have no way to start it again.
+   * Held by the player rather than by the game. A flag of our own rather than
+   * Phaser's `scene.pause()`, which stops `update` altogether — and `update` is
+   * what reads the keyboard, so the key that paused it could never unpause it.
    */
   private paused = false;
 
@@ -564,49 +456,32 @@ export class BoardScene extends Scene {
   private pauseHint: Phaser.GameObjects.Text;
 
   /**
-   * Tiles borrowed for the duration of one cascade beat: `popTiles` shrink
-   * where a tile just cleared, `fallTiles` travel from a tile's old row to its
-   * new one.
-   *
-   * Pooled at full board size and reused, so a cascade allocates nothing. A
-   * beat can touch at most every visible cell, which is the pool size.
+   * Tiles borrowed for one cascade beat: `popTiles` shrink where a tile cleared,
+   * `fallTiles` travel from a tile's old row to its new one. Pooled at full board
+   * size and reused, so a cascade allocates nothing.
    */
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
 
   /**
-   * The lit eyes laid over every shadow on the board, one slot per visible cell
-   * and indexed exactly like `cellTiles`.
-   *
-   * Separate objects rather than part of the tile texture because they are the
-   * half that has to move independently: they blink, they flare as a shadow
-   * arrives, and they are drawn additively so they read as light rather than as
-   * paint. A slot per cell rather than a pool sized to some guess at how many
-   * shadows there can be — the board is 72 cells and every one of them can end
-   * up holding one.
-   */
-  /**
-   * The creature laid over each cell it has taken, one slot per visible cell
-   * and indexed exactly like `cellTiles`.
-   *
-   * A layer rather than a swapped texture, because a shadow POSSESSES a tile:
-   * the cell underneath goes on drawing its real colour, and this sits on top
-   * of it. Freeing the tile is then this coming off, which is the mechanic
-   * animating itself.
+   * One slot per visible cell, indexed exactly like `cellTiles`. A layer rather
+   * than a swapped texture, because a shadow POSSESSES a tile: the cell goes on
+   * drawing its real colour underneath, so freeing it is this coming off.
    */
   private shadowBodies: Phaser.GameObjects.Image[];
 
+  /**
+   * The lit eyes, indexed the same way. Separate from the body because they move
+   * independently — they blink, they flare on arrival — and are drawn additively
+   * so they read as light rather than paint.
+   */
   private shadowEyes: Phaser.GameObjects.Image[];
 
   /**
-   * Which cells are currently being drawn as a live shadow, and the one that is
-   * still climbing out of the board.
-   *
-   * The set exists to put a cell BACK when it stops holding a shadow: the idle
-   * writes position, angle, scale and alpha every frame, and a cell that is
-   * cleared while leaning would otherwise stay leaning for the rest of the run.
-   * Resetting every cell unconditionally instead is not an option — it would
-   * flatten the landing bounce, which is a tween on those same tiles.
+   * Exists to put a cell BACK when it stops holding a shadow: the idle writes
+   * position, angle, scale and alpha every frame, so a cell cleared while leaning
+   * would stay leaning for the run. Resetting every cell instead would flatten
+   * the landing bounce, a tween on those same tiles.
    */
   private animatedShadowCells = new Set<number>();
 
@@ -621,12 +496,9 @@ export class BoardScene extends Scene {
   private shadowArrival: { cellIndex: number; age: number } | null = null;
 
   /**
-   * The shadow talking, and what it has already said.
-   *
-   * Deliberately NOT the reveal overlay the memories use. A fragment stops the
-   * game and dims it; this does neither. The shadow gets to needle you while
-   * you are still playing, which is the whole difference between something the
-   * game is showing you and something that is in the room with you.
+   * The shadow talking, and what it has already said. Deliberately NOT the reveal
+   * overlay the memories use: a fragment stops the game and dims it, and this does
+   * neither, so the shadow needles you while you are still playing.
    */
   private shadowSpeech: Phaser.GameObjects.Text;
 
@@ -635,10 +507,9 @@ export class BoardScene extends Scene {
   private arrivalsSinceShadowSpoke = 0;
 
   /**
-   * The clock the idle is computed from. Its own, rather than `time` from the
-   * frame, because it must stop when the game does: a paused board whose
-   * shadows keep breathing does not read as paused, and a hit-stop that
-   * everything on screen ignores does not read as impact.
+   * The clock the idle is computed from. Its own rather than the frame's `time`,
+   * because it must stop when the game does — a paused board whose shadows keep
+   * breathing does not read as paused.
    */
   private shadowClock = 0;
 
@@ -647,39 +518,29 @@ export class BoardScene extends Scene {
 
   /**
    * The traces between matching neighbours — the board wiring itself up as it
-   * fills. ART-DIRECTION has called this the highest-value idea in the document
-   * since Stage 2: the leading between panes IS the pathway, so a group is
-   * visibly a connected circuit before it ever pops, and a cascade is a signal
-   * crossing it.
+   * fills. The leading between panes IS the pathway, so a group is visibly a
+   * connected circuit before it pops and a cascade is a signal crossing it.
    */
   private connections: ConnectionSlot[];
 
   /**
-   * How this run ended, or `null` while it is still going.
-   *
-   * One field rather than three booleans in three places. `toppedOut` lives on
-   * the simulation, `boardLost` was added when running out of pieces became the
-   * loss, and winning needed a third — and every consumer that knew about one
-   * of them silently ignored the others.
+   * How this run ended, or `null` while it is still going. One field rather than
+   * a boolean per ending, because a consumer that knows about one of them
+   * silently ignores the others.
    */
   private runOver: 'topped-out' | 'out-of-pieces' | 'won' | null = null;
 
   /**
-   * The readouts that only mean something while a run is going.
-   *
-   * NEXT and PIECES answer "what do I have left to work with", which a finished
-   * run does not have. The memory panel deliberately is NOT in here: it is the
-   * thing that was just filled in, and it should stay up to be looked at.
+   * The readouts that only mean something while a run is going: NEXT and PIECES
+   * answer "what do I have left to work with". The memory panel is deliberately
+   * NOT in here — it was just filled in, and should stay up to be looked at.
    */
   private runReadouts: Phaser.GameObjects.Text[] = [];
 
   /**
-   * Whether the objective and piece count are held dark until whatever is
-   * covering the board lifts.
-   *
-   * Two callers. The run's opening line holds them so the objective arrives as
-   * the ANSWER to it, and a board handing over holds them so the next lock's
-   * numbers do not appear over the fragment the last one just earned.
+   * Held dark until whatever covers the board lifts. The opening holds them so
+   * the objective arrives as its ANSWER; a handover holds them so the next lock's
+   * numbers do not appear over the fragment the last one earned.
    */
   private objectiveHeld = false;
 
@@ -693,53 +554,38 @@ export class BoardScene extends Scene {
   private shownLitNeurons = 0;
 
   /**
-   * Fragments of memory surfaced this run, counted across every memory rather
-   * than per memory. Progress is measured from it rather than by resetting the
-   * engine's counter, so connections earned past a threshold carry into the
-   * next fragment instead of being thrown away at the door.
+   * Fragments surfaced this run, counted across every memory. Progress is measured
+   * from it rather than by resetting the engine's counter, so connections earned
+   * past a threshold carry into the next fragment instead of being thrown away.
    */
   private nodesRevealed = 0;
 
   /**
-   * Milliseconds left on a surfaced fragment. While it is positive the
-   * simulation is frozen and input is ignored — the board is held, not torn
-   * down, because a memory here is an interruption to a run rather than a
-   * departure from it.
+   * Milliseconds left on a surfaced fragment. While positive the simulation is
+   * frozen and input ignored — the board is held, not torn down, because a memory
+   * is an interruption to a run rather than a departure from it.
    */
   private revealRemaining = 0;
 
   /**
-   * A closed circuit waiting for the board to stop moving.
-   *
-   * `drawProgress` runs during a cascade on purpose — the ring filling as a
-   * chain resolves is the best build-up in the game. Surfacing the fragment
-   * from in there was not: it froze the simulation mid-cascade, so a five-link
-   * chain stopped at link three to show a memory, and `refreshChain` went on
-   * drawing "3 CHAIN" at 64px behind it because `resolving` was still true
-   * underneath. The two best moments in the game were landing on top of each
-   * other. The circuit closes when it closes; the fragment waits for the last
-   * link.
+   * A closed circuit waiting for the board to stop moving. `drawProgress` runs
+   * during a cascade deliberately, but surfacing from in there would freeze the
+   * simulation mid-cascade and land the game's two best moments on each other.
    */
   private revealPending = false;
 
   /**
-   * The `piecesLocked` count the last fragment surfaced on, so at most one can
-   * surface per placement.
-   *
-   * A deep chain can pay for every fragment a memory has in one go — a 4-link
-   * clear measured 61 connections against the 43 a whole memory costs — and
-   * without this they arrive as a stack of modals over a board nobody has
-   * touched. Spread across placements the same chain pays FORWARD: the next
-   * few pieces each surface something, which is what a chain reward should
-   * feel like. -1 so the first fragment of a run is never held back.
+   * At most one fragment per placement. A deep chain can pay for a whole memory
+   * at once, which without this arrives as a stack of modals over a board nobody
+   * has touched; spread out, the same chain pays FORWARD. -1 so the first
+   * fragment of a run is never held back.
    */
   private lastRevealPiece = -1;
 
   /**
-   * A question waiting for the fragment in front of it to finish.
-   *
-   * Completing a memory used to swap the last node's words FOR the question,
-   * which quietly ate a fragment the player had earned. It follows it instead.
+   * A question waiting for the fragment in front of it to finish, rather than
+   * replacing it — swapping the last node's words for the question would eat a
+   * fragment the player earned.
    */
   private pendingReveal: { title: string; body: string; memoryIndex: number } | null = null;
 
@@ -752,27 +598,20 @@ export class BoardScene extends Scene {
   private revealSkippableIn = 0;
 
   /**
-   * The question waiting on an answer, what has been typed into it, and where
-   * the answers already given are kept.
+   * `awaitingAnswer` holds the game as a fragment does but has no clock: it ends
+   * on Enter and not before, the only screen here that waits on a person.
    *
-   * `awaitingAnswer` holds the game exactly as a fragment does, but it has no
-   * clock: it ends when the player presses Enter and not before. This is the
-   * only screen in the game that waits on a person rather than on a timer, and
-   * it should — everything else here is a thing the game does TO you.
-   *
-   * What was typed is kept only so the panel can show it back. It is never
-   * scored, never branched on and never handed to the engine; `answerQuestion`
-   * is told THAT an answer happened, never what it said.
+   * What was typed is kept only so the panel can show it back. Never scored,
+   * branched on, or handed to the engine.
    */
   private awaitingAnswer = false;
 
   private answerText = '';
 
   /**
-   * Which memory the question on screen belongs to, carried from the fragment
-   * that earned it rather than re-derived. `nodesRevealed` has already moved
-   * past that memory by the time the answer arrives, so deriving it here would
-   * be asking a counter about a moment it has left behind.
+   * Which memory the question on screen belongs to, carried from the fragment that
+   * earned it rather than re-derived: `nodesRevealed` has already moved past that
+   * memory by the time the answer arrives.
    */
   private answeringMemory = 0;
 
@@ -783,20 +622,12 @@ export class BoardScene extends Scene {
   private answerEcho: Phaser.GameObjects.Text;
   private revealBody: Phaser.GameObjects.Text;
 
-  /**
-   * Sparks of current running the energised part of the track, and how far
-   * round the leading one is.
-   *
-   * A lit circuit that does not move reads as a drawn border. Something
-   * travelling it is what says the thing is switched on.
-   */
-
 
   /**
-   * Visible-cell indices that `drawBoard` must leave empty because a
-   * `fallTile` is currently animating into them. Without this the board
-   * would paint the tile at its destination the instant the engine settled,
-   * and the travelling copy would be a duplicate rather than the fall itself.
+   * Visible-cell indices `drawBoard` must leave empty because a `fallTile` is
+   * animating into them. Without this the board paints the tile at its
+   * destination the instant the engine settles, and the travelling copy reads as
+   * a duplicate rather than as the fall.
    */
   private cellsBeingFilled = new Set<number>();
 
@@ -846,11 +677,8 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Phaser calls this once when the scene starts. Everything drawn is allocated
-   * here — 72 board cells, 2 pair cells, 2 preview cells and the text — and
-   * never again — the frame loop only changes colour and position. Not strictly
-   * allocation-free: `drawPair` builds a fresh cells array each frame. It is
-   * tiny and short-lived.
+   * Everything drawn is allocated here and never again: the frame loop only
+   * changes texture and position.
    */
   create(): void {
     // A COPY of the defaults, so mutating this scene's tuning at runtime cannot
@@ -863,35 +691,21 @@ export class BoardScene extends Scene {
     this.nextFpsRefresh = 0;
 
     // Live tuning hook. `import.meta.env.DEV` is replaced with `false` at build
-    // time, so this branch is removed entirely from the production bundle —
-    // verified: `window.tuning` appears zero times in the built output.
+    // time, so this branch drops out of the production bundle entirely.
     if (import.meta.env.DEV) {
       window.tuning = this.tuning;
-      // The board too, so a chain can be built from the console instead of
-      // played for. Feel is judged from deliberate chains, and stacking one by
-      // hand is slower than the thing being judged.
+      // The board too, so a chain can be built from the console rather than
+      // played for.
       window.simulation = this.simulation;
-      // And the scene, so the juice can be inspected and stretched out from the
-      // console — most of it lasts a few hundred milliseconds, which is shorter
-      // than it takes to look at.
+      // And the scene, so the juice can be stretched out from the console: most
+      // of it is shorter than it takes to look at.
       window.boardScene = this;
     }
 
-    // Darkness at the edges, so the board sits in a pool of light rather than
-    // on a flat background.
-    //
-    // Tuned by eye against the real board, not guessed: the first values that
-    // looked right in isolation dimmed the tiles so far that colours stopped
-    // being tellable apart at speed. ART-DIRECTION is explicit that readability
-    // beats beauty in a game built on fast pattern recognition, so this is
-    // deliberately weak — it shades the corners and nothing more.
-    //
-    // The lit circular platform ART-DIRECTION calls for is NOT here on purpose.
-    // It was built and cut: a circle large enough to sit under a 812-tall board
-    // does not fit a 620-wide canvas, so it clipped on all four sides and read
-    // as stray arcs rather than as a stage. It also broke that document's own
-    // first rule — art waits until the core loop is proven fun. Revisit it as a
-    // flattened ellipse in perspective, after the playtest.
+    // Darkness at the edges, so the board sits in a pool of light rather than on
+    // a flat background. Deliberately weak: it shades the corners and nothing
+    // more, because anything stronger stops the colours being tellable apart at
+    // speed.
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
 
     // Under everything on the board, so a tile in the outermost column sits on
@@ -907,14 +721,11 @@ export class BoardScene extends Scene {
     this.boardFrame.closePath();
     this.boardFrame.strokePath();
 
-    // Before the cells, so the brain sits behind the board's own column rather
-    // than over it. It used to share this spot with the progress ring; the ring
-    // is gone and the brain is the meter on its own now.
+    // Before the cells, so the brain sits behind the board's own column.
     this.memoryPanel = this.add.graphics();
 
     // Every texture the board draws with, before the first thing that asks for
-    // one. Baking after the fact is how the sparks first shipped as Phaser's
-    // missing-texture placeholder.
+    // one — anything built against a missing texture never recovers.
     bakeTileTextures(this, CELL_SIZE, GAP);
 
     // One image per VISIBLE cell. The hidden row is deliberately not drawn, so
@@ -987,23 +798,20 @@ export class BoardScene extends Scene {
     for (let index = 0; index < COLUMNS * VISIBLE_ROWS; index += 1) {
       this.fallTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
     }
-    // Twice the board for the pop pool, because a purified cell borrows TWO —
-    // the creature breaking open and the tile blooming under it — on top of one
-    // per cleared cell. `borrowPopTile` refuses past the end rather than
-    // indexing off it: an exception escaping `update` is never caught by
-    // Phaser, the rAF chain is never re-requested, and the game is dead until a
-    // reload.
+    // Twice the board for the pop pool: a purified cell borrows TWO — the
+    // creature breaking open and the tile blooming under it — on top of one per
+    // cleared cell. `borrowPopTile` refuses past the end rather than indexing off
+    // it, because an exception escaping `update` kills the game until a reload.
     for (let index = 0; index < COLUMNS * VISIBLE_ROWS * 2; index += 1) {
       this.popTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
     }
-    // One round white dot, drawn once and thrown away. Tinted per group at emit
-    // time, so four colours of debris cost one texture and no art.
+    // One round white dot, tinted per group at emit time, so four colours of
+    // debris cost one texture.
     const sparkTexture = this.add.graphics();
     sparkTexture.fillStyle(0xffffff, 1).fillCircle(SPARK_RADIUS, SPARK_RADIUS, SPARK_RADIUS);
     sparkTexture.generateTexture(SPARK_TEXTURE, SPARK_RADIUS * 2, SPARK_RADIUS * 2);
 
-    // Coarse rather than per-pixel: a 3px grain reads as interference at this
-    // size, where single pixels read as a dirty screen.
+    // Coarse rather than per-pixel: single pixels read as a dirty screen.
     sparkTexture.clear();
     for (let y = 0; y < STATIC_SIZE; y += 3) {
       for (let x = 0; x < STATIC_SIZE; x += 3) {
@@ -1044,9 +852,8 @@ export class BoardScene extends Scene {
     }).setOrigin(0.5, 0.5));
 
     // What the board has left to spend, in the gap between the preview and the
-    // memory panel. It sat ABOVE the preview first, which put the label at
-    // y = -16 — off the top of the canvas entirely, with the number stranded in
-    // the corner beside the FPS readout looking like part of the debug overlay.
+    // memory panel. It has to clear the preview: above it the label runs off the
+    // top of the canvas.
     this.runReadouts.push(this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 88, 'PIECES', {
       fontFamily: 'monospace',
       fontSize: '13px',
@@ -1080,19 +887,17 @@ export class BoardScene extends Scene {
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
 
-    // Typing is the one input that cannot be polled. Every other key in this
-    // game is a state the frame asks about; text is a stream of events, and a
-    // frame that samples it drops characters typed fast enough to fall between
-    // two frames — which is most of them.
+    // Typing is the one input that cannot be polled. Every other key is a state
+    // the frame asks about; text is a stream of events, and sampling it drops
+    // characters typed fast enough to fall between two frames.
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.typeIntoAnswer(event));
 
     // Browsers will not start audio until the player has interacted with the
     // page, so the context is built on the first key rather than here.
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
-    // Dev only. `import.meta.env.DEV` is replaced with `false` at build time
-    // and the whole readout drops out of the bundle, the same way the live
-    // tuning hook does — a shipped game should not have a debug overlay on it.
+    // Dev only: the whole readout drops out of the production bundle, the same
+    // way the live tuning hook does.
     this.showFps = import.meta.env.DEV;
     this.fpsText = this.add.text(8, 8, '', {
       fontFamily: 'monospace',
@@ -1111,8 +916,8 @@ export class BoardScene extends Scene {
 
     this.chainText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, ORIGIN_Y + 30, '', {
       fontFamily: 'monospace',
-      // 28px near the top edge, not 64px dead centre. At full size over the
-      // middle of the board it covered the tiles it was congratulating you for.
+      // Near the top edge rather than dead centre, or it covers the tiles it is
+      // congratulating you for.
       fontSize: '28px',
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
@@ -1150,35 +955,32 @@ export class BoardScene extends Scene {
     }).setOrigin(0.5, 0.5).setVisible(false);
 
     // Only shown once the fragment can actually be skipped, so it teaches the
-    // grace period as well as the key. Dim, because a prompt that competes with
-    // the line it is offering to dismiss has its priorities backwards.
+    // grace period as well as the key. Dim, because it must not compete with the
+    // line it is offering to dismiss.
     this.revealHint = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 96, SKIP_PROMPT, {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: '#6b5a80',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    // What they are typing, under the question. Its own object rather than more
-    // lines on `revealBody`, so the question stays still while the answer grows
-    // underneath it.
+    // Its own object rather than more lines on `revealBody`, so the question
+    // stays still while the answer grows underneath it.
     this.answerLine = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 74, '', {
       fontFamily: 'monospace',
       fontSize: '19px',
       color: '#c98cff',
       align: 'center',
       wordWrap: { width: BOARD_WIDTH - 80 },
-      // Stroked because it outlives the scrim: the answer is held over the
-      // board while the wave clears it, by which point the dimming has gone
-      // and it is sitting on bare tiles.
+      // Stroked because it outlives the scrim: the answer is still up while the
+      // wave clears the board, by which point it sits on bare tiles.
       stroke: '#150a24',
       strokeThickness: 5,
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    // The answer, kept beside the memory it belongs to for the rest of the run.
-    // Left of the panel and wider than it, because the panel's 128px is a
-    // column for nodes, not for prose. At 11px inside it this read as fine
-    // print — which is the wrong thing for the one line in the game the player
-    // wrote themselves.
+    // Kept beside the memory it belongs to for the rest of the run. Wider than
+    // the panel, whose column is for nodes rather than prose — this is the one
+    // line in the game the player wrote themselves, and it should not be fine
+    // print.
     this.answerEcho = this.add.text(
       ANSWER_ECHO_LEFT,
       MEMORY_PANEL_TOP + MEMORY_PANEL_HEIGHT + 20,
@@ -1192,8 +994,7 @@ export class BoardScene extends Scene {
       },
     ).setOrigin(0, 0).setVisible(false);
 
-    // The way out, at the moment it is needed. The pause screen has always said
-    // `esc to resume`; losing said nothing at all, so R was a secret.
+    // The way out, at the moment it is needed. Without it R is a secret.
     this.gameOverHint = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2 + 78,
@@ -1207,10 +1008,9 @@ export class BoardScene extends Scene {
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
-    // Under the restart prompt, and only ever up on a win. Interactive, so it
-    // is a way out of the game rather than an instruction to go and find one:
-    // `/#contact` is the portfolio's own contact section, which is where the
-    // mail address and the links already live.
+    // Under the restart prompt and only ever up on a win. Interactive, so it is a
+    // way out rather than an instruction to go and find one — `/#contact` is the
+    // portfolio's own contact section.
     this.contactOffer = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2 + 112,
@@ -1253,9 +1053,8 @@ export class BoardScene extends Scene {
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
-    // The shadow's last word, under the game's. It speaks here through its own
-    // object rather than the needling one, because this line is said when
-    // nothing can be answered.
+    // The shadow's last word, through its own object rather than the needling
+    // one, because this is said when nothing can be answered.
     this.gameOverLine = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2 + 34,
@@ -1267,18 +1066,16 @@ export class BoardScene extends Scene {
         backgroundColor: '#221038',
         padding: { x: 12, y: 6 },
         align: 'center',
-        // Wrapped, because this line is composed at the end from the fragment
-        // the run was reaching for, and a long title ran it off both edges of
-        // the canvas. Two centred lines still clear the restart prompt below.
+        // Wrapped: this line is composed from the fragment the run was reaching
+        // for, and a long title runs off both edges of the canvas.
         wordWrap: { width: BOARD_WIDTH - 24 },
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
-    // Last, so it covers the board, the readouts and anything mid-reveal.
-    // Over the board's upper third, which is empty for most of a run — and when
-    // it is not, the stack is high, which is exactly when it has most to say.
-    // Stroked rather than backed with a panel so it stays legible over tiles
-    // without another object to fade in step.
+    // Last, so it covers the board, the readouts and anything mid-reveal. Over
+    // the board's upper third, which is empty for most of a run. Stroked rather
+    // than backed with a panel, so it stays legible over tiles without a second
+    // object to fade in step.
     this.shadowSpeech = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, ORIGIN_Y + BOARD_HEIGHT * 0.28, '', {
       fontFamily: 'monospace',
       fontSize: '17px',
@@ -1313,12 +1110,8 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Phaser calls this once per rendered frame. `delta` is milliseconds since
-   * the last one.
-   *
-   * Order matters: input is read FIRST so a keypress affects the very next
-   * simulation step rather than waiting a frame, which is the cheapest latency
-   * there is to win.
+   * Input is read FIRST, so a keypress affects the very next simulation step
+   * rather than waiting a frame. That is the cheapest latency there is to win.
    */
   update(time: number, delta: number): void {
     // Escape is not a pause while a question is waiting: the game is already
@@ -1327,36 +1120,34 @@ export class BoardScene extends Scene {
       this.setPaused(!this.paused);
     }
 
-    // Space resumes as well, because that is the reflex — and it is safe for a
-    // reason worth stating: `JustDown` returns true once per press, so reading
-    // it here CONSUMES it. The same press cannot also reach `readInput` and
-    // hard-drop the piece the player just came back to. The `paused` test has
-    // to come first for that to hold; short-circuiting is what leaves the key
-    // unread, and therefore still available, during normal play.
+    // Space resumes as well, because that is the reflex. Safe because `JustDown`
+    // returns true once per press, so reading it here CONSUMES it and the same
+    // press cannot also reach `readInput` and slam the piece. The `paused` test
+    // must come first for that to hold — short-circuiting is what leaves the key
+    // unread, and so still available, during normal play.
     if (this.paused && Input.Keyboard.JustDown(this.hardDropKey)) {
       this.setPaused(false);
     }
 
-    // R is a LETTER while a question is waiting for one. Ungated, typing any
-    // answer containing an "r" — remember, work, start — restarted the run
-    // mid-sentence, which looked like the game refusing to let you finish.
+    // R is a LETTER while a question is waiting for one. Ungated, any answer
+    // containing an "r" restarts the run mid-sentence.
     if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.restartKey)) {
       this.restart();
     }
 
-    // Nothing to read once the game is over: the simulation refuses input
-    // anyway, and polling on would keep writing `softDropping` to a pair that
-    // is already part of the board. Nothing to read while paused either — but
-    // the two keys above are still polled, or there would be no way out.
+    // Nothing to read once the game is over: the simulation refuses input anyway,
+    // and polling on would keep writing `softDropping` to a pair already part of
+    // the board. Nothing while paused either — but the two keys above are still
+    // polled, or there would be no way out.
     if (!this.paused && !this.simulation.toppedOut && !this.storyHolding
       && this.runOver !== 'won') {
       this.readInput(delta);
     }
 
     if (this.paused) {
-      // Everything below this advances something. Drawing continues, because
-      // Phaser clears the canvas every frame and a held game still has to be
-      // looked at; nothing here consumes `delta`, so no time is banked.
+      // Everything below advances something. Drawing continues, because Phaser
+      // clears the canvas every frame; nothing here consumes `delta`, so no time
+      // is banked.
       this.drawBoard();
       this.drawConnections(0);
       this.drawPair();
@@ -1383,12 +1174,11 @@ export class BoardScene extends Scene {
           this.tweens.add({ targets: this.revealHint, alpha: 1, duration: 260 });
         }
       } else if (Input.Keyboard.JustDown(this.hardDropKey)) {
-        // Space skips. The hold is generous on purpose — long enough for a slow
-        // reader — and somebody who has already finished the line should not be
-        // made to sit out the rest of it. Safe to read the key here: `readInput`
-        // is refused while a fragment is up, so this is the only claim on the
-        // press, and hard drop is edge-triggered, so holding Space through the
-        // skip cannot slam the next pair.
+        // Space skips: the hold is generous for a slow reader, and somebody who
+        // has finished the line should not sit out the rest of it. Safe here
+        // because `readInput` is refused while a fragment is up, and hard drop is
+        // edge-triggered, so holding Space through the skip cannot slam the next
+        // pair.
         this.revealRemaining = 0;
       }
 
@@ -1396,9 +1186,9 @@ export class BoardScene extends Scene {
         this.advanceReveal();
       }
     } else if (this.hitStopRemaining > 0) {
-      // Deliberately does NOT call `stepsFor`. Asking the accumulator for steps
-      // and throwing them away would bank the frozen milliseconds and pay them
-      // out in a burst the moment the freeze ended.
+      // Deliberately does NOT call `stepsFor`: asking the accumulator for steps
+      // and discarding them banks the frozen time and pays it out in a burst the
+      // moment the freeze ends.
       this.hitStopRemaining -= delta;
     } else if (this.runOver === 'won') {
       // Held for good. A won run keeps its board on screen exactly as a lost
@@ -1409,9 +1199,8 @@ export class BoardScene extends Scene {
       }
     }
 
-    // The shadows are frozen by hit-stop and by a reveal along with everything
-    // else: a board that holds still except for the creatures on it breathing
-    // does not read as held.
+    // Frozen by hit-stop and by a reveal along with everything else: a board that
+    // holds still except for the creatures breathing does not read as held.
     if (this.hitStopRemaining <= 0 && !this.storyHolding) {
       this.shadowClock += delta;
 
@@ -1445,11 +1234,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Jitter the interference, once the run is lost.
-   *
-   * Scrolled and re-alpha'd every frame rather than tweened, because static is
-   * not an animation with a shape — it is noise that has to be different each
-   * frame or the eye reads it as a texture sitting still on the glass.
+   * Jitter the interference, once the run is lost. Scrolled and re-alpha'd every
+   * frame rather than tweened: static has to be different each frame or the eye
+   * reads it as a texture sitting still on the glass.
    */
   private refreshStatic(): void {
     if (this.staticStrength <= 0) {
@@ -1464,17 +1251,13 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * The answer as it is typed, with a caret.
-   *
-   * Blinks off wall-clock time rather than off anything the simulation owns,
-   * because the simulation is stopped — a still caret on a still board would
-   * read as a hung game rather than as one waiting for you.
+   * The answer as it is typed, with a caret. Blinks off wall-clock time rather
+   * than anything the simulation owns, because the simulation is stopped and a
+   * still caret on a still board reads as a hung game.
    */
   private refreshAnswerLine(time: number): void {
     // The prompt has done its job the moment anything is typed, and a two-line
-    // answer is drawn straight through where it sits. Fading it on the first
-    // keystroke fixes the collision and reads better than an instruction that
-    // stays up after it has been followed.
+    // answer draws straight through where it sits.
     if (this.awaitingAnswer) {
       this.revealHint.setVisible(this.answerText.length === 0);
     }
@@ -1488,11 +1271,8 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Hold or release the game.
-   *
-   * Tweens are paused wholesale alongside the flag: a pop shrinking or a tile
-   * falling would otherwise carry on behind the overlay, and a pause that only
-   * stops some of the motion reads as a bug rather than as a pause.
+   * Hold or release the game. Tweens are paused wholesale alongside the flag, or
+   * a pop shrinking behind the overlay makes it read as a bug rather than a pause.
    */
   private setPaused(paused: boolean): void {
     if (paused === this.paused) {
@@ -1512,14 +1292,11 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Start a new game without tearing the scene down. `scene.restart()` would
-   * also work, but it destroys and rebuilds every game object — including the
-   * pools above — to change state the simulation can reset on its own.
-   */
-  /**
-   * Start again. `keepMemory` re-seeds the BOARD only, which is what running
-   * out of pieces does: a lost board costs you the board. R, which is the
-   * player asking for a new run, does not pass it and loses everything.
+   * Without tearing the scene down: `scene.restart()` would rebuild every game
+   * object, pools included, to change state the simulation can reset itself.
+   *
+   * `keepMemory` re-seeds the BOARD only, which is what running out of pieces
+   * does. R does not pass it and loses everything.
    */
   private restart(keepMemory = false, keepStory = false): void {
     // A held game that restarts is a running game: leaving the flag set would
@@ -1527,9 +1304,8 @@ export class BoardScene extends Scene {
     this.setPaused(false);
     this.simulation.restart();
 
-    // Force `newPiece` on the next frame so the input translator re-latches a
-    // held key exactly as it does after a lock — no held direction or soft drop
-    // carries into the new game.
+    // Force `newPiece` next frame so the input translator re-latches a held key
+    // as it does after a lock, and nothing carries into the new game.
     this.lastPiecesSpawned = -1;
 
     this.tweens.killTweensOf(this.popTiles);
@@ -1546,21 +1322,17 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Forget everything the scene believes it has already drawn and sounded.
-   *
-   * Shared by `create` and `restart` because both leave the simulation at the
-   * start of a game with nothing on screen belonging to it yet. The counters
-   * are seeded from the engine rather than zeroed, so a restart cannot sound a
-   * landing or replay a beat that belonged to the run before it.
+   * Forget everything the scene believes it has already drawn and sounded. The
+   * counters are seeded from the engine rather than zeroed, so a restart cannot
+   * sound a landing or replay a beat belonging to the run before it.
    */
   private resetShownState(keepMemory = false, keepStory = false): void {
     this.cellsBeingFilled.clear();
     this.threatenedIndex = null;
 
-    // BEFORE `startLock`, and this is load-bearing: the lock a board seeds is
-    // now derived from how many fragments have been earned, so seeding while
-    // this still held the finished run's count opened a brand new run on the
-    // LAST lock of the memory — ten pieces and four neurons as a tutorial.
+    // BEFORE `startLock`, and load-bearing: the lock a board seeds is derived
+    // from fragments earned, so seeding while this still holds the finished run's
+    // count opens a new run on the LAST lock of the memory.
     if (!keepMemory) {
       this.shownLitNeurons = 0;
       this.nodesRevealed = 0;
@@ -1578,13 +1350,11 @@ export class BoardScene extends Scene {
       slot.trace.setVisible(false);
     }
 
-    // Undo the losing sequence. It dims the panel, fades two texts in and
-    // tweens every lit trace to nothing, and R can land in the middle of all
-    // three — a new run must not open holding the last one's ending.
+    // Undo the losing sequence: R can land in the middle of its three tweens, and
+    // a new run must not open holding the last one's ending.
     //
-    // `runOver` first, because it is what lets the ending's delayed callbacks
-    // know they have been overtaken. Left set, a re-seeded board would still be
-    // treated as ended and print the last board's ending over the new one.
+    // `runOver` first, because it is what lets the ending's delayed callbacks know
+    // they have been overtaken.
     this.runOver = null;
     this.tweens.killTweensOf([
       this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
@@ -1607,16 +1377,11 @@ export class BoardScene extends Scene {
       slot.trace.setAlpha(1);
     }
 
-    // Cut, not faded. `hideReveal` runs the countdown's 280ms dissolve, and it
-    // is only ever reached BY that countdown — a restart sets `revealRemaining`
-    // to 0 directly, so nothing was left to reach it and a fragment the player
-    // restarted out of stayed on screen over the new run for the rest of the
-    // session.
+    // Cut, not faded: `hideReveal` is only reached by the countdown, and a
+    // restart zeroes `revealRemaining` directly.
     //
-    // ALL of it skipped when the story is holding the board, because that is
-    // the case where the re-seed is deliberately happening behind a fragment
-    // that must survive it. Clearing `pendingReveal` there would also swallow
-    // the question waiting behind a memory's last fragment.
+    // Skipped when the story holds the board — that is the case where the
+    // re-seed is deliberately happening behind a fragment that must survive it.
     if (!keepStory) {
       this.tweens.killTweensOf([
         this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
@@ -1626,16 +1391,11 @@ export class BoardScene extends Scene {
       }
       this.revealSkippableIn = 0;
     }
-    // Put back whatever the winning sequence faded out, or a run started from
-    // one opens with no preview, no piece count and no objective. `startLock`
-    // used to bring the objective back itself, which is why it is in the list
-    // now: a handover re-seeds the board from in here, and a lock that lit its
-    // own objective line would have written the next board's count over the
-    // fragment this one earned.
-    //
-    // Skipped entirely under `keepStory`, for that same reason — the hold is
-    // already on, put there by the handover on its way out, and releasing it
-    // is `releaseObjective`'s job once the fragment lifts.
+    // Put back whatever the winning sequence faded out. The objective is in that
+    // list rather than lit by `startLock`, because a handover re-seeds from in
+    // here and a lock lighting its own line would write the next board's count
+    // over the fragment this one earned. Skipped under `keepStory`, where the
+    // hold is already on and `releaseObjective` will lift it.
     if (!keepStory) {
       this.objectiveHeld = false;
       this.tweens.killTweensOf([
@@ -1658,10 +1418,9 @@ export class BoardScene extends Scene {
       this.memoryAnswers = [];
     }
 
-    // EVERY cell, not only the ones a shadow was standing on. `killAll` above
-    // stops any tween mid-flight, and a cell left part-way through the flare a
-    // lit neuron plays would keep that scale for the rest of the session —
-    // `drawBoard` only ever swaps a texture, so nothing would put it back.
+    // EVERY cell, not only the ones a shadow stood on. `killAll` stops tweens
+    // mid-flight, and a cell left part-way through a neuron's flare keeps that
+    // scale forever — `drawBoard` only swaps textures, so nothing puts it back.
     this.tweens.killTweensOf(this.cellTiles);
     for (let index = 0; index < this.cellTiles.length; index += 1) {
       this.restoreCell(index);
@@ -1691,17 +1450,16 @@ export class BoardScene extends Scene {
       this.pendingReveal = null;
       this.revealPending = false;
     }
-    // Back to -1, not to the engine's count: the new run has locked nothing,
-    // and seeding this from `piecesLocked` would make the first fragment wait
-    // for a placement it has already been paid for.
+    // Back to -1, not the engine's count: seeding from `piecesLocked` would make
+    // the first fragment wait for a placement already paid for.
     this.lastRevealPiece = -1;
-    // Drawn here as well as on every change: the panel is otherwise blank until
-    // the first pad lights, which is exactly when it has the most to say.
+    // Drawn here as well as on every change, or the panel is blank until the
+    // first node lights.
     this.redrawMemoryPanel(0);
 
-    // Last, so the cleanup above cannot hide the thing it just put up. A board
-    // re-seed keeps the memory and does NOT re-open the run — the opening
-    // frames the run, and a player who has already read it is four boards in.
+    // Last, so the cleanup above cannot hide what it just put up. A board re-seed
+    // does NOT re-open the run: the opening frames the run, and a player who has
+    // read it is already four boards in.
     if (!keepMemory) {
       this.openTheRun();
     }
@@ -1710,18 +1468,9 @@ export class BoardScene extends Scene {
   /**
    * The cold open: the shadow speaks over a board that is not moving yet.
    *
-   * There was no opening at all. The game began on a board already falling,
-   * which for a portfolio is the worst available first impression — a stranger
-   * clicked "play" and got a wall of pieces and an objective line reading as an
-   * instruction from nowhere. Nothing said what the board was, whose it was, or
-   * why anything was dark.
-   *
-   * Built out of `showReveal` rather than as its own screen, and that is the
-   * whole reason it is four lines: a fragment ALREADY freezes the simulation
-   * without banking the time, dims the board without replacing it, and offers
-   * Space to skip after a grace period. An opening needs exactly those three
-   * things. Nothing pends after it, so `advanceReveal` simply dissolves it and
-   * the first pair falls.
+   * Built out of `showReveal` rather than its own screen, which is why it is four
+   * lines — a fragment already freezes the simulation, dims the board and offers
+   * Space, which is exactly what an opening needs.
    */
   private openTheRun(): void {
     this.showReveal('', SHADOW_OPENING_LINE, this.holdFor(SHADOW_OPENING_LINE, 1100));
@@ -1729,24 +1478,17 @@ export class BoardScene extends Scene {
     // before a memory exists to be spoken about.
     this.revealBody.setColor('#b07dff');
 
-    // The objective arrives AFTER the line, because it is the answer to it —
-    // "light every neuron" reads as an instruction from nowhere on its own, and
-    // as a reply to "you stopped here before" when it follows one. It sits
-    // above the board and therefore outside the scrim, so it has to be dimmed
-    // by hand rather than covered.
-    // Cut to dark rather than faded: nothing has been on screen yet, so there
-    // is nothing to fade FROM. A handover is the other case and it fades.
+    // The objective arrives AFTER the line because it is the answer to it. It
+    // sits above the board and therefore outside the scrim, so it is dimmed by
+    // hand rather than covered — cut to dark rather than faded, since nothing has
+    // been on screen yet to fade from.
     this.holdObjective(0);
   }
 
   /**
-   * Hold the objective and the piece count dark until the board is uncovered.
-   *
-   * `fade` is 0 for the opening and a duration for a handover, and the
-   * difference is the whole reason it is a parameter. The opening holds them
-   * before either has ever been drawn, so it cuts; a handover dims them out
-   * from under the player's eye while the fragment is going up, and cutting
-   * two lit readouts to nothing on one frame reads as a flicker.
+   * `fade` is 0 for the opening, which holds them before either has been drawn,
+   * and a duration for a handover, which dims them under the player's eye: two
+   * lit readouts cut to nothing on one frame read as a flicker.
    */
   private holdObjective(fade: number): void {
     const held = [this.objectiveText, this.piecesText];
@@ -1764,17 +1506,12 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Bring them back once whatever was covering the board lifts.
+   * Driven from `update` rather than scheduled: both the opening and a handover
+   * can be cut short by Space, and a `delayedCall` would leave the objective dark
+   * until a timer that no longer matched fired.
    *
-   * Driven from `update` rather than scheduled, because Space skips a fragment
-   * and a `delayedCall` would leave the objective dark until the timer it no
-   * longer matches fired. That was written for the opening and it is the same
-   * reason the handover needs it: both are held by something the player is
-   * allowed to cut short.
-   *
-   * Tests `storyHolding` rather than the countdown, so a fragment that hands
-   * over to a QUESTION does not uncover the next lock's numbers in the gap
-   * between the two.
+   * Tests `storyHolding` rather than the countdown, so a fragment handing over to
+   * a QUESTION does not uncover the next lock's numbers in the gap.
    */
   private releaseObjective(): void {
     if (!this.objectiveHeld || this.storyHolding) {
@@ -1801,8 +1538,8 @@ export class BoardScene extends Scene {
     if (Input.Keyboard.JustDown(this.hardDropKey)) {
       const locksBefore = this.simulation.piecesLocked;
       const distance = this.simulation.hardDrop();
-      // Only if it actually committed. Mashing Space through a cascade is
-      // refused, and must not sound like a landing that never happened.
+      // Only if it actually committed: mashing Space through a cascade is refused
+      // and must not sound like a landing.
       if (this.simulation.piecesLocked !== locksBefore) {
         this.slamDistance = distance;
       }
@@ -1823,9 +1560,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Which way the player is pressing. The only genuinely Phaser-specific piece
-   * of input logic, which is why it stayed in the scene: resolving both keys
-   * being held needs `timeDown`, a Phaser Key property.
+   * Which way the player is pressing. The only genuinely Phaser-specific input
+   * logic, and why it stayed in the scene: resolving both keys held needs
+   * `timeDown`, a Phaser Key property.
    */
   private pressedDirection(): HorizontalDirection | null {
     const { left, right } = this.cursors;
@@ -1848,13 +1585,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Repaint all 72 cells from board state.
-   *
-   * Unconditionally, every frame, even though the board only changes when a
-   * pair locks. That is knowingly wasteful and knowingly negligible: measured
-   * at roughly 126 nanoseconds — 0.0008% of a 60fps frame. A dirty flag would
-   * save nothing and add a piece of cache-invalidation state for the cascade to
-   * keep correct.
+   * Every visible cell, unconditionally, every frame. Knowingly wasteful and
+   * negligible: a dirty flag would save nothing and add cache-invalidation state
+   * for the cascade to keep correct.
    */
   private drawBoard(): void {
     for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
@@ -1863,9 +1596,8 @@ export class BoardScene extends Scene {
         const index = visibleCellIndex(column, row);
         const possessed = isShadow(pieceType);
 
-        // A possessed cell still draws its own tile. The colour the shadow is
-        // standing on is the whole point: it took a specific thing, and the
-        // player has to be able to see which.
+        // A possessed cell still draws its own tile: the shadow took a specific
+        // thing, and the player has to see which.
         this.cellTiles[index].setTexture(
           tileTexture(possessed ? shadowHolding(pieceType as number) : pieceType),
         );
@@ -1876,11 +1608,9 @@ export class BoardScene extends Scene {
           this.restoreCell(index);
         }
 
-        // An unlit neuron breathes. It is the objective, and it was the
-        // quietest thing on the board — a muted violet socket on a violet
-        // ground, read as background while the coloured tiles shouted. Motion
-        // is what the eye actually catches, and a neuron waiting to be
-        // connected is the one thing here that should look like it is waiting.
+        // An unlit neuron breathes. It is the objective, and a muted socket on a
+        // violet ground otherwise reads as background while the tiles shout.
+        // Motion is what the eye catches.
         const waiting = pieceType === neuronCell(false);
         if (waiting) {
           this.pulsingCells.add(index);
@@ -1896,11 +1626,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Lay out the lock this board is posing, and say what it asks for.
-   *
-   * The board no longer opens empty. It opens as a puzzle with a stated goal,
-   * which is the whole escape-room turn: something to solve rather than
-   * something to survive.
+   * Lay out the lock this board is posing, and say what it asks for. A board
+   * opens as a puzzle with a stated goal rather than empty: something to solve
+   * rather than something to survive.
    */
   private startLock(): void {
     const lock = lockFor(this.nodesRevealed);
@@ -1914,11 +1642,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Say what the board is asking for, and how much of it is left.
-   *
-   * The count matters as much as the words. "Light every neuron" alone is a
-   * title; "light every neuron — 1 of 3" is a position, and a player who can
-   * read their position can tell whether the last thing they did helped.
+   * Say what the board is asking for, and how much is left. The count matters as
+   * much as the words: "light every neuron" is a title, and "light every neuron —
+   * 1 of 3" is a position the player can tell they moved.
    */
   private refreshObjective(): void {
     const lock = lockFor(this.nodesRevealed);
@@ -1929,12 +1655,8 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Check whether the board has been solved, once per settled board.
-   *
-   * Only while nothing is resolving: mid-cascade the shadows are already gone
-   * from the cells they were in but the board has not finished falling, and
-   * calling a lock solved on a board still in motion means the payoff lands
-   * under the tail of the clear that earned it.
+   * Only while nothing is resolving: calling a lock solved on a board still in
+   * motion lands the payoff under the tail of the clear that earned it.
    */
   private checkLock(): void {
     if (this.lockSolved || this.simulation.resolving || this.storyHolding) {
@@ -1950,29 +1672,19 @@ export class BoardScene extends Scene {
     this.objectiveText.setText(`${lock.objective}  \u2014  open`);
     this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
 
-    // Solving is what surfaces a fragment now. It used to be a connection
-    // count, which is the thing that made the writing feel bolted on: a
-    // threshold crossing has no relationship to what the words say, where
-    // opening a lock is the memory being recovered.
+    // Solving is what surfaces a fragment. A threshold crossing has no
+    // relationship to what the words say, where opening a lock is the memory
+    // being recovered.
     this.revealPending = true;
   }
 
   /**
-   * Draw the route the run has taken between the neurons it has lit.
+   * The route between the neurons the run has lit — a figure drawn BY the play,
+   * which is why the second neuron feels different from the first: one is a dot,
+   * two is a shape. The dashed run past the end reaches toward the next.
    *
-   * The storyboard's memory panels are vignettes wired together by threads with
-   * circle terminals, and this is that figure being drawn BY the play rather
-   * than handed over finished. It is the reason lighting the second neuron
-   * feels different from lighting the first: the first is a dot, the second is
-   * the beginning of a shape.
-   *
-   * Redrawn every frame from `litNeurons` rather than appended to, for the same
-   * reason `drawBoard` repaints unconditionally — one source of truth, no
-   * invalidation to keep correct across a cascade, a settle and a retry.
-   *
-   * The dashed run past the end reaches toward the next neuron still dark. That
-   * is the foreshadowing the notes asked for: the shape of what is coming,
-   * shown before it has been earned.
+   * Redrawn every frame rather than appended to, for the reason `drawBoard`
+   * repaints unconditionally: no invalidation to keep correct across a cascade.
    */
   private drawNeuronThread(): void {
     this.neuronThread.clear();
@@ -2023,12 +1735,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Keep the piece counter honest, and run out the clock on a spent board.
-   *
    * A board is lost exactly one way: the pieces are gone and a neuron is still
-   * dark. The lock is re-seeded rather than the run ended, because there is no
-   * death in front of the writing — what you lose is the board, never the
-   * memory you have already earned.
+   * dark. The lock is re-seeded rather than the run ended — what you lose is the
+   * board, never the memory you have already earned.
    */
   private refreshPieces(delta: number): void {
     // A won run does not hand over to another board. Losing re-seeds because
@@ -2051,44 +1760,36 @@ export class BoardScene extends Scene {
       if (this.lockEndingIn <= 0) {
         this.lockEndingIn = 0;
         // Read now rather than remembered from when the countdown was set: a
-        // fragment can be skipped inside it, and a board that re-seeds as if
-        // it were still covered would keep a dissolved fragment's state.
+        // fragment can be skipped inside it.
         this.restart(true, this.storyHolding);
       }
       return;
     }
 
-    // A SOLVED board hands over, and this was a hard freeze before it did.
-    // Solving with pieces still in hand left the board sitting there until they
-    // ran out — at which point the failure branch below was skipped BECAUSE it
-    // was solved, so nothing ever scheduled the re-seed, while
-    // `simulation.acceptsInput` had already gone false on `outOfPieces`. The
-    // board locked up showing a stale objective and a red 0, and only R got out
-    // of it.
+    // A SOLVED board hands over. Without this it sits there until the pieces run
+    // out, at which point the failure branch below is skipped BECAUSE it is
+    // solved — so nothing schedules the re-seed while the simulation has already
+    // stopped accepting input, and only R gets out.
     if (this.lockSolved) {
-      // Not yet: the cascade is still running, or the fragment it earned has
-      // not surfaced. `revealPending` is set the instant the lock is solved and
-      // consumed when the words go up, so handing over before that would
-      // re-seed the board out from under the thing it just earned.
+      // Not yet: the cascade is still running, or the fragment it earned has not
+      // surfaced. Handing over before that re-seeds the board out from under the
+      // thing it just earned.
       if (this.simulation.resolving || this.revealPending) {
         return;
       }
 
-      // Nor while a question is coming or on screen. `pendingReveal` is the
-      // one waiting behind a memory's last fragment, and the answer to it
-      // drives every shadow off THIS board — the one that earned the question.
-      // Re-seeding behind it would pay that out on a board nobody has played.
+      // Nor while a question is coming or on screen: the answer drives every
+      // shadow off THIS board, the one that earned the question, and re-seeding
+      // behind it would pay that out on a board nobody has played.
       if (this.pendingReveal !== null || this.awaitingAnswer) {
         return;
       }
 
-      // Behind the fragment when there is one to hide behind, which is nearly
-      // always. The board the player solved is left standing until the words
-      // cover it, swaps underneath them, and the fragment lifts onto a fresh
-      // one — so a solved board is never taken apart in front of the person
-      // who solved it. The objective and the count go with it, dimming as the
-      // scrim comes up; `releaseObjective` brings them back with the new
-      // numbers once the fragment is gone.
+      // Behind the fragment when there is one to hide behind. The solved board
+      // stands until the words cover it, swaps underneath them, and the fragment
+      // lifts onto a fresh one, so it is never taken apart in front of the person
+      // who solved it. The objective and count dim as the scrim comes up, and
+      // `releaseObjective` brings them back with the new numbers.
       if (this.revealRemaining > 0) {
         this.holdObjective(HANDOVER_DIM);
         this.lockEndingIn = HANDOVER_BEHIND_REVEAL;
@@ -2099,21 +1800,15 @@ export class BoardScene extends Scene {
       return;
     }
 
-    // Not while a cascade is still running: the last piece's chain can light
-    // the neuron that solves the board, and calling it failed before that has
-    // played out would take a win away on the frame it was won.
+    // Not while a cascade is still running: the last piece's chain can light the
+    // neuron that solves the board, and calling it failed first takes a win away
+    // on the frame it was won.
     if (!this.simulation.outOfPieces || this.simulation.resolving || this.storyHolding) {
       return;
     }
 
     // Running out of pieces IS the loss now, so the ending plays here.
-    // Everything below — the static, the colour drain, the connections dying
-    // one at a time, and the line naming what you were short of — was wired to
-    // a top-out instead, which a twelve-piece budget on a board seeded with
-    // eleven tiles makes very nearly unreachable. It was ninety lines and six
-    // objects for a state almost nobody would ever see.
-    //
-    // Longer than the old beat, because there is now something to watch.
+    // Longer than a plain re-seed, because there is something to watch.
     this.lockEndingIn = 2600;
     this.runOver = 'out-of-pieces';
     this.objectiveText.setText('out of pieces').setAlpha(1);
@@ -2122,21 +1817,11 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Show where the shadow is about to reach, before it gets there.
+   * Show where the shadow is about to reach. A creature appearing with no warning
+   * is an interruption rather than tension, so the eyes arrive before the body.
    *
-   * The six seconds of hesitation are the only real pressure in this game and
-   * nothing on screen represented them: a creature simply appeared on a tile,
-   * with no warning, no way to read what was coming and no way to learn what
-   * caused it. That is an interruption, not tension.
-   *
-   * The eyes arrive before the body — the same baked pair the real creature
-   * uses, fading up on the tile it wants while it dims under them. It reads as
-   * something reaching out of the board, it teaches the rule by showing the
-   * consequence building, and it costs one texture that was already there.
-   *
-   * Reusing `shadowEyes[index]` is safe because a threatened cell is by
-   * definition a colour the shadow has not taken yet, and `animateShadow` only
-   * ever touches cells it already holds.
+   * Reusing `shadowEyes[index]` is safe: a threatened cell is by definition one
+   * the shadow has not taken, and `animateShadow` only touches cells it holds.
    */
   private drawThreat(): void {
     const clearPrevious = () => {
@@ -2174,15 +1859,13 @@ export class BoardScene extends Scene {
     // last second before an arrival is unmistakable.
     const closeness = (progress - THREAT_VISIBLE_FROM) / (1 - THREAT_VISIBLE_FROM);
 
-    // A quickening flicker rather than a smooth fade. Something steady reads as
-    // a UI element; something unsteady reads as alive and impatient.
+    // A quickening flicker rather than a smooth fade: something steady reads as a
+    // UI element, and something unsteady reads as alive.
     const flicker = 0.75 + 0.25 * Math.sin(this.shadowClock / (70 - closeness * 40));
 
-    // The eyes alone. This used to tint the tile up to 75% toward black as
-    // well, which destroyed the one piece of information the warning exists to
-    // protect: WHICH tile is about to go. A player cannot plan around a cell
-    // whose colour has been taken away to tell them the colour is about to be
-    // taken away.
+    // The eyes alone, and the tile is deliberately left untinted: dimming it
+    // would destroy the one thing the warning exists to convey, which is WHICH
+    // tile is about to go.
     this.shadowEyes[index]
       .setVisible(true)
       .setPosition(centerOfColumn(target.column), centerOfRow(target.row))
@@ -2192,19 +1875,13 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * One shadow, alive: bobbing, leaning, breathing, blinking — and still
-   * climbing out of the board if it has only just arrived.
+   * One shadow, alive. Every part is a function of the clock and the cell's own
+   * coordinates, so no shadow holds state and no two move in step — creatures
+   * breathing in unison read as one animation played twice.
    *
-   * Every part of it is a function of the clock and the cell's own coordinates,
-   * so no shadow holds any state of its own and no two of them move in step.
-   * Two creatures breathing in unison read as one animation played twice, which
-   * is the thing that makes a screen full of them look like wallpaper.
-   *
-   * Written per frame rather than as tweens because the tiles it moves are the
-   * board's own cells: `drawBoard` rewrites every one of them every frame, a
-   * shadow changes which cell it lives in whenever the stack settles, and a
-   * landing bounce is already tweening those same objects. A tween here would
-   * have to be found, killed and rebuilt on every one of those events.
+   * Per frame rather than tweened: `drawBoard` rewrites these cells every frame,
+   * a shadow changes cell when the stack settles, and the landing bounce already
+   * tweens the same objects.
    */
   private animateShadow(index: number, column: number, row: number, strength: number): void {
     this.animatedShadowCells.add(index);
@@ -2224,10 +1901,8 @@ export class BoardScene extends Scene {
     const y = centerOfRow(row) + bob + (1 - risen) * CELL_SIZE * 0.55;
     const opening = Math.min(arriving * 2.5, 1);
 
-    // Only the creature moves. The tile underneath stays square in the grid
-    // where the player left it — it is still part of the board, and a cell
-    // that leans and breathes reads as the TILE being alive rather than as
-    // something crouching on top of it.
+    // Only the creature moves. The tile stays square in the grid, or the cell
+    // reads as the TILE being alive rather than something crouching on it.
     this.shadowBodies[index]
       .setVisible(true)
       .setTexture(shadowBodyTexture(strength))
@@ -2236,9 +1911,9 @@ export class BoardScene extends Scene {
       .setScale(breath * (0.5 + 0.5 * risen))
       .setAlpha(opening);
 
-    // Eyes wide as it lands, settling to their idle glow: the flare is what
-    // makes an arrival read as something noticing you, and it is the part that
-    // catches the eye of a player looking somewhere else on the board.
+    // Eyes wide as it lands, settling to their idle glow: the flare is what makes
+    // an arrival read as something noticing you, and what catches the eye of a
+    // player looking elsewhere.
     const flare = 1 - arriving;
     const glow = 0.8 + 0.2 * Math.sin(clock / 610 + phase);
 
@@ -2254,11 +1929,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * How open a shadow's eyes are, 0 to 1.
-   *
-   * Read off the clock rather than scheduled, so a blink costs no timer, no
-   * stored state and no allocation — and a shadow that ends up in a different
-   * cell simply picks up that cell's rhythm.
+   * How open a shadow's eyes are, 0 to 1. Read off the clock rather than
+   * scheduled, so a blink costs no timer and no state, and a shadow that moves
+   * cell picks up that cell's rhythm.
    */
   private blinkAt(clock: number, phase: number): number {
     const into = (clock + phase * 700) % (BLINK_INTERVAL + phase * 210);
@@ -2266,17 +1939,15 @@ export class BoardScene extends Scene {
       return 1;
     }
 
-    // Shut and open again across the window, so the lid travels rather than the
-    // eye disappearing for a frame.
+    // Shut and open across the window, so the lid travels rather than the eye
+    // disappearing for a frame.
     return Math.abs(into / (BLINK_DURATION / 2) - 1);
   }
 
   /**
-   * Let the shadow say something, if it has earned the right to.
-   *
-   * The decision is not here — `shadow-voice.ts` owns when it may speak and
-   * what it picks, so the writing and its rules are unit-tested rather than
-   * judged by playing for ten minutes. This only counts arrivals and draws.
+   * Let the shadow say something, if it has earned the right to. `shadow-voice.ts`
+   * owns when it may speak and what it picks, so this only counts arrivals and
+   * draws.
    */
   private speakForShadow(): void {
     const line = shadowLine(
@@ -2306,13 +1977,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Put a cell back the way an ordinary tile expects to find it.
-   *
-   * The idle writes position, angle, scale and alpha every frame, so a cell
-   * that stops holding a shadow — cleared, or settled into from above — would
-   * otherwise keep the lean and the half-second of breath it was in the middle
-   * of for the rest of the run. Resetting every cell unconditionally instead
-   * would flatten the landing bounce, which is a tween on these same objects.
+   * The idle writes position, angle, scale and alpha every frame, so a cell that
+   * stops holding a shadow keeps the lean it was mid-way through. Resetting every
+   * cell instead would flatten the landing bounce, a tween on these same objects.
    */
   private restoreCell(index: number): void {
     const column = index % COLUMNS;
@@ -2328,15 +1995,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Announce a cell the shadow has just taken.
-   *
-   * Counted off the engine's own counter rather than noticed by watching the
-   * board, for the same reason a landing is: by the time the scene looks, the
-   * shadow is simply there, and being there is not an event.
-   *
-   * Every arrival is in a visible row, so there is no hidden-row case to
-   * handle: `encroach` only ever possesses a tile the player can
-   * see.
+   * Counted off the engine's counter rather than noticed by watching the board:
+   * by the time the scene looks the shadow is simply there, and being there is
+   * not an event. Every arrival is in a visible row.
    */
   private playShadowArrival(): void {
     const { shadowTaken, lastShadowCell } = this.simulation;
@@ -2386,32 +2047,25 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Light every trace whose two cells hold the same colour, and dim the rest.
-   *
-   * A cell still being animated into counts as empty here, exactly as it does
-   * in `drawBoard`, or a trace would connect to a tile that has not landed.
+   * A cell still being animated into counts as empty here, as it does in
+   * `drawBoard`, or a trace connects to a tile that has not landed.
    */
   private drawConnections(delta: number): void {
-    // Once a run is OVER the traces are no longer a picture of the board —
-    // they are being put out one at a time by `loseTheBoard`, or lit one at a
-    // time by `winTheRun`. Recomputing them from board state here would undo
-    // each one the frame after it changed.
-    //
-    // This tested `simulation.toppedOut`, which was the only ending when it was
-    // written. Running out of pieces became the loss and finishing a memory
-    // became a win, and neither sets that flag — so both endings were fighting
-    // this loop for control of the same objects and losing.
+    // Once a run is OVER the traces are no longer a picture of the board: they
+    // are being put out one at a time by `loseTheBoard`, or lit one at a time by
+    // `winTheRun`. Recomputing from board state here would undo each one the
+    // frame after it changed. Test `runOver`, which covers all three endings —
+    // `simulation.toppedOut` is only one of them.
     if (this.runOver !== null) {
       return;
     }
 
     for (const slot of this.connections) {
-      // Colourless occupants are excluded rather than falling out naturally:
-      // two shadow cells side by side hold the same value, so without this they
-      // would "connect" — lighting a trace between the two things in the game
-      // that are least connected, tinted from a palette entry that does not
-      // exist. `isColour` is the same question `findGroups` asks, so the two
-      // layers cannot come to different conclusions about what connects.
+      // Colourless occupants are excluded explicitly: two shadow cells side by
+      // side hold the same value and would "connect", lighting a trace between the
+      // two least connected things on the board and tinting it from a palette
+      // entry that does not exist. `isColour` is the same question `findGroups`
+      // asks, so the two layers cannot disagree about what connects.
       const pieceType = this.settledPieceAt(slot.column, slot.row);
       const linked = isColour(pieceType)
         && pieceType === this.settledPieceAt(slot.toColumn, slot.toRow);
@@ -2420,9 +2074,8 @@ export class BoardScene extends Scene {
         slot.chargeColor = TRACE_COLORS[pieceType];
       }
 
-      // Eased rather than switched, and asymmetrically: quick to light, slow
-      // to let go. The long tail is what stops a settling board from flickering
-      // as tiles pass each other.
+      // Eased asymmetrically — quick to light, slow to let go — so a settling
+      // board does not flicker as tiles pass each other.
       const target = linked ? 1 : 0;
       const step = delta / (linked ? TRACE_FADE_IN : TRACE_FADE_OUT);
       const gap = target - slot.lit;
@@ -2435,18 +2088,17 @@ export class BoardScene extends Scene {
       }
       const signal = slot.chargeDelay > 0 ? 0 : slot.charge;
 
-      // The signal shows even on a trace whose tiles have gone — which is most
-      // of them, a frame after a clear. That is the point: the charge outlives
-      // the group, so the cascade is something crossing the board rather than
-      // a set of tiles disappearing.
+      // The signal shows even on a trace whose tiles have gone, which is most of
+      // them a frame after a clear. The charge outliving the group is what makes
+      // a cascade read as something crossing the board.
       const strength = Math.max(slot.lit, signal);
       if (strength <= 0.002) {
         slot.trace.setVisible(false);
         continue;
       }
 
-      // A slow breath along a settled network, phase-shifted per cell so it
-      // never pulses in unison. A circuit at rest should still look powered.
+      // A slow breath, phase-shifted per cell so it never pulses in unison: a
+      // circuit at rest should still look powered.
       const breath = 0.87 + 0.13 * Math.sin(
         this.shadowClock / 380 + slot.column * 1.7 + slot.row * 0.9,
       );
@@ -2460,17 +2112,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Send a charge through every trace the link just cleared, and one step
-   * further out.
-   *
-   * ART-DIRECTION's Stage 2, finally built: "chains light the leading between
-   * cleared tiles, so a cascade is visibly a signal crossing the network." It
-   * is also the only thing on screen that makes chain DEPTH legible — the
-   * mechanic the game most wants understood and the one it never showed.
-   *
-   * The colour is captured here rather than read at draw time because the
-   * cells are empty by the next frame; a charge has to remember what cleared
-   * it.
+   * The only thing on screen that makes chain DEPTH legible. The colour is
+   * captured here rather than read at draw time, because the cells are empty by
+   * the next frame and a charge has to remember what cleared it.
    */
   private chargeNetwork(link: ChainLink): void {
     const cleared = new Map<number, number>();
@@ -2496,11 +2140,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Light the next pad on the progress track when the run has earned it.
-   *
-   * Deliberately a whole number of pads, not a fraction: a pad either is or is
-   * not lit, so every unit of progress arrives as something the player watches
-   * happen rather than as a value drifting upward.
+   * Light the next node when the run has earned it. Deliberately a whole number
+   * rather than a fraction, so progress arrives as something the player watches
+   * happen rather than a value drifting upward.
    */
   private drawProgress(): void {
     // Nothing accrues while a fragment is on screen: a second one landing on
@@ -2509,19 +2151,8 @@ export class BoardScene extends Scene {
       return;
     }
 
-    // ONE meter. This used to say the same number in five places at once — the
-    // objective line, a ring around the board, the brain, the neuron tiles
-    // themselves, and the thread between them — and two of those were lying.
-    // The ring divided three neurons across six pads, so it could only ever
-    // show 0, 2, 4 or 6 and pads 1, 3 and 5 never lit alone; its "every fifth
-    // pad is bigger" rule made pads 0 and 5 oversized, which on a six-pad loop
-    // are adjacent. It also drew an 850px glowing wall down the right edge that
-    // cut the column off from the board it was supposed to be measuring.
-    //
-    // The brain is the meter now, which is what `brain.ts` has claimed since it
-    // was written. The board still says it too, because a lit neuron is a
-    // legible thing in its own right — but that is the tile telling you about
-    // itself, not a second gauge.
+    // ONE meter: the brain. The board says it too, but that is a lit tile telling
+    // you about itself rather than a second gauge.
     const total = neuronsOn(this.simulation.board).length;
     const lit = total === 0 ? 0 : total - unlitCount(this.simulation.board);
 
@@ -2533,10 +2164,9 @@ export class BoardScene extends Scene {
     this.shownLitNeurons = lit;
     this.redrawMemoryPanel(total === 0 ? 0 : lit / total);
 
-    // One announcement per neuron, staggered, so a cascade that reaches two of
-    // them walks up audibly instead of landing as one chord. The sparks fire at
-    // the brain node that just lit rather than out on the old track, so the
-    // sound and the light finally agree about where progress happened.
+    // One announcement per neuron, staggered, so a cascade reaching two walks up
+    // audibly rather than landing as a chord. The sparks fire at the brain node
+    // that lit, so the sound and the light agree about where progress happened.
     this.sparks.setParticleTint(TRACK_LIT_COLOR);
     for (let node = gainedFrom; node < lit; node += 1) {
       const at = brainNodeAt(this.nodesRevealed + node, BRAIN_BOX);
@@ -2547,16 +2177,14 @@ export class BoardScene extends Scene {
       });
     }
 
-    // Deliberately does NOT bank a fragment. `checkLock` owns that now, and a
-    // full meter is the same instant as a solved lock — asking for the reveal
-    // in both places would surface two fragments for one board.
+    // Deliberately does NOT bank a fragment: `checkLock` owns that, and a full
+    // meter is the same instant as a solved lock, so asking in both places would
+    // surface two fragments for one board.
   }
 
   /**
-   * Which memory a fragment index falls in, and where inside it.
-   *
-   * Derived rather than tracked as two counters, so there is one number to
-   * reset and no way for the pair to disagree.
+   * Derived rather than tracked as two counters, so there is one number to reset
+   * and no way for the pair to disagree.
    */
   private locate(total: number): { memoryIndex: number; nodeIndex: number } | null {
     let remaining = total;
@@ -2569,29 +2197,21 @@ export class BoardScene extends Scene {
       remaining -= nodes;
     }
 
-    // Every fragment the game has has been surfaced. This used to hand back an
-    // index one past the end instead, which `revealNextNode` then read straight
-    // off the array — and a frame that throws stops the render loop for the
-    // rest of the session, so the only thing between that and a dead game was a
-    // caller remembering to check a constant first. `null` makes both callers
-    // say what they do when there is nothing left.
+    // Every fragment the game has has been surfaced. `null` rather than an index
+    // one past the end, so both callers have to say what they do when there is
+    // nothing left — reading off the end throws, and a frame that throws stops
+    // the render loop for the rest of the session.
     return null;
   }
 
   /**
-   * Hand over a banked fragment, once the board has actually stopped moving.
+   * Hand over a banked fragment, once the board has stopped moving.
    *
-   * Three conditions, each of which was a bug before it was a condition. The
-   * cascade has to be over, or the fragment freezes a chain half-resolved. The
-   * story has to be clear, or one fragment lands on top of the last. And a
-   * piece has to have been placed since the previous one, or a chain that
-   * banked a whole memory dumps every fragment of it back to back over a board
-   * the player has not touched.
-   *
-   * The last of those is the one that turns the reward round: a chain worth
-   * four fragments now pays one now and one on each of the next three
-   * placements, so the run keeps handing things back for a while after the
-   * clear that earned them.
+   * Three conditions: the cascade over, or it freezes a chain half-resolved; the
+   * story clear, or one fragment lands on the last; and a piece placed since the
+   * previous one, or a chain that banked a whole memory dumps every fragment over
+   * a board nobody has touched. That last turns the reward round, paying one now
+   * and one on each of the next placements.
    */
   private surfaceBankedFragment(): void {
     if (
@@ -2609,23 +2229,17 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Surface the fragment the closed circuit just paid for.
+   * Deliberately NOT a scene change: cutting away to read makes a memory
+   * something the player is SHOWN rather than something that happened to the run
+   * they are in. The board is held for a beat and play resumes.
    *
-   * Deliberately NOT a scene change. Cutting away to read and cutting back is
-   * the shape of every narrative game that feels like homework, and it made a
-   * memory something the player was shown rather than something that happened
-   * to the run they were in. So the board is held for a beat, one fragment
-   * surfaces over it, and play resumes — while the node lights permanently in
-   * the panel, which is the part that lasts.
-   *
-   * Filling the last node of a memory earns its question instead, which is the
-   * only moment anything here speaks to the person at the keyboard.
+   * Filling the last node of a memory earns its question instead.
    */
   private revealNextNode(): void {
     const at = this.locate(this.nodesRevealed);
     if (at === null) {
-      // Nothing left to surface. The track stays full, which is the honest
-      // picture: the run has seen everything this game has.
+      // Nothing left to surface. The meter stays full, which is honest: the run
+      // has seen everything the game has.
       return;
     }
 
@@ -2634,25 +2248,21 @@ export class BoardScene extends Scene {
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
 
-    // The question follows the last fragment rather than replacing it, and it
-    // arrives with NO title over it. It used to carry the memory's name, and
-    // "HIGH SCHOOL" standing over "What have you been putting off?" read as a
-    // question about high school — it is not. It is the one line in the game
-    // addressed to the person holding the keyboard, and a category label above
-    // it makes it part of the exhibit instead.
+    // The question follows the last fragment rather than replacing it, and
+    // arrives with NO title. A memory's name over it reads as a question about
+    // that memory — it is not, it is addressed to the person at the keyboard, and
+    // a label above it makes it part of the exhibit instead.
     this.pendingReveal = nodeIndex === memory.nodes.length - 1
       ? { title: '', body: memory.question, memoryIndex }
       : null;
 
-    // Spent. Emptying the track is the feedback that the circuit paid for
-    // something, and it re-arms `drawProgress`, which short-circuits whenever
-    // the lit count is unchanged — leaving it full meant a player who banked
-    // more than one fragment's worth never saw the second.
+    // Spent. Emptying it is the feedback that the circuit paid for something, and
+    // it re-arms `drawProgress`, which short-circuits on an unchanged count —
+    // left full, a player who banked two fragments' worth never sees the second.
     this.shownLitNeurons = 0;
     // With the count already incremented, so the node just earned draws as
-    // earned. Without it the panel keeps the half-lit "arriving" styling from
-    // the draw before the increment until the next pad crosses — which, on the
-    // escalating schedule, can be a minute later.
+    // earned rather than keeping its half-lit "arriving" styling until the next
+    // one crosses.
     this.redrawMemoryPanel(0);
 
     this.showReveal(
@@ -2664,12 +2274,8 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * How long to hold a line on screen: a floor, plus reading time for its
-   * length.
-   *
-   * Here rather than inside `showReveal` because the floor differs by what is
-   * being shown — a question lingers after it has been read and a fragment does
-   * not — and passing the number in keeps `showReveal` about drawing.
+   * A floor, plus reading time for the line's length. The floor is passed in
+   * because a question lingers after being read and a fragment does not.
    */
   private holdFor(text: string, floor: number): number {
     return floor + text.length * this.tuning.readingPerCharacter;
@@ -2686,10 +2292,8 @@ export class BoardScene extends Scene {
 
   /**
    * Move past the fragment on screen: to its question if it has one, or off.
-   *
-   * Shared by the countdown running out and by Space, so a skip advances the
-   * same way a wait does — pressing Space through a memory walks its last
-   * fragment to the question rather than throwing the question away with it.
+   * Shared by the countdown and by Space, so pressing Space through a memory
+   * walks its last fragment to the question rather than throwing it away.
    */
   private advanceReveal(): void {
     const pending = this.pendingReveal;
@@ -2727,12 +2331,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * One keystroke into the answer.
-   *
-   * Enter submits, and an empty answer is how you decline — no second key to
-   * learn, and refusing is a real choice rather than a missing one. Printable
-   * characters only: everything else on a keyboard is a control this screen
-   * does not have.
+   * One keystroke into the answer. Enter submits, and an empty answer is how you
+   * decline — no second key to learn, and refusing is a real choice rather than a
+   * missing one. Printable characters only.
    */
   private typeIntoAnswer(event: KeyboardEvent): void {
     if (!this.awaitingAnswer) {
@@ -2755,15 +2356,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Take the answer, and pay it out.
-   *
-   * The engine is handed the FACT of an answer and nothing else — see
-   * `Simulation.answerQuestion`. What was typed only ever comes back to the
-   * panel, where the person who wrote it can see it; nothing reads it.
-   *
-   * Declining is silent on purpose. There is no penalty sting, no "are you
-   * sure": you simply keep every cell the shadow took, which is penalty enough
-   * and does not scold.
+   * The engine is handed the FACT of an answer and nothing else; what was typed
+   * only comes back to the panel. Declining is silent — no sting and no "are you
+   * sure", you simply keep every cell the shadow took.
    */
   private submitAnswer(): void {
     const answer = this.answerText.trim();
@@ -2772,17 +2367,15 @@ export class BoardScene extends Scene {
 
     if (answer === '') {
       this.answerLine.setVisible(false);
-      // Declining still finishes the memory — it keeps the shadows, it does not
-      // withhold the ending. The offer to say something is for someone who got
-      // here, not a reward for typing.
+      // Declining still finishes the memory: it keeps the shadows, it does not
+      // withhold the ending.
       this.endRunIfNothingLeft(700);
       return;
     }
 
-    // Held over the board while the wave clears it, rather than vanishing the
-    // instant it is submitted. What the player typed is the thing that paid
-    // for the payout, so it should still be on screen while the payout happens
-    // — and at the size they typed it, not shrunk into the margin.
+    // Held over the board while the wave clears it, at the size it was typed:
+    // what the player wrote is what paid for the payout, so it should still be on
+    // screen while the payout happens.
     this.answerLine.setText(answer);
     this.tweens.killTweensOf(this.answerLine);
     this.tweens.add({
@@ -2803,13 +2396,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * End the run if that question was the last thing the game had to say.
-   *
-   * `locate` returning null is the game's own definition of "nothing left to
-   * surface", so this reads the same counter the brain and the memory panel do
-   * rather than hard-coding how many memories are written. When memory 2
-   * exists, finishing High School will simply not be the end any more, and
-   * nothing here has to change.
+   * `locate` returning null is the definition of "nothing left to surface", so
+   * this reads the same counter the brain does rather than hard-coding how many
+   * memories are written.
    */
   private endRunIfNothingLeft(after: number): void {
     if (this.locate(this.nodesRevealed) !== null) {
@@ -2838,13 +2427,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * The wave: every shadow on the board driven off, deepest first.
-   *
-   * Staggered rather than simultaneous, and the stagger is the whole effect —
-   * a board that empties in one frame is a state change, and one that empties
-   * over a second and a half is something happening. The camera kick scales
-   * with how much was taken back, so answering on a board you were losing hits
-   * hardest, which is when it should.
+   * Every shadow driven off, deepest first. The stagger is the whole effect: a
+   * board that empties in one frame is a state change, one that empties over a
+   * second and a half is something happening.
    */
   private driveOffShadow(): void {
     const { driven, settled } = this.simulation.answerQuestion();
@@ -2855,10 +2440,9 @@ export class BoardScene extends Scene {
     this.tweens.killTweensOf(this.popTiles);
     this.cameras.main.shake(220 + 18 * Math.min(driven.length, 12), this.tuning.shakeIntensity * 3);
 
-    // The stack falls into the holes the wave just opened. Delayed past the
-    // end of the wave rather than run underneath it, so the two read as cause
-    // and effect: the shadow is driven off, and THEN what it was holding up
-    // comes down. Running together looked like the board collapsing.
+    // The stack falls into the holes the wave opened, delayed past the end of it
+    // rather than run underneath, so the two read as cause and effect rather than
+    // as the board collapsing.
     this.time.delayedCall(driven.length * 55 + 180, () => this.dropTiles(settled));
 
     for (let index = 0; index < driven.length; index += 1) {
@@ -2894,17 +2478,9 @@ export class BoardScene extends Scene {
     }
   }
 
-  /** Hold the board and put a line over it. */
   /**
-   * Fit a memory's picture above the words, if it has one.
-   *
-   * Baked out of the game's own tiles rather than loaded, so there is no file
-   * to be missing and nothing to fetch — a memory with no picture simply has no
-   * entry in `MEMORY_ART`.
-   *
-   * Scaled DOWN only. A picture smaller than the box is left alone rather than
-   * blown up, because enlarging a grid of tiles just makes the grid the
-   * subject.
+   * Baked out of the game's own tiles rather than loaded, so there is no file to
+   * be missing. Scaled DOWN only: enlarging a grid makes the grid the subject.
    */
   private showRevealPicture(picture?: string): void {
     const key = picture === undefined ? null : memoryArtTexture(picture);
@@ -2928,7 +2504,7 @@ export class BoardScene extends Scene {
 
   private showReveal(title: string, body: string, duration: number, photo?: string): void {
     // Reset first: `openTheRun` borrows this object for the shadow's voice, and
-    // without this every fragment after the opening would inherit its violet.
+    // every fragment after the opening would otherwise inherit its violet.
     this.revealBody.setColor(REVEAL_BODY_COLOR);
     this.revealRemaining = duration;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
@@ -2970,12 +2546,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Draw the coming memory as an unlit constellation, lighting one node for
-   * each fraction of it the run has earned.
-   *
-   * The same layout the memory itself uses, so what fills in here is what the
-   * player will walk through — an outline completing is only a payoff if the
-   * thing that arrives is the thing they watched.
+   * Draw the coming memory as an unlit constellation, lighting one node for each
+   * fraction the run has earned. The same layout the memory itself uses, because
+   * an outline completing is only a payoff if what arrives is what was watched.
    */
   private redrawMemoryPanel(progress: number): void {
     drawBrain(this.memoryPanel, BRAIN_BOX, this.nodesRevealed, progress);
@@ -2990,20 +2563,17 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Sound the transitions the engine has just been through.
-   *
-   * A landing is counted off `piecesLocked` rather than off the spawn counter:
-   * a lock that starts a cascade, and a lock that tops the board out, both
-   * commit a pair without spawning another, and those are the two landings the
-   * player most wants to hear.
+   * A landing is counted off `piecesLocked` rather than the spawn counter: a lock
+   * that starts a cascade and one that tops the board out both commit a pair
+   * without spawning another, and those are the landings most worth hearing.
    */
   private playSounds(): void {
     const { piecesLocked, toppedOut, chainLength, resolving } = this.simulation;
 
     if (piecesLocked !== this.soundedPiecesLocked) {
       this.soundedPiecesLocked = piecesLocked;
-      // One voice per landing. A slam already speaks for its own impact, and a
-      // soft thud underneath it would only muddy the hit.
+      // One voice per landing: a slam speaks for its own impact, and a thud under
+      // it would muddy the hit.
       this.soundBoard.play(
         this.slamDistance === null ? landVoice() : hardDropVoice(this.slamDistance),
       );
@@ -3029,13 +2599,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Turn the beat the engine just played into motion.
-   *
-   * The engine has already mutated the board by the time this runs, so both
-   * halves animate what the board no longer shows: a pop draws a tile that is
-   * gone, and a fall draws one that has already arrived. Which beat it was
-   * comes off a counter, not off comparing objects — the engine promises the
-   * count ticks, it does not promise a fresh allocation per beat.
+   * The engine has already mutated the board, so both halves animate what it no
+   * longer shows: a pop draws a tile that is gone, a fall one that has arrived.
+   * Which beat it was comes off a counter rather than object identity.
    */
   private playCascadeBeat(): void {
     const { beatsPlayed, lastBeat } = this.simulation;
@@ -3052,16 +2618,14 @@ export class BoardScene extends Scene {
 
     const poppedAt = this.popCells(lastBeat.link, lastBeat.connections);
 
-    // Recorded per LINK, which is what makes a chain read as reaching. A
-    // cascade that lights three neurons draws three segments of thread on three
-    // separate beats, so the player watches the route being taken rather than
-    // finding it already drawn when the board stops moving.
+    // Recorded per LINK, which is what makes a chain read as reaching: three
+    // neurons draw three segments on three beats, so the route is watched being
+    // taken rather than found already drawn.
     this.reachNeurons(lastBeat.link.neuronsLit);
 
     // `chainLength` has already been incremented past this link, so the first
-    // link of a cascade pops at index 0. The pop is placed where the clear
-    // actually happened, which is what stops a six-wide board sounding like a
-    // single point.
+    // link pops at index 0. Placed where the clear happened, so a six-wide board
+    // does not sound like a single point.
     this.soundBoard.play({
       ...popVoice(this.simulation.chainLength - 1),
       pan: poppedAt === null ? 0 : panForX(poppedAt),
@@ -3069,12 +2633,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Take the neurons a link just reached: record the route, and sound them.
-   *
-   * The pitch climbs with how many are already lit, the same shape `answerVoice`
-   * uses when it drives the shadows off — this is the other moment in the game
-   * where something the player did resolves a whole board, and the two should
-   * be recognisably the same instrument.
+   * Record the route, and sound them. The pitch climbs the same shape
+   * `answerVoice` uses, so the two moments where the player resolves a board are
+   * recognisably the same instrument.
    */
   private reachNeurons(lit: readonly NeuronSite[]): void {
     const total = neuronsOn(this.simulation.board).length;
@@ -3087,9 +2648,8 @@ export class BoardScene extends Scene {
       });
 
       const index = visibleCellIndex(site.column, site.row);
-      // A flare on the cell itself, so the moment has a place. The tile below
-      // it is the one that cleared; without this the neuron simply changes
-      // texture and the cause is invisible.
+      // A flare on the cell itself, so the moment has a place — without it the
+      // neuron simply changes texture and the cause is invisible.
       this.cellTiles[index].setScale(1.35);
       this.tweens.add({
         targets: this.cellTiles[index],
@@ -3154,9 +2714,9 @@ export class BoardScene extends Scene {
       }
     }
 
-    // Fixed before the shadow borrows from the same pool, because the popup
-    // belongs over what the player cleared — averaging the shadow cells in
-    // would drag it off toward whatever happened to be standing beside it.
+    // Fixed before the shadow borrows from the same pool: the popup belongs over
+    // what the player cleared, and averaging the shadow cells in would drag it
+    // toward whatever was standing beside it.
     const poppedCells = borrowed;
 
     for (const cell of purified) {
@@ -3167,11 +2727,9 @@ export class BoardScene extends Scene {
       const x = centerOfColumn(cell.column);
       const y = centerOfRow(cell.row);
 
-      // The creature breaking open, drawn over the top of the tile that is now
-      // underneath it. Outward and fading, where a cleared tile collapses
-      // inward — a piece falls into the hole it leaves, and this cell has no
-      // hole to fall into. Bigger the stronger it was, so turning something a
-      // single clear could not have touched is visibly the larger event.
+      // The creature breaking open over the tile now underneath it. Outward and
+      // fading, where a cleared tile collapses inward — a piece falls into the
+      // hole it leaves, and this cell has none. Bigger the stronger it was.
       const husk = this.popTiles[borrowed];
       if (husk === undefined) {
         continue;
@@ -3195,19 +2753,17 @@ export class BoardScene extends Scene {
         onComplete: () => husk.setVisible(false),
       });
 
-      // And the tile arriving under it, blooming up from nothing. `drawBoard`
-      // already shows the real cell at full size the moment the engine turns
-      // it, so without this the colour simply APPEARS and the beat reads as a
-      // substitution rather than as something becoming something else.
+      // And the tile arriving under it, blooming up from nothing — without this
+      // the colour simply appears, and the beat reads as a substitution rather
+      // than as something becoming something else.
       const born = cell.turnedTo === undefined ? undefined : this.popTiles[borrowed];
       if (born !== undefined && cell.turnedTo !== undefined) {
         borrowed += 1;
 
-        // Held back from `drawBoard` for exactly as long as the bloom runs, the
-        // same trick a falling tile uses. The engine turns the cell the instant
-        // the link resolves, so without this the finished tile is already
-        // sitting there at full size and the bloom is a second copy growing on
-        // top of it.
+        // Held back from `drawBoard` for as long as the bloom runs, the same
+        // trick a falling tile uses: the engine turns the cell the instant the
+        // link resolves, so the finished tile would otherwise already be sitting
+        // there with the bloom growing on top of it.
         const index = visibleCellIndex(cell.column, cell.row);
         this.cellsBeingFilled.add(index);
 
@@ -3231,8 +2787,8 @@ export class BoardScene extends Scene {
           },
         });
 
-        // Sparks in the colour it turned INTO, not the shadow's violet. The
-        // cell gained something; the particles should say which side won it.
+        // Sparks in the colour it turned INTO, not the shadow's violet: the cell
+        // gained something, and the particles should say which side won it.
         this.sparks.setParticleTint(PIECE_COLORS[cell.turnedTo]);
       } else {
         this.sparks.setParticleTint(SHADOW_EYE_GLOW);
@@ -3257,20 +2813,13 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * A shadow that was hit and survived: knocked back, then held.
+   * A shadow hit and survived. Without this the tiered mechanic is invisible: a
+   * clear that leaves a strong shadow standing is indistinguishable from one that
+   * did nothing, so the player learns "singles don't work on that one" rather
+   * than "singles wear it down".
    *
-   * The whole tiered mechanic is invisible without this. A single clear beside
-   * a strong shadow leaves it standing, and with no reaction that is
-   * indistinguishable from a clear that did nothing at all — so the player
-   * learns "singles don't work on that one" instead of "singles wear it down".
-   *
-   * The tile is already showing its weaker texture by now, because `drawBoard`
-   * reads the board and the engine has already stepped it down a tier. So the
-   * crest shrinking IS the damage readout; this just puts a hit behind it.
-   * `animateShadow` recomputes position and scale from the shadow clock every
-   * frame, which would fight a tween on the same properties — so the knock is
-   * drawn on a borrowed pop tile over the top, and the cell underneath is left
-   * alone.
+   * Drawn on a borrowed pop tile rather than the cell, because `animateShadow`
+   * recomputes position and scale every frame and would fight a tween on them.
    */
   private flinchDamagedShadow(damaged: readonly ShadowHit[], from: number): number {
     let borrowed = from;
@@ -3283,10 +2832,9 @@ export class BoardScene extends Scene {
       const x = centerOfColumn(cell.column);
       const y = centerOfRow(cell.row);
 
-      // One tier up from what it is now — the creature it was a moment ago,
-      // flashing off as it is knocked down to the one underneath. Borrowed
-      // from the same running count as everything else this beat, so it can
-      // never land on a tile that is already mid-tween.
+      // One tier up from what it is now: the creature it was a moment ago,
+      // flashing off as it is knocked down. Borrowed from the same running count
+      // as everything else this beat, so it cannot land on a tile mid-tween.
       const tile = this.popTiles[borrowed];
       if (tile === undefined) {
         continue;
@@ -3322,14 +2870,8 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Squash the tiles a pair just came to rest on. Puyo holds this bounce for 16
-   * frames and it is a large part of why landing there feels like contact
-   * rather than like a value changing.
-   *
-   * The pair itself is gone by now — its halves are board cells, and `settle`
-   * may have moved either of them — so the engine reports where each half came
-   * to rest and the scene bounces exactly those two cells. A half that settled
-   * into the hidden row has no rectangle and simply does not bounce.
+   * Much of why landing reads as contact. The pair is gone by now and `settle`
+   * may have moved either half, so the engine reports where each came to rest.
    */
   private bounceLanding(): void {
     for (const cell of this.simulation.lastLanded) {
@@ -3351,11 +2893,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Translation AND roll, both scaled by how deep the chain is.
-   *
    * A camera that only slides reads as a glitch; a couple of tenths of a degree
-   * of roll is what reads as force. The roll is tweened back to zero rather
-   * than snapped, or the board would end the shake visibly crooked.
+   * of roll reads as force. Tweened back to zero rather than snapped, or the
+   * board ends the shake visibly crooked.
    */
   private kickCamera(): void {
     const camera = this.cameras.main;
@@ -3364,8 +2904,8 @@ export class BoardScene extends Scene {
 
     camera.shake(90 + 20 * depth, this.tuning.shakeIntensity * weight);
 
-    // Alternating direction, so consecutive links of one cascade rock the board
-    // rather than pushing it further the same way each time.
+    // Alternating, so consecutive links rock the board rather than pushing it
+    // further the same way each time.
     const roll = this.tuning.shakeRollDegrees * weight * (depth % 2 === 0 ? 1 : -1);
     camera.setAngle(roll);
     // `rotateTo` takes radians, unlike `setAngle`.
@@ -3373,13 +2913,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * What this link earned, floating up from the middle of what popped.
-   *
-   * Connections, not points, because connections are what buy a memory — and
-   * the multiplier is spelled out beside them whenever it is above one. The
-   * chain weighting existed for a while with nothing on screen reporting it,
-   * which made deliberately building a chain a strictly invisible reward: the
-   * player got three times the progress and no way to learn that they had.
+   * Connections rather than points, because connections are what buy a memory.
+   * The multiplier is spelled out above one, or a built chain pays three times
+   * the progress with no way to learn that it did.
    */
   private showConnectionPopup(x: number, y: number, connections: number): void {
     const multiplier = this.simulation.chainLength;
@@ -3403,12 +2939,12 @@ export class BoardScene extends Scene {
   /**
    * Carry each settled tile from the row it left to the row it landed in, with
    * the destination held empty until it arrives. Eased in, because a falling
-   * thing accelerates — linear motion is what makes a drop read as a slide.
+   * thing accelerates and linear motion reads as a slide.
    */
   private dropTiles(moves: readonly TileMove[]): void {
-    // A previous drop still in flight owns pooled rectangles and suppressed
-    // cells that this one is about to reuse. Ending it first is what keeps a
-    // slow `fallDuration` from stranding a cell as permanently empty.
+    // A previous drop still in flight owns pooled tiles and suppressed cells this
+    // one is about to reuse. Ending it first keeps a slow `fallDuration` from
+    // stranding a cell as permanently empty.
     this.tweens.killTweensOf(this.fallTiles);
     for (const tile of this.fallTiles) {
       tile.setVisible(false);
@@ -3436,9 +2972,9 @@ export class BoardScene extends Scene {
       this.tweens.add({
         targets: tile,
         y: centerOfRow(move.toRow),
-        // Square root of the distance, not the distance: real falls accelerate,
-        // so a six-row drop takes about two and a half times as long as a
-        // one-row drop rather than six times, and reads as heavier for it.
+        // Square root of the distance rather than the distance: falls accelerate,
+        // so a six-row drop takes about two and a half times as long as a one-row
+        // drop rather than six times, and reads as heavier for it.
         duration: this.tuning.fallDuration * Math.sqrt(move.toRow - move.fromRow),
         ease: 'Quad.easeIn',
         onComplete: () => {
@@ -3450,18 +2986,15 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Draw the two halves of the falling pair on top of the board.
-   *
-   * These are separate rectangles from the board grid because the pair moves
-   * independently of the cell layout — and later will need to move smoothly
-   * between cells, which fixed-position grid cells cannot do.
+   * Draw the two halves of the falling pair on top of the board. Separate objects
+   * from the board grid, because the pair moves smoothly between cells and
+   * fixed-position grid cells cannot.
    */
   private drawPair(): void {
     // In all of these states `pair` still points at the pair whose tiles are
     // already part of the board, so drawing it paints a ghost duplicate — and
-    // after a top-out it would hang there at its pre-settle position forever.
-    // A won run is the same case: the simulation is held rather than stopped,
-    // so the pair kept being drawn, straight over the closing words.
+    // after a top-out it hangs at its pre-settle position forever. A won run is
+    // the same case: the simulation is held rather than stopped.
     if (this.simulation.resolving || this.simulation.toppedOut || this.runOver === 'won') {
       for (const tile of this.pairTiles) {
         tile.setVisible(false);
@@ -3470,9 +3003,9 @@ export class BoardScene extends Scene {
     }
 
     // Draw the pair between rows rather than on them. `fallProgress` is only
-    // meaningful while the pair can actually fall — a landed pair keeps its
-    // last value through the lock delay, and offsetting by it would sink the
-    // piece into the tile it is resting on.
+    // meaningful while the pair can fall: a landed pair keeps its last value
+    // through the lock delay, and offsetting by it sinks the piece into the tile
+    // it is resting on.
     const descent = this.simulation.pair.canFall(this.simulation.board)
       ? this.simulation.fallProgress
       : 0;
@@ -3490,9 +3023,8 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * Paint the "NEXT" panel. Repainted only when the upcoming pair actually
-   * changes, which keeps the per-frame path free of pointless writes — and
-   * compared as two numbers, so the check itself allocates nothing.
+   * Paint the "NEXT" panel, only when the upcoming pair actually changes.
+   * Compared as two numbers, so the check itself allocates nothing.
    */
   private drawPreview(): void {
     const [pivotType, satelliteType] = this.simulation.upcoming;
@@ -3502,8 +3034,8 @@ export class BoardScene extends Scene {
 
     this.shownPivotType = pivotType;
     this.shownSatelliteType = satelliteType;
-    // Index 0 is the lower rectangle (the pivot) and index 1 the upper (the
-    // satellite), matching orientation 0 — how the pair will actually appear.
+    // Index 0 is the pivot and index 1 the satellite, matching orientation 0 —
+    // how the pair will actually appear.
     this.previewTiles[0].setTexture(tileTexture(pivotType));
     this.previewTiles[1].setTexture(tileTexture(satelliteType));
   }
@@ -3516,10 +3048,9 @@ export class BoardScene extends Scene {
   private refreshChain(): void {
     const { resolving, chainLength } = this.simulation;
 
-    // Not while the story has the board. A reveal freezes the simulation with
-    // `resolving` still true, so without this the callout from the chain that
-    // paid for the fragment sits at 64px directly behind it — and the question
-    // is drawn in the same slot the callout occupies.
+    // Not while the story has the board: a reveal freezes the simulation with
+    // `resolving` still true, so the callout from the chain that paid for the
+    // fragment would sit directly behind it, in the slot the question uses.
     const showing = resolving && chainLength >= 2 && !this.storyHolding;
 
     this.chainText.setVisible(showing);
@@ -3530,24 +3061,17 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * The board is left exactly as it stood, with the readout over it — losing is
-   * information, and clearing the screen would throw away the shape that
-   * explains why. Restarting means reloading the page for now.
+   * The board is left exactly as it stood: losing is information, and clearing
+   * the screen throws away the shape that explains why.
+   *
+   * This only ever HIDES the readout. `loseTheBoard` and `winTheRun` show it,
+   * once their sequences have played.
    */
   private refreshGameOver(): void {
-    // Not while a fragment is up. Both can be true in one frame — the clear
-    // that fills the meter can be the same clear that ends the run — and the
-    // reveal was drawn first, so GAME OVER printed straight across the memory
-    // it had just paid for. The run is over either way; the memory goes first.
-    // Shown by `loseTheBoard` once the connections have finished dying, rather
-    // than the instant the run ends — otherwise the words arrive over an ending
-    // that has not happened yet. This only ever hides them.
-    // Three ways a run can be over, and this tested one. `toppedOut` was the
-    // only ending when it was written; running out of pieces became the loss
-    // and winning became an ending, and neither sets that flag — so this hid
-    // both of them on the frame after they were shown. The lost board still
-    // composed its closing line naming what the run was short of, correctly,
-    // into a text object that was invisible from the next frame onward.
+    // Tests `runOver`, which covers all three endings. Not while a fragment is
+    // up: the clear that fills the meter can be the same clear that ends the run,
+    // and the reveal draws first, so the readout would print across the memory it
+    // just paid for. The run is over either way; the memory goes first.
     if (this.runOver === null || this.storyHolding) {
       this.gameOverText.setVisible(false);
       this.gameOverLine.setVisible(false);
@@ -3557,24 +3081,18 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * The shadow winning, which until now was the words TOPPED OUT.
+   * The shadow winning. This board is about connections, so losing is watching
+   * them go: every lit trace dies in turn, falling a semitone a cell —
+   * `answerVoice` backwards, because answering is the moment this is opposite to.
    *
-   * This board is about connections, so losing it is watching them go: every
-   * lit trace dies in turn, falling a semitone a cell — `answerVoice` run
-   * backwards, because answering the question is the moment this is the
-   * opposite of. The memory panel dims with them, since what a run built is
-   * what it loses.
-   *
-   * Nothing here touches the simulation. The run is already over; this is the
-   * scene taking a beat to say so.
+   * Nothing here touches the simulation. The run is already over.
    */
   private loseTheBoard(): void {
     const lit = this.connections.filter((slot) => slot.trace.visible);
 
-    // The signal degrading, which is the half of this the notes asked for and
-    // the connections dying is the other half. Colour drains and the image
-    // coarsens as the interference comes up, so the board is visibly being
-    // lost rather than merely covered over.
+    // The signal degrading: colour drains and the image coarsens as the
+    // interference comes up, so the board is visibly being lost rather than
+    // covered over.
     this.staticOverlay.setVisible(true).setAlpha(0);
     this.tweens.addCounter({
       from: 0,
@@ -3620,8 +3138,8 @@ export class BoardScene extends Scene {
       if (this.runOver === null) {
         return;
       }
-      // Composed here rather than at creation, because what the run was
-      // reaching for is only known once it has ended.
+      // Composed here rather than at creation: what the run was reaching for is
+      // only known once it has ended.
       this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
 
       for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint]) {
@@ -3632,42 +3150,27 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * A memory finished, which until now was silence.
-   *
-   * The exact mirror of `loseTheBoard`, and built as one on purpose. That
-   * sequence was the most atmospheric thing in the game and it was also the
-   * ONLY authored ending: past the last fragment `locate` returned null,
-   * `revealNextNode` returned quietly, and the run went on re-seeding a board
-   * with nothing left on it to earn. A game whose only ending is losing hands
-   * its last word to the shadow by default.
-   *
-   * So everything the loss does, run the other way. The traces light instead
-   * of dying. The pitch CLIMBS a semitone a cell, which is `answerVoice`
-   * forwards — the loss is that voice backwards, so the two endings are
-   * literally the same sound in opposite directions. The memory panel comes up
-   * full instead of dimming. No static and no colour drain: what the shadow
-   * does is degrade the signal, and this is the run where it did not.
+   * The exact mirror of `loseTheBoard`, so the game's two endings are the same
+   * shape in opposite directions: the traces light rather than die, the pitch
+   * climbs rather than falls, the panel fills rather than dims. No static and no
+   * colour drain — degrading the signal is what the shadow does.
    */
   private winTheRun(): void {
     this.runOver = 'won';
 
-    // Everything that answers "what do I have left to work with" goes, along
-    // with the objective — which was still reading "light every neuron — 0 of
-    // 3" over the words saying the memory was finished, because the board it
-    // described was mid-play when the question was answered.
+    // Everything answering "what do I have left to work with" goes, the objective
+    // included: the board it describes was mid-play when the question was
+    // answered, and it would stand over the words saying the memory is finished.
     this.tweens.add({
       targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],
       alpha: 0,
       duration: 420,
     });
 
-    // The board's own skeleton, lit one link at a time.
-    //
-    // Every trace between two occupied cells, not only the ones joining a
-    // matching pair — the losing sequence puts out what was lit, and the mirror
-    // of that is the network completing rather than a handful of leftover
-    // couplings brightening. Lighting ALL of the grid instead was the other
-    // option and it reads as a mesh, not as a thing that was built.
+    // The board's own skeleton, lit one link at a time: every trace between two
+    // occupied cells, not only those joining a matching pair. The mirror of the
+    // loss is the network COMPLETING, where lighting the whole grid would read as
+    // a mesh rather than as something that was built.
     const built = this.connections.filter((slot) => (
       isColour(this.settledPieceAt(slot.column, slot.row))
       && isColour(this.settledPieceAt(slot.toColumn, slot.toRow))
@@ -3697,13 +3200,12 @@ export class BoardScene extends Scene {
     const settled = built.length * 60 + 520;
 
     this.time.delayedCall(settled, () => {
-      // A restart during the sequence cancels it, exactly as it does for a
-      // loss: the next run must not open with the last one's ending on it.
+      // A restart during the sequence cancels it, as it does for a loss.
       if (this.runOver !== 'won') {
         return;
       }
 
-      // The memory just finished is the one before whatever comes next, and
+      // The memory just finished is the one before whatever comes next:
       // `nodesRevealed` has already walked past it.
       const finished = MEMORIES[Math.max(0, this.answeringMemory)];
       this.gameOverText.setText(STILL_CONNECTED);
@@ -3717,12 +3219,9 @@ export class BoardScene extends Scene {
   }
 
   /**
-   * The fragment this run was working toward, and how far off it was.
-   *
-   * Read at the end rather than tracked, because nothing needs it until then.
-   * `locate` returns null once every fragment has surfaced, and that is a real
-   * ending too — there was nothing left to fail to reach, so the closing line
-   * has nothing specific to name and says the general thing instead.
+   * Read at the end rather than tracked. `locate` returns null once every
+   * fragment has surfaced: nothing was left to fail to reach, so the closing line
+   * says the general thing instead.
    */
   private unfinishedBusiness(): UnfinishedBusiness {
     const at = this.locate(this.nodesRevealed);
@@ -3730,9 +3229,8 @@ export class BoardScene extends Scene {
       return { reaching: null, connectionsShort: 0 };
     }
 
-    // Counted in neurons still dark, and the word survives the change because a
-    // neuron IS a connection — the closing line reads "two connections short of
-    // The Hat" and means the two nodes on the board that never lit.
+    // Counted in neurons still dark: a neuron IS a connection, so "two
+    // connections short of The Hat" means the two nodes that never lit.
     return {
       reaching: MEMORIES[at.memoryIndex].nodes[at.nodeIndex].title,
       connectionsShort: Math.max(1, unlitCount(this.simulation.board)),

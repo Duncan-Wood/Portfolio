@@ -14,108 +14,56 @@ import { findGroups } from './matching';
 import { allLit } from './neurons';
 
 /*
- * A lock: one board with something to work out.
+ * A lock: one board with something to work out. A run is a sequence of them, one
+ * per node on the brain, and failing resets the lock rather than the run —
+ * there is no death in front of the writing.
  *
- * This is the escape-room turn, and it is a different game from the one that
- * was here. The matcher was an endless survival stack — you played until the
- * board filled, and the memories were paid out for lasting. That put a Puyo
- * skill gate in front of someone's life story, which for a portfolio is
- * backwards; and survival produces the satisfaction of DEXTERITY, where what
- * was wanted was the satisfaction of working something out.
- *
- * So a run is a sequence of locks, one per node on the brain. Each states an
- * objective in words you can act on, seeds a board that poses it, and is
- * solved or not. Failing resets the lock, never the run — there is no death in
- * front of the writing.
- *
- * Dr. Mario is the model, and it is already cited in `DESIGN-PLAN.md`: clear
- * the viruses, and level 0 is four of them. A stated, finite goal is why
- * nobody bounces off it, and why every round can be judged rather than merely
- * survived.
- *
- * Difficulty here is DESIGN rather than speed — a hard lock is one that needs
- * a clever setup, not faster fingers. That is the only kind of hard that
- * produces an "aha".
+ * Difficulty is DESIGN rather than speed: a hard lock needs a cleverer setup,
+ * not faster fingers.
  */
 
 export interface Lock {
-  /** What the player is told to do, in words they can act on. */
   objective: string;
   /**
-   * How many neurons the board poses, and therefore what solving it means.
-   *
-   * The objective used to be the shadows, and that was the fault under the
-   * whole board: hesitation FEEDS the shadow, so dithering lengthened the
-   * puzzle instead of costing anything, and the goal and the threat were the
-   * same axis. Separating them is what lets the shadow finally be opposition.
+   * What solving it means. Deliberately not the shadows: hesitation feeds the
+   * shadow, so as an objective it would make dithering lengthen the puzzle
+   * rather than cost anything.
    */
   neurons: number;
-  /** How many shadows the board opens holding. */
   shadows: number;
-  /** How many ordinary tiles are seeded around them. */
   tiles: number;
   /**
-   * How many pieces the board gives you to do it in.
-   *
-   * The constraint, and therefore the difficulty dial. It is level design
-   * rather than a feel setting, which is why it lives on the lock and not in
-   * `tuning.ts`: two boards asking for the same three neurons are a different
-   * puzzle at fourteen pieces than at eight, and that difference is the thing
-   * being authored. Vite reloads this file on save, so sweeping it is still a
-   * matter of seconds.
+   * The constraint, and so the difficulty dial. Level design rather than a feel
+   * setting, which is why it lives here and not in `tuning.ts`.
    */
   pieces: number;
 }
 
 /**
- * How far down the board a lock is allowed to seed.
- *
- * Everything sits on the floor and nothing is seeded above this, so there is
- * always board left to play in. A puzzle that opens nearly full is not harder,
- * it is just shorter.
+ * Nothing seeds above this, so there is always board left to play in: a puzzle
+ * that opens nearly full is not harder, only shorter.
  */
 const SEED_ROWS = 3;
 
 /**
- * The locks, in the order a run meets them: one per fragment of the memory
- * being unlocked.
+ * One per fragment of the memory being unlocked. What escalates is the budget
+ * PER NEURON, falling from four pieces to two and a half, which is why the
+ * fourth board can ask for a cascade the first would be cruel to.
  *
- * There was one, and that was a prototype of the STRUCTURE — the question it
- * existed to answer was whether a single board with a stated goal beats an
- * endless one. It does, so the run now has a shape as well: the board that
- * earns the last fragment of a memory used to be byte-for-byte the board that
- * earned the first, which is four tutorials in a row rather than a middle.
- *
- * What escalates is not speed. It is the budget PER NEURON — how much room
- * there is to work each one out — which falls from four pieces to two and a
- * half across the four. That is difficulty as design rather than as reflex,
- * which is the only kind that produces an "aha", and it is the reason the
- * fourth board can ask for a cascade that the first would be cruel to.
- *
- * `tiles + shadows + neurons` must fit the floor `seedLock` will lay them on
- * (COLUMNS x SEED_ROWS = 18). Overflow is silent: the seeder simply stops, and
- * a board with fewer neurons than its objective counts cannot be solved.
+ * `tiles + shadows + neurons` must fit COLUMNS x SEED_ROWS = 18. Overflow is
+ * SILENT: the seeder stops, and a board with fewer neurons than its objective
+ * counts cannot be solved.
  */
 export const LOCKS: readonly Lock[] = [
   {
     objective: 'light every neuron',
     neurons: 3,
-    // ONE, where the old lock opened with three. The shadow is no longer what
-    // you are here to remove, so a board crowded with them is just noise; one
-    // standing next to a neuron is enough to pose the question the board is
-    // really asking.
     shadows: 1,
     tiles: 11,
-    // Generous, deliberately. Three neurons need three clears at worst, and a
-    // clear costs two or three pieces on a board seeded this full — so twelve
-    // is roughly double what a solution needs. The first lock is the tutorial
-    // and it should be beaten; the dial tightens on the locks after it.
+    // Roughly double what a solution needs: the first lock should be beaten.
     pieces: 12,
   },
   {
-    // A second shadow, and one piece less. The first board teaches that a
-    // shadow beside a neuron is an opportunity; this one puts that reading
-    // under mild pressure without changing what is being asked.
     objective: 'light every neuron',
     neurons: 3,
     shadows: 2,
@@ -123,8 +71,7 @@ export const LOCKS: readonly Lock[] = [
     pieces: 11,
   },
   {
-    // A fourth neuron. The budget goes UP by one and the room per neuron still
-    // falls, which is the point: more to reach, not less time to think.
+    // The budget goes UP and the room per neuron still falls.
     objective: 'light every neuron',
     neurons: 4,
     shadows: 2,
@@ -132,10 +79,8 @@ export const LOCKS: readonly Lock[] = [
     pieces: 12,
   },
   {
-    // The last board of the memory, and the only one where a single clear per
-    // neuron will not cover it: ten pieces against four neurons means one
-    // cascade has to reach two of them. That is the board asking for the skill
-    // the first three taught, on the fragment that ends with the question.
+    // The only board where one clear per neuron will not cover it: ten pieces
+    // against four neurons means a cascade has to reach two of them.
     objective: 'light every neuron',
     neurons: 4,
     shadows: 2,
@@ -145,13 +90,9 @@ export const LOCKS: readonly Lock[] = [
 ];
 
 /**
- * The lock for the fragment currently being earned.
- *
- * Clamped at both ends. The scene spelled this out at three call sites with a
- * `Math.min` each, against a `lockIndex` field that was declared, read three
- * times and never once incremented — which is what made every board of a run
- * the same board. Deriving it from the fragments already earned removes the
- * field, and with it the possibility of the two drifting apart.
+ * The lock for the fragment currently being earned, clamped at both ends.
+ * Derived from the fragments earned rather than stored, so the counter and the
+ * board cannot drift apart.
  */
 export function lockFor(fragmentsEarned: number): Lock {
   const index = Math.max(0, Math.min(fragmentsEarned, LOCKS.length - 1));
@@ -165,11 +106,9 @@ export function lockFor(fragmentsEarned: number): Lock {
  * when the last neuron goes and the lock is still open — what they cost you is
  * pieces and room, not the objective.
  *
- * The lock is taken but not yet read: every lock so far asks the same thing,
- * and inventing a discriminated union for one case would be scaffolding with
- * nothing in it. The parameter is here because the SIGNATURE is the honest one
- * — "is this lock solved" — and the day a lock asks for a chain instead, the
- * call sites already say which lock they mean.
+ * The lock is taken but not read: every lock so far asks the same thing. The
+ * parameter is here because the signature is the honest one, and the day a lock
+ * asks for something else the call sites already say which lock they mean.
  */
 export function isSolved(_lock: Lock, board: Board): boolean {
   return allLit(board);
@@ -178,19 +117,12 @@ export function isSolved(_lock: Lock, board: Board): boolean {
 /**
  * Lay out the board this lock poses.
  *
- * Built bottom-up in columns so everything rests on the floor: a seeded board
- * with tiles floating in it is not a puzzle, it is a bug the player has to
- * work around, and `settle` would silently rearrange it on the first clear
- * anyway.
+ * Bottom-up so everything rests on the floor: `settle` would rearrange a seeded
+ * board with floating tiles on the first clear anyway. Colours are rotated
+ * rather than drawn, and the result checked for a group, because a board that
+ * opens already matching solves itself the moment the first piece lands.
  *
- * Colours are rotated rather than drawn at random, and the result is checked
- * for a group before it is handed over. A lock that opens with four in a row
- * already touching solves itself the moment the first piece lands, which reads
- * as the game being broken rather than as a gift.
- *
- * `random` is injected for the same reason the piece bag is: a lock has to be
- * reproducible in a test, and "it looked fine when I played it" is not a
- * regression test.
+ * `random` is injected so a lock is reproducible in a test.
  */
 export function seedLock(board: Board, lock: Lock, random: () => number): void {
   board.reset();
@@ -198,13 +130,13 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
   const total = lock.tiles + lock.shadows + lock.neurons;
   const heights = new Array<number>(COLUMNS).fill(0);
 
-  // Spread across the columns rather than piled: the puzzle should ask the
-  // player to reach several places, not to dig one hole.
+  // Spread rather than piled: the puzzle should ask the player to reach several
+  // places, not dig one hole.
   for (let placed = 0; placed < total; placed += 1) {
     let column = Math.floor(random() * COLUMNS) % COLUMNS;
 
-    // Shortest column wins if the pick is already full, which keeps the
-    // opening board flat enough to play on whatever the random does.
+    // Shortest column wins if the pick is full, so the board opens flat enough
+    // to play on whatever the random does.
     for (let tried = 0; tried < COLUMNS && heights[column] >= SEED_ROWS; tried += 1) {
       column = (column + 1) % COLUMNS;
     }
@@ -215,17 +147,13 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     const row = ROWS - 1 - heights[column];
     heights[column] += 1;
 
-    // Rotating the colour rather than drawing it keeps the mix even, and an
-    // even mix is what makes a group reachable from more than one direction.
+    // An even mix is what makes a group reachable from more than one direction.
     board.place(column, row, placed % PIECE_TYPE_COUNT);
   }
 
   /**
-   * How many of a cell's neighbours could ever host a clear.
-   *
-   * Walls cannot, and neither can a neuron or a shadow: a neuron never clears,
-   * and a shadow only leaves when a clear happens somewhere it can happen.
-   * Anything else — a colour, or an empty cell a piece could land in — counts.
+   * How many of a cell's neighbours could ever host a clear. Walls, neurons and
+   * shadows cannot; a colour or an empty cell can.
    */
   const reachable = (column: number, row: number): number => {
     let count = 0;
@@ -244,22 +172,13 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     return count;
   };
 
-  // Neurons take a cell each, spread across columns and staggered in depth,
-  // because the board should ask the player to reach SEVERAL places — that is
-  // what makes one cascade reaching two of them worth setting up.
+  // Spread and staggered, so the board asks the player to reach several places
+  // and one cascade reaching two is worth setting up.
   //
-  // Every site must have somewhere a clear could actually happen beside it,
-  // and this is not a nicety. Measured before the check existed: a competent
-  // bot solved 56% of seeded boards at a budget of twelve pieces, and exactly
-  // 56% at eighteen and at thirty. More pieces changed nothing, because the
-  // boards it failed were not hard, they were impossible. The commonest shape
-  // was a neuron in the bottom corner with two walls, a shadow and a single
-  // tile beside it — light that one tile's group or never light it at all. And
-  // neurons are ANCHORS, so nothing can ever fall in to help.
-  //
-  // THREE rather than two, because a shadow is about to take one of them on
-  // purpose (see below) and the neuron has to survive that with a way in to
-  // spare.
+  // Every site must have somewhere a clear could happen beside it, or the board
+  // is not hard but impossible — neurons are ANCHORS, so nothing can fall in to
+  // help. THREE ways in rather than two, because a shadow is about to take one
+  // on purpose and the neuron has to survive that with one to spare.
   const neurons: { column: number; row: number }[] = [];
 
   for (let wanted = 0; wanted < lock.neurons; wanted += 1) {
@@ -276,20 +195,10 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
           continue;
         }
 
-        // Three things, in this order of weight.
-        //
-        // OPEN ABOVE is the big one, and it was the whole regression when this
-        // heuristic only asked for room: a neuron with nothing on top of it can
-        // be reached by dropping a piece straight onto it, where a buried one
-        // needs a clear to happen at a specific depth. Siting for room alone
-        // put neurons under the stack and the median solve went from four
-        // pieces to twelve — solvable, but a dig rather than a puzzle.
-        //
-        // SPREAD, still, because the board should ask the player to reach
-        // several places — that is what makes one cascade reaching two of them
-        // worth setting up. Weighted under openness rather than over it.
-        //
-        // ROOM breaks the ties.
+        // OPEN ABOVE dominates: a neuron with nothing on top is reached by
+        // dropping a piece onto it, where a buried one needs a clear at a
+        // specific depth, which is a dig rather than a puzzle. Then SPREAD, then
+        // ROOM to break ties.
         const openAbove = row === FIRST_VISIBLE_ROW || board.isEmpty(column, row - 1);
         const spread = neurons.length === 0
           ? 0
@@ -303,8 +212,7 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     }
 
     if (chosen === null) {
-      // Nothing roomy enough anywhere: take any colour cell with two ways in
-      // rather than seed fewer neurons than the objective counts.
+      // Rather than seed fewer neurons than the objective counts.
       for (let row = ROWS - 1; row >= FIRST_VISIBLE_ROW && chosen === null; row -= 1) {
         for (let column = 0; column < COLUMNS && chosen === null; column += 1) {
           if (isColour(board.pieceAt(column, row)) && reachable(column, row) >= 2) {
@@ -323,27 +231,19 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     neurons.push(chosen);
   }
 
-  // Shadows are placed by possessing tiles already on the board, because that
-  // is the only way a shadow ever exists — it holds a colour, and freeing it
-  // gives that colour back.
-  //
-  // The FIRST one is put next to a neuron deliberately, and that placement is
-  // the point of the whole board. Freeing a shadow restores the tile it took,
-  // and a restored tile can complete the very group that freed it — so a
-  // shadow sitting beside a neuron is not only the thing in your way, it is
-  // the thing that gets you there. Nobody is told this. It is found, which is
-  // the only way an "aha" has ever worked, and Dr. Mario's level 0 is designed
-  // rather than rolled for exactly this reason.
+  // A shadow possesses a tile already on the board, which is the only way one
+  // exists. The FIRST is put beside a neuron deliberately, and that placement is
+  // the point of the board: freeing it restores the tile it took, and a restored
+  // tile can complete the group that freed it, so the shadow in the way is also
+  // the way through. Nobody is told this; it is found.
   let taken = 0;
 
   for (const neuron of neurons) {
     if (taken >= lock.shadows) {
       break;
     }
-    // Only a neighbour the neuron can spare. Taking its last way in is what
-    // turned the designed opportunity into a dead board almost half the time:
-    // the shadow beside a neuron is meant to be the thing that GETS you there,
-    // not the thing that walls it off.
+    // Only a neighbour the neuron can spare: taking its last way in would wall
+    // the neuron off rather than open it.
     const beside = [
       { column: neuron.column, row: neuron.row + 1 },
       { column: neuron.column - 1, row: neuron.row },
@@ -379,14 +279,12 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     }
   }
 
-  // A board that has already solved itself is not a puzzle. Nudging one tile
-  // is enough to break the group and cheaper than starting the layout again.
+  // Nudging one tile breaks the group, and is cheaper than starting over.
   for (const group of findGroups(board)) {
     const cell = group.cells[0];
     const piece = board.pieceAt(cell.column, cell.row);
-    // `findGroups` only ever returns colour, but reading it back as one keeps
-    // the arithmetic below honest: `(piece + 1) % PIECE_TYPE_COUNT` on a shadow
-    // or a neuron would quietly turn it into a tile.
+    // `(piece + 1) % PIECE_TYPE_COUNT` on a shadow or neuron would quietly turn
+    // it into a tile.
     if (!isColour(piece)) {
       continue;
     }
