@@ -225,7 +225,6 @@ describe('clearing without settling', () => {
 describe('the hidden row is inert', () => {
   const RED = PIECE_LETTERS.R;
 
-  /** Three reds stacked at the top of the visible field, in one column. */
   const threeVisibleReds = () => {
     const board = new Board();
     for (let offset = 0; offset < 3; offset += 1) {

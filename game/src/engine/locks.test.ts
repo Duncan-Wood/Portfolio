@@ -5,7 +5,6 @@ import { Board } from './board';
 import { LOCKS, isSolved, lockFor, seedLock } from './locks';
 import { MEMORIES } from '../memories';
 
-/** A deterministic "random" so a seeded board is the same board every time. */
 const fixed = (values: number[]) => {
   let index = 0;
   return () => values[index++ % values.length];
@@ -28,7 +27,6 @@ describe('a lock is a board with something to work out', () => {
   it('has an objective written in words the player can act on', () => {
     for (const lock of LOCKS) {
       expect(lock.objective.length).toBeGreaterThan(0);
-      // Not "score 400" — a lock has to say what to DO.
       expect(lock.objective).toMatch(/[a-z]/);
     }
   });
@@ -44,7 +42,6 @@ describe('a lock is a board with something to work out', () => {
   });
 
   it('never seeds a board that has already solved itself', () => {
-    // A lock that opens with a group of four sitting on it is not a puzzle.
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.05, 0.35, 0.65, 0.95, 0.15, 0.55]));
 
@@ -88,10 +85,9 @@ describe('a lock is a board with something to work out', () => {
   });
 
   it('opens with a shadow standing beside a neuron', () => {
-    // The discovery the whole board is built around: freeing a shadow gives
-    // back the tile it took, so the thing in your way is also the thing you
-    // needed. It is seeded rather than left to chance on the first lock, the
-    // way Dr. Mario's level 0 is designed rather than rolled.
+    // The discovery the whole board is built around: freeing a shadow gives back
+    // the tile it took, so the thing in your way is also the thing you needed.
+    // Seeded rather than left to chance on the first lock.
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.3, 0.7, 0.5, 0.15, 0.85]));
 
@@ -107,8 +103,6 @@ describe('a lock is a board with something to work out', () => {
     seedLock(board, LOCKS[0], fixed([0.3, 0.7, 0.5]));
     expect(isSolved(LOCKS[0], board)).toBe(false);
 
-    // Light them one at a time: the board must not count itself solved until
-    // the last one goes.
     const sites = neuronsOn(board);
     sites.forEach((site, index) => {
       lightAdjacent(board, [{ column: site.column, row: site.row - 1 }]);
@@ -117,8 +111,6 @@ describe('a lock is a board with something to work out', () => {
   });
 
   it('does not care whether the shadows are gone', () => {
-    // The old objective WAS the shadows, which meant hesitating lengthened the
-    // puzzle instead of costing anything. Goal and threat are separate now.
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.3, 0.7, 0.5]));
 
@@ -135,8 +127,6 @@ describe('a lock is a board with something to work out', () => {
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.25, 0.55, 0.85]));
 
-    // Freeing one has to give a tile back, so there is no such thing as a
-    // shadow standing on nothing.
     for (const cell of cellsOn(board)) {
       if (isShadow(cell.piece)) {
         expect(isColour(cell.piece)).toBe(false);
@@ -147,13 +137,6 @@ describe('a lock is a board with something to work out', () => {
 });
 
 describe('a seeded lock is always solvable', () => {
-  /**
-   * How many of a cell's neighbours could ever host a clear.
-   *
-   * Walls cannot, and neither can a neuron or a shadow: a neuron never clears,
-   * and a shadow has to be driven off by a clear that has somewhere to happen.
-   * Anything else — a colour, or an empty cell a piece could land in — counts.
-   */
   const reachableNeighbours = (board: Board, column: number, row: number) => {
     let count = 0;
     for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
@@ -172,13 +155,6 @@ describe('a seeded lock is always solvable', () => {
   };
 
   it('never strands a neuron with only one way in', () => {
-    // Measured before this existed: a competent bot solved 56% of seeded
-    // boards at a budget of 12, and exactly 56% at 18 and at 30. More pieces
-    // changed nothing, because the boards it failed were not hard — they were
-    // impossible. The commonest shape was a neuron in the bottom corner with
-    // two walls, a shadow, and a single tile beside it: light that one tile's
-    // group or never light the neuron. Neurons are anchors, so nothing can
-    // fall in to help.
     for (let attempt = 0; attempt < 200; attempt += 1) {
       const board = new Board();
       seedLock(board, LOCKS[0], Math.random);
@@ -214,16 +190,10 @@ describe('a seeded lock is always solvable', () => {
 
 describe('the run escalates across the memory it is unlocking', () => {
   it('has a lock for every fragment, so no board is ever played twice', () => {
-    // The four boards used to be one board. `LOCKS` held a single entry and
-    // the scene clamped to it, so the board that earned the last fragment of a
-    // memory was identical to the board that earned the first.
     expect(LOCKS.length).toBeGreaterThanOrEqual(MEMORIES[0].nodes.length);
   });
 
   it('never eases the pressure as the memory fills in', () => {
-    // Pieces alone is the wrong measure — a board asking for a fourth neuron
-    // needs more of them. What has to fall is the budget PER neuron, which is
-    // how much room the player has to work each one out.
     const roomPerNeuron = LOCKS.map((lock) => lock.pieces / lock.neurons);
 
     for (let index = 1; index < roomPerNeuron.length; index += 1) {
@@ -232,9 +202,9 @@ describe('the run escalates across the memory it is unlocking', () => {
   });
 
   it('asks for a board that fits, so nothing it seeds is silently dropped', () => {
-    // `seedLock` fills at most SEED_ROWS deep across the columns and simply
-    // stops when it runs out of floor. A lock whose numbers overflow that
-    // seeds fewer neurons than its objective counts, which is unwinnable.
+    // `seedLock` fills at most SEED_ROWS deep and stops when it runs out of floor.
+    // A lock whose numbers overflow that seeds fewer neurons than its objective
+    // counts, which is unwinnable.
     for (const lock of LOCKS) {
       expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * 3);
     }
@@ -261,8 +231,6 @@ describe('lockFor picks the board for the fragment being earned', () => {
   });
 
   it('holds on the last lock rather than running off the end', () => {
-    // A run that outlasts the written locks keeps playing the hardest one. The
-    // scene used to spell this clamp out at all three of its call sites.
     expect(lockFor(LOCKS.length)).toBe(LOCKS[LOCKS.length - 1]);
     expect(lockFor(LOCKS.length + 99)).toBe(LOCKS[LOCKS.length - 1]);
   });

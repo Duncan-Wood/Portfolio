@@ -15,7 +15,6 @@ import {
 const NEVER_SPOKEN: string[] = [];
 const ENOUGH = ARRIVALS_BETWEEN_LINES;
 
-/** Every line it knows, flattened, for the exhaustion cases. */
 const everyLine = SHADOW_LINES.flat();
 
 describe('when the shadow is allowed to speak', () => {
@@ -30,9 +29,6 @@ describe('when the shadow is allowed to speak', () => {
   });
 
   it('is silent through the first arrivals of a run', () => {
-    // The counter starts at zero, so the creature gets to be a thing on the
-    // board before it is a voice. The first sighting should not come with
-    // captions.
     expect(shadowLine(1, 0, NEVER_SPOKEN)).toBeNull();
   });
 });
@@ -64,8 +60,6 @@ describe('what it picks', () => {
   });
 
   it('drops to a gentler tier rather than going quiet mid-run', () => {
-    // It is winning, and everything it has for winning is used up. A long
-    // grinding run should still have something left to say.
     const topTier = SHADOW_LINES[SHADOW_LINES.length - 1];
 
     const line = shadowLine(20, ENOUGH, [...topTier]);
@@ -81,9 +75,6 @@ describe('what it picks', () => {
 
 describe('the writing itself', () => {
   it('keeps every line short enough to read at a glance', () => {
-    // It appears over a board the player is still playing, and it does not stop
-    // the game. Anything longer than this is a wall they have to choose between
-    // reading and playing.
     for (const line of everyLine) {
       expect(line.length).toBeLessThanOrEqual(56);
     }
@@ -96,8 +87,6 @@ describe('the writing itself', () => {
 
 describe('what is left when the shadow has won', () => {
   it('does not reuse a line the player has already been needled with', () => {
-    // The closing line is said when nothing can be answered. Recycling a taunt
-    // there would make the ending feel like the game ran out of script.
     expect(everyLine).not.toContain(SHADOW_CLOSING_LINE);
   });
 
@@ -116,22 +105,16 @@ describe('what a lost run says it lost', () => {
   });
 
   it('says something different when the run was one connection away', () => {
-    // "1 connections" is the tell of a string built without looking at it, and
-    // this is the last sentence anyone reads.
     expect(closingLine({ reaching: 'My Voice', connectionsShort: 1 }))
       .not.toContain('1 connections');
   });
 
   it('falls back to the thesis when there was nothing left to reach for', () => {
-    // Every fragment already surfaced. There is no specific loss to name, so it
-    // says the general thing instead of an empty sentence with a hole in it.
     expect(closingLine({ reaching: null, connectionsShort: 0 }))
       .toBe(SHADOW_CLOSING_LINE);
   });
 
   it('never gives the player permission to leave', () => {
-    // The rule the first version broke. Whatever else it says, it must not be
-    // readable as "stop now" at the moment someone decides whether to press R.
     const lines = [
       closingLine({ reaching: 'The Build', connectionsShort: 7 }),
       closingLine({ reaching: 'The Hat', connectionsShort: 1 }),
@@ -146,15 +129,11 @@ describe('what a lost run says it lost', () => {
 
 describe('how a run opens', () => {
   it('speaks in the same register as the rest of the shadow, not as a tutorial', () => {
-    // It is the first sentence anyone reads. If it explains the controls it is
-    // a manual, and the objective line is already there to say what to do.
     expect(SHADOW_OPENING_LINE.toLowerCase())
       .not.toMatch(/press|key|arrow|space|drop|rotate|match|click/);
   });
 
   it('obeys the closing line\'s rule, since it is read at the same decision', () => {
-    // Whether to play at all is the same choice as whether to press R, and the
-    // shadow must not be the one giving permission to skip it.
     expect(SHADOW_OPENING_LINE.toLowerCase())
       .not.toMatch(/tomorrow|come back|another day|stop now|do not have to/);
   });
@@ -171,8 +150,6 @@ describe('what a finished memory says', () => {
   });
 
   it('names the memory that was recovered rather than congratulating in general', () => {
-    // The same rule `closingLine` follows: a line equally true of every run
-    // lands like a fortune cookie.
     expect(recoveredLine('High School')).toContain('High School');
     expect(recoveredLine('College')).toContain('College');
   });

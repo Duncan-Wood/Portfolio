@@ -3,7 +3,6 @@ import { COLUMNS, FIRST_VISIBLE_ROW, ROWS } from './grid';
 import { DEFAULT_TUNING } from '../tuning';
 import { SPAWN_COLUMN, SPAWN_ROW, Simulation } from './simulation';
 
-
 const { fallInterval, lockDelay, softDropInterval } = DEFAULT_TUNING;
 
 const RED = 0;
@@ -29,7 +28,6 @@ const fillUnderSpawn = (game: Simulation) => {
   }
 };
 
-/** Stacks `height` tiles of one colour under the spawn column. */
 const stackUnderSpawn = (game: Simulation, pieceType: number, height: number) => {
   for (let row = ROWS - height; row < ROWS; row += 1) {
     game.board.place(SPAWN_COLUMN, row, pieceType);
@@ -354,8 +352,6 @@ describe('resolving a chain over time', () => {
     game.update(DEFAULT_TUNING.chainLinkDelay);
     const second = game.lastBeat;
 
-    // The scene cannot derive this: by the time it reads the beat the running
-    // total has already moved on, and the multiplier is gone.
     expect(first?.kind === 'clear' && first.connections).toBe(5);
     expect(second?.kind === 'clear' && second.connections).toBe(10);
   });
@@ -572,10 +568,9 @@ describe('topping out', () => {
   });
 
   /**
-   * The board must be frozen exactly as the player left it. Were a pair still
-   * to spawn, `Board.place` would either throw on the occupied spawn cell or
-   * overwrite it — this catches both, where asserting the spawn cell's colour
-   * alone caught neither, since `lock` had just written that colour itself.
+   * The board must be frozen exactly as the player left it. Were a pair still to
+   * spawn, `Board.place` would either throw on the occupied spawn cell or
+   * overwrite it.
    */
   it('leaves the final board untouched', () => {
     const game = lockIntoAFullColumn();
@@ -590,9 +585,8 @@ describe('topping out', () => {
 
   /**
    * The other route into the rule: a chain finishes and the pair after it has
-   * nowhere to go. It reaches `spawnOrTopOut` with `resolving` already cleared
-   * and the board freshly settled, so it is worth its own test — the lock-path
-   * tests above pass with this call site broken.
+   * nowhere to go, reaching `spawnOrTopOut` with `resolving` already cleared. The
+   * lock-path tests above pass with this call site broken.
    */
   it('tops out at the end of a cascade', () => {
     const game = simulation();
@@ -713,8 +707,8 @@ describe('reporting each cascade beat to the scene', () => {
   });
 
   /**
-   * The cascade ending is not a beat. Counting it would have the scene reach
-   * for a `lastBeat` describing the previous one and replay it.
+   * The cascade ending is not a beat. Counting it would have the scene reach for a
+   * `lastBeat` describing the previous one and replay it.
    */
   it('does not count the step that finds nothing left to clear', () => {
     const game = chainingGame();
@@ -743,11 +737,6 @@ describe('reporting each cascade beat to the scene', () => {
     expect(popped.every((cell) => cell.column === SPAWN_COLUMN)).toBe(true);
   });
 
-  /**
-   * The score survives because it is still drawn in the corner, but it no
-   * longer rides on the beat: nothing reads what one link alone scored, and
-   * `connections` — asserted above — is what progression is measured in.
-   */
   it('adds each link\'s score to the running total', () => {
     const game = chainingGame();
     game.update(DEFAULT_TUNING.chainLinkDelay);
@@ -832,10 +821,6 @@ describe('hard drop', () => {
     expect(game.hardDrop()).toBe(0);
   });
 
-  /**
-   * The point of the whole feature: no waiting. A pair that lands on the lock
-   * timer takes `lockDelay` to commit, and this must not.
-   */
   it('commits without waiting out the lock delay', () => {
     const game = simulation();
     const spawned = game.piecesSpawned;
@@ -912,9 +897,8 @@ describe('reporting where a pair came to rest', () => {
   });
 
   /**
-   * The reason this is reported rather than derived. A half that settles into a
-   * hole ends up somewhere neither the pair's last position nor a scan of the
-   * column's topmost tile would find.
+   * A half that settles into a hole ends up somewhere neither the pair's last
+   * position nor a scan of the column's topmost tile would find.
    */
   it('reports where a half ended up after settling, not where it was placed', () => {
     const game = new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
@@ -929,10 +913,6 @@ describe('reporting where a pair came to rest', () => {
     expect(satellite).toEqual({ column: SPAWN_COLUMN + 1, row: ROWS - 1, pieceType: BLUE });
   });
 
-  /**
-   * The landings the whole game is about. Inferring a lock from `piecesSpawned`
-   * missed these, because a lock that starts a cascade spawns nothing.
-   */
   it('counts a lock that starts a cascade, which spawns no pair', () => {
     const game = simulation();
     stackUnderSpawn(game, RED, 3);
@@ -1027,8 +1007,8 @@ describe('the piece budget', () => {
 describe('a board that has run out of pieces', () => {
   it('still lets the last piece\'s cascade play out', () => {
     // `outOfPieces` goes true inside the lock, before the chain it started has
-    // resolved. Stopping the clock at the top of `update` would freeze the
-    // strongest moment the board has on its very last piece.
+    // resolved. Stopping the clock at the top of `update` would freeze the board on
+    // its very last piece.
     const simulation = new Simulation(() => [0, 0]);
     simulation.pieceBudget = 2;
     simulation.restart();
@@ -1070,8 +1050,6 @@ const THINKING = { ...DEFAULT_TUNING, fallInterval: 100_000 };
 
 describe('the shadow waits for the player to start', () => {
   it('takes nothing until the first piece of a board has been committed', () => {
-    // The first thing anyone does with a new board is read it, and the clock
-    // must not be running while they do.
     const simulation = new Simulation(() => [0, 1], THINKING);
     simulation.restart();
 

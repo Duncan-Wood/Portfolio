@@ -63,11 +63,6 @@ describe('the pop, which carries the chain escalation', () => {
     }
   });
 
-  /**
-   * Chains have no theoretical ceiling, and an uncapped ratio would walk a long
-   * one straight out of the hearing range — the payoff getting quieter the
-   * better you play.
-   */
   it('stops climbing before it leaves the hearing range', () => {
     expect(popVoice(200).startFrequency).toBe(MAX_POP_FREQUENCY);
   });
@@ -140,8 +135,6 @@ describe('the shadow', () => {
     const arrival = shadowArrivalVoice();
     const others = [popVoice(0), landVoice(), nodeVoice(0, 20), ...chainVoices(3)];
 
-    // It is the only voice the player did not cause, so it has to be tellable
-    // apart from all of them without looking at the board.
     for (const voice of others) {
       expect(arrival.endFrequency).toBeLessThan(voice.startFrequency);
     }
@@ -170,8 +163,7 @@ describe('answering the question', () => {
   });
 
   it('stops climbing before it walks out of the hearing range', () => {
-    // A board can hold 72 shadows. Uncapped, the last of them would be
-    // inaudible — quietest exactly where the player earned the most.
+    // A board can hold 72 shadows. Uncapped, the last of them would be inaudible.
     expect(answerVoice(72).startFrequency).toBe(answerVoice(24).startFrequency);
   });
 
@@ -206,8 +198,6 @@ describe('a shadow struck but not shifted', () => {
     const struck = shadowStruckVoice(1);
     const receded = shadowRecedeVoice(1);
 
-    // The one thing that must never blur: staying put has to sound different
-    // from leaving, or a single clear against a strong shadow reads as a win.
     expect(struck.endFrequency).toBeLessThan(struck.startFrequency);
     expect(receded.endFrequency).toBeGreaterThan(receded.startFrequency);
   });
@@ -219,8 +209,6 @@ describe('a shadow struck but not shifted', () => {
   });
 
   it('stays quieter than the clear that caused it', () => {
-    // It fires on ordinary clears all run long; anything at pop volume would
-    // be underfoot.
     expect(shadowStruckVoice(4).gain).toBeLessThan(popVoice(0).gain);
   });
 
