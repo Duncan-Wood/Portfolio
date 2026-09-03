@@ -89,11 +89,5 @@ reader would otherwise trip over.
   above the catch-all.
 
 ## Open questions
-Decisions not yet made, all beyond the current ship bar.
-- **Newcomer onramp** — ship a gentler mode, strong onboarding, or accept the curve.
-- **Earth** — "pushes the player 1 block deeper" is the least legible special piece.
-  Warned bottom-row insertion, garbage-style?
-- **A 30-second timer** — a hard guillotine is off-genre for a chain-planning game.
-  Pacing dial, soft pressure, or cut?
-- **Fire and Rain as light and dark** — tidy under the art direction, but it may
-  collapse two distinct pieces onto one axis.
+In `OPEN-QUESTIONS.md`. An unmade decision goes there, never into a comment
+beside the code it will change.
