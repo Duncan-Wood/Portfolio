@@ -11,13 +11,6 @@ import {
   shadowStrength,
 } from './grid';
 
-/*
- * The match rule and the cascade: what counts as a group, what clearing does,
- * and how a chain scores. Pure, so the whole rule set is testable from ASCII
- * pictures of boards.
- */
-
-/** How many connected tiles are needed to clear. */
 const MATCH_SIZE = 4;
 
 const NEIGHBOURS = [
@@ -33,10 +26,6 @@ export interface GroupCell {
 }
 
 /**
- * A shadow cell a link hit. Carried because the scene cannot recover it: by the
- * time anything renders, a purified cell holds a colour and a damaged one holds
- * its new strength.
- *
  * `strength` means different things in the two arrays this appears in. In
  * `shadowPurified` it is the strength broken AT, with `turnedTo` the colour left
  * behind; in `shadowDamaged` it is the strength LEFT, and `turnedTo` is absent.
@@ -46,22 +35,11 @@ export interface ShadowHit extends GroupCell {
   turnedTo?: number;
 }
 
-/** One set of connected same-coloured tiles that is large enough to clear. */
 export interface Group {
   pieceType: number;
   cells: GroupCell[];
 }
 
-/**
- * One step of a cascade: everything that cleared simultaneously.
- *
- * Purified and damaged are reported separately so the scene can tell "your clear
- * did nothing" from "your clear took a hit off it" — a dented shadow is still on
- * the board, and that is what teaches the player a chain finishes the job.
- *
- * `neuronsLit` is per link so a deep chain lights them a beat at a time rather
- * than paying out all at once at the end.
- */
 export interface ChainLink {
   groups: Group[];
   cellsCleared: number;
@@ -74,7 +52,6 @@ export function findGroups(board: Board): Group[] {
   const visited = new Set<number>();
   const groups: Group[] = [];
 
-  // From the first VISIBLE row: a tile resting in the hidden field is inert.
   for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
     for (let column = 0; column < COLUMNS; column += 1) {
       const pieceType = board.pieceAt(column, row);
@@ -95,8 +72,8 @@ export function findGroups(board: Board): Group[] {
 
 /**
  * Clear every group on the board, WITHOUT applying gravity: leaving the holes
- * open for a beat is what separates cause from effect and makes a cascade
- * legible. `null` when nothing matched, which is how a cascade ends.
+ * open for a beat is what separates cause from effect. `null` when nothing
+ * matched, which is how a cascade ends.
  */
 export function clearStep(board: Board, linkIndex: number): ChainLink | null {
   const groups = findGroups(board);
@@ -112,29 +89,23 @@ export function clearStep(board: Board, linkIndex: number): ChainLink | null {
     }
   }
 
-  // Depth is the damage. `linkIndex` is 0-based, so an ordinary clear deals 1.
   const { purified, damaged } = damageShadow(board, groups, linkIndex + 1);
 
   // Both belong inside the clearing step rather than a layer up in `Simulation`:
-  // every other path in would otherwise clear groups without the shadow receding
-  // or the objective advancing, reporting a board the real game cannot produce.
+  // every other path in would otherwise clear groups without the shadow
+  // receding or the objective advancing, reporting a board the game cannot
+  // produce.
   const neuronsLit = lightAdjacent(board, groups.flatMap((group) => group.cells));
 
   return { groups, cellsCleared, shadowPurified: purified, shadowDamaged: damaged, neuronsLit };
 }
 
 /**
- * Hit every shadow touching what just cleared, and turn the ones that break.
- *
- * A broken shadow gives back the tile it was standing on rather than leaving a
- * hole, and a restored tile can complete a group — so pushing the shadow back
- * can extend the chain that did it. This is the only way shadow leaves in play.
- *
- * The damage is the link's DEPTH: a single clear deals 1, so only a chain clears
- * a board the shadow has really taken hold of.
- *
  * ONE hit per shadow per link however many cleared cells touched it, hence the
  * set. Per adjacent cell instead would let a fat single clear out-damage a chain.
+ *
+ * A broken shadow gives back the tile it was standing on, and a restored tile can
+ * complete a group — so pushing the shadow back can extend the chain that did it.
  */
 function damageShadow(
   board: Board,
@@ -171,7 +142,6 @@ function damageShadow(
     board.clear(column, row);
 
     if (remaining <= 0) {
-      // The tile it took, not the colour of whatever reached it.
       board.place(column, row, holding);
       purified.push({ column, row, strength: was, turnedTo: holding });
     } else {
@@ -184,26 +154,18 @@ function damageShadow(
 }
 
 /**
- * Settle, then clear: one link applied instantly. Settling first means a
- * floating tile can never be scored into a group it would not have belonged to
- * once gravity ran.
+ * Settle, then clear. Settling first means a floating tile can never be scored
+ * into a group it would not have belonged to once gravity ran.
  */
 export function resolveStep(board: Board, linkIndex = 0): ChainLink | null {
   board.settle();
   return clearStep(board, linkIndex);
 }
 
-/**
- * A whole cascade at once, one entry per link. `Simulation` steps through a
- * chain over time instead; this is here so tests can assert an outcome with no
- * clock.
- */
 export function resolveChain(board: Board): ChainLink[] {
   const links: ChainLink[] = [];
 
   for (;;) {
-    // Depth is damage, so the index travels here as it does through the timed
-    // path.
     const link = resolveStep(board, links.length);
     if (link === null) {
       return links;
@@ -215,10 +177,6 @@ export function resolveChain(board: Board): ChainLink[] {
 /**
  * `linkIndex` is 0-based, so each link scores at double the MULTIPLIER of the
  * last — not double the score, which also depends on how many tiles it cleared.
- * Exponential in depth rather than in tiles, because depth is the skill.
- *
- * PLACEHOLDER: the curve is untuned and has none of the colour or group bonuses
- * the genre's real formulas carry.
  */
 export function scoreLink(link: ChainLink, linkIndex: number): number {
   return link.cellsCleared * 10 * 2 ** linkIndex;
@@ -229,12 +187,10 @@ export function scoreChain(links: ChainLink[]): number {
 }
 
 /**
- * Flood fill through orthogonal neighbours of the same colour. Never enters the
- * hidden field, and iterative so a whole-board region cannot overflow the stack.
- *
- * Cells are marked visited when PUSHED, not when popped: marking on pop lets
- * several neighbours push the same cell before any is processed, counting it
- * twice and inflating both the group size and the score.
+ * Flood fill through orthogonal neighbours of the same colour. Cells are marked
+ * visited when PUSHED, not when popped: marking on pop lets several neighbours
+ * push the same cell before any is processed, counting it twice and inflating
+ * both the group size and the score.
  */
 function connectedCells(
   board: Board,
@@ -255,8 +211,6 @@ function connectedCells(
       const column = cell.column + offset.column;
       const row = cell.row + offset.row;
 
-      // Stops the fill leaking up into the hidden field and sweeping an inert
-      // tile into an otherwise visible group.
       if (
         row < FIRST_VISIBLE_ROW ||
         !board.isInside(column, row) ||
@@ -276,7 +230,6 @@ function connectedCells(
   return cells;
 }
 
-/** A unique number per cell, so `visited` can be a `Set<number>`. */
 function keyOf(column: number, row: number): number {
   return row * COLUMNS + column;
 }

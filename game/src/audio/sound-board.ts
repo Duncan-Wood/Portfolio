@@ -1,11 +1,5 @@
 import { type Voice } from './voices';
 
-/*
- * The half of the audio that touches the browser. Deliberately thin and
- * untested: everything deciding how the game SOUNDS is plain data in
- * `voices.ts`, and what is left here could only be asserted by re-describing
- * the Web Audio API back to itself.
- */
 export class SoundBoard {
   private context: AudioContext | null = null;
 
@@ -38,7 +32,6 @@ export class SoundBoard {
     oscillator.type = voice.waveform;
     oscillator.frequency.setValueAtTime(voice.startFrequency, startAt);
     if (voice.endFrequency !== voice.startFrequency) {
-      // Pitch is perceived logarithmically; a linear sweep slows at the top.
       oscillator.frequency.exponentialRampToValueAtTime(voice.endFrequency, endAt);
     }
 
@@ -50,7 +43,6 @@ export class SoundBoard {
 
     oscillator.connect(envelope);
 
-    // Only when a voice asks for it, so voices with no pan build no extra node.
     if (voice.pan) {
       const panner = context.createStereoPanner();
       panner.pan.setValueAtTime(Math.max(-1, Math.min(1, voice.pan)), startAt);

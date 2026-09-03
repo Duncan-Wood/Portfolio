@@ -1,20 +1,11 @@
 import { COLUMNS, ROWS, isAnchored } from './grid';
 
-/*
- * The settled contents of the playfield. It knows nothing about the falling
- * pair, matching, scoring or time.
- */
-
 /**
  * `null`, not `0`: piece type 0 is a real colour, so `if (!pieceAt())` would
  * treat it as empty.
  */
 const EMPTY = null;
 
-/**
- * One tile's journey during a settle. The board is in its final state by the
- * time anything renders, so without this a fall can only be drawn as a teleport.
- */
 export interface TileMove {
   column: number;
   fromRow: number;
@@ -22,7 +13,6 @@ export interface TileMove {
 }
 
 export class Board {
-  /** Flat rather than 2D, indexed `row * COLUMNS + column`. */
   private cells: (number | null)[] = new Array(COLUMNS * ROWS).fill(EMPTY);
 
   isInside(column: number, row: number): boolean {
@@ -38,10 +28,6 @@ export class Board {
     return this.pieceAt(column, row) === EMPTY;
   }
 
-  /**
-   * No exemption for cells above the board: the topping-out rule depends on the
-   * ceiling blocking.
-   */
   isBlocked(column: number, row: number): boolean {
     return !this.isInside(column, row) || !this.isEmpty(column, row);
   }
@@ -70,14 +56,11 @@ export class Board {
   }
 
   /**
-   * Gravity for already-placed tiles: each column compacted downward. A tile
-   * never changes column.
+   * The scan runs bottom-up, reading upward and writing downward, so it can never
+   * overwrite a tile it has not yet visited and needs no temporary copy.
    *
-   * The scan runs bottom-up, reading upward and writing downward, so it can
-   * never overwrite a tile it has not yet visited and needs no temporary copy.
-   *
-   * An ANCHORED cell stays put and nothing falls past it: tiles above come to
-   * rest ON it while the ones below compact among themselves.
+   * An ANCHORED cell stays put and nothing falls past it: tiles above come to rest
+   * ON it while the ones below compact among themselves.
    */
   settle(): TileMove[] {
     const moves: TileMove[] = [];
@@ -91,14 +74,11 @@ export class Board {
           continue;
         }
 
-        // The floor for everything above it. The scan is bottom-up, so `target`
-        // is never below `row` here and the tiles beneath are left alone.
         if (isAnchored(pieceType)) {
           target = row - 1;
           continue;
         }
 
-        // Reporting a tile that has not moved would animate a zero-length drop.
         if (row !== target) {
           moves.push({ column, fromRow: row, toRow: target });
         }
@@ -114,11 +94,9 @@ export class Board {
 
   /**
    * Where a tile dropped down this column comes to rest, or `-1` if nothing can
-   * enter it.
-   *
-   * From the TOP down. Scanning up from the floor for the deepest empty cell is
-   * only correct if a column has no floating gaps, and anchored cells break
-   * that: the pocket under a neuron is unreachable, and a piece must land ON it.
+   * enter it. From the TOP down: scanning up from the floor for the deepest empty
+   * cell is only correct if a column has no floating gaps, and anchored cells break
+   * that.
    */
   landingRow(column: number): number {
     let landing = -1;

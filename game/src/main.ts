@@ -18,8 +18,6 @@ const config: Phaser.Types.Core.GameConfig = {
   backgroundColor: GROUND_COLOR,
 
   scale: {
-    // Letterboxed at a fixed aspect ratio, so the picture is scaled and never
-    // reflowed. There is no responsive layout anywhere in the game.
     mode: Scale.FIT,
     autoCenter: Scale.CENTER_BOTH,
   },

@@ -1,21 +1,8 @@
 import { MEMORIES } from '../memories';
 import { EMPTY_COLOR, SHADOW_EYE_GLOW, TRACK_COLOR, TRACK_LIT_COLOR, mix } from '../palette';
 
-/*
- * The brain IS the meter and each node IS a fragment, so lighting one is the
- * memory arriving rather than a threshold that then triggers some text.
- *
- * ONE brain for the whole game. Nodes for memories nobody has written yet draw
- * dim, so what is still to come is visible in the shape of what is still dark.
- */
-
-/** Slots the brain has room for, written or not. */
 const BRAIN_NODE_SLOTS = 16;
 
-/**
- * Hand-placed: a grid reads as a grid and an even scatter reads as noise.
- * Ordered so the first memory fills the lower-left and later ones climb.
- */
 const NODE_SLOTS: readonly { x: number; y: number }[] = [
   { x: 0.26, y: 0.78 }, { x: 0.46, y: 0.86 }, { x: 0.66, y: 0.77 }, { x: 0.80, y: 0.63 },
   { x: 0.18, y: 0.62 }, { x: 0.37, y: 0.66 }, { x: 0.58, y: 0.60 }, { x: 0.76, y: 0.47 },
@@ -23,7 +10,6 @@ const NODE_SLOTS: readonly { x: number; y: number }[] = [
   { x: 0.30, y: 0.29 }, { x: 0.50, y: 0.33 }, { x: 0.68, y: 0.24 }, { x: 0.45, y: 0.15 },
 ];
 
-/** Wraps if the game ever outgrows the brain. */
 function brainNode(index: number): { x: number; y: number } {
   return NODE_SLOTS[index % NODE_SLOTS.length];
 }
@@ -33,9 +19,8 @@ function writtenNodeCount(): number {
 }
 
 /**
- * Only the silhouette survives at this size, so gyri are a lumpy edge rather
- * than internal detail. One polygon rather than arcs: Phaser steps an arc at a
- * fixed 1/100 turn and pays for it every frame.
+ * One polygon rather than arcs: Phaser steps an arc at a fixed 1/100 turn and
+ * pays for it every frame.
  */
 const OUTLINE: readonly { x: number; y: number }[] = [
   { x: 0.50, y: 0.04 }, { x: 0.62, y: 0.06 }, { x: 0.68, y: 0.13 }, { x: 0.79, y: 0.13 },
@@ -59,10 +44,6 @@ export function brainNodeAt(index: number, box: BrainBox): { x: number; y: numbe
   return { x: box.left + slot.x * box.width, y: box.top + slot.y * box.height };
 }
 
-/**
- * `lit` is how many fragments have surfaced; `arriving` is how far along the
- * next is, 0..1, so the node being worked toward brightens as the board fills it.
- */
 export function drawBrain(
   graphics: Phaser.GameObjects.Graphics,
   box: BrainBox,
@@ -78,8 +59,6 @@ export function drawBrain(
     y: box.top + fraction.y * box.height,
   });
 
-  // A container for the nodes rather than a picture of a brain: anything more
-  // solid competes with the board.
   graphics.fillStyle(mix(EMPTY_COLOR, TRACK_COLOR, 0.45), 0.5);
   graphics.beginPath();
   const outline = OUTLINE.map(point);
@@ -93,13 +72,11 @@ export function drawBrain(
   graphics.lineStyle(1.5, TRACK_COLOR, 0.85);
   graphics.strokePath();
 
-  // So it reads as a brain rather than a cloud.
   const stemTop = point({ x: 0.5, y: 0.86 });
   const stemEnd = point({ x: 0.46, y: 1.0 });
   graphics.lineStyle(4, TRACK_COLOR, 0.85);
   graphics.lineBetween(stemTop.x, stemTop.y, stemEnd.x, stemEnd.y);
 
-  // Before the nodes, so they sit on top.
   for (let index = 1; index < Math.min(BRAIN_NODE_SLOTS, written); index += 1) {
     const from = brainNodeAt(index - 1, box);
     const to = brainNodeAt(index, box);
@@ -109,7 +86,6 @@ export function drawBrain(
     graphics.lineBetween(from.x, from.y, to.x, to.y);
   }
 
-  // Only the nodes that exist.
   for (let index = 0; index < Math.min(BRAIN_NODE_SLOTS, written); index += 1) {
     const at = brainNodeAt(index, box);
     const earned = index < lit;
