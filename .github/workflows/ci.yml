@@ -20,11 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 24 to match game/mise.toml, which is what the game is developed
-      # against. It also satisfies the root's engines requirement of >= 22.12.
+      # `.node-version` is this repo's only Node version: Netlify reads the
+      # same file for production builds, and mise reads it for local work.
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .node-version
           cache: npm
 
       - run: npm ci
