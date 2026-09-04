@@ -10,9 +10,6 @@ export default defineConfig({
   },
 
   server: {
-    // Vite's default is 5173, which is the game's dev server port. Strict, so a
-    // port that is already taken fails loudly instead of silently serving on
-    // 3001 and making every note that says :3000 wrong.
     port: 3000,
     strictPort: true,
     proxy: {
