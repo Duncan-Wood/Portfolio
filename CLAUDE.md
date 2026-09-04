@@ -31,4 +31,3 @@ This mono-repo contains two independent Vite applications joined only by root sc
 ## Known Traps & Quirks
 - **Hidden Tabs:** Chrome pauses `requestAnimationFrame` when the tab is hidden. Do not trust or debug execution metrics unless the window is focused and visible.
 - **Fatal Crashes:** Any unhandled exception escaping `BoardScene.update` halts Phaser's rAF chain permanently. If the FPS frozen display reads alive but `game.loop.frame` stalls, an exception was thrown (frequently via `Board.place` on an occupied tile).
-- **Routing Overrides:** If Netlify directory resolution forces `/game` requests back to the portfolio home index, place `/game/* /game/:splat 200` directly above the `/* /index.html 200` catch-all directive in `public/_redirects`.
