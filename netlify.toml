@@ -1,5 +1,3 @@
-# Netlify installs only the root package, so the game's devDependencies are
-# absent unless this asks for them; `npm run build` then fails on `tsc`.
 [build]
   command = "npm --prefix game ci && npm run build"
   publish = "build"

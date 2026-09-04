@@ -5,7 +5,6 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
 
-  // Netlify publishes `build`. Vite's default is `dist`.
   build: {
     outDir: "build",
   },

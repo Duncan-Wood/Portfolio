@@ -20,8 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # `.node-version` is this repo's only Node version: Netlify reads the
-      # same file for production builds, and mise reads it for local work.
+      # Netlify reads the same file for production builds.
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
