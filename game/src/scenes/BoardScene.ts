@@ -230,13 +230,13 @@ function randomPieceTypes(): [number, number] {
 }
 
 export class BoardScene extends Scene {
-  private simulation: Simulation;
-  private cellTiles: Phaser.GameObjects.Image[];
-  private pairTiles: Phaser.GameObjects.Image[];
-  private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-  private fpsText: Phaser.GameObjects.Text;
+  private simulation!: Simulation;
+  private cellTiles!: Phaser.GameObjects.Image[];
+  private pairTiles!: Phaser.GameObjects.Image[];
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private fpsText!: Phaser.GameObjects.Text;
   private showFps = false;
-  private objectiveText: Phaser.GameObjects.Text;
+  private objectiveText!: Phaser.GameObjects.Text;
 
   private lockSolved = false;
 
@@ -246,58 +246,58 @@ export class BoardScene extends Scene {
 
   private litNeurons: NeuronSite[] = [];
 
-  private neuronThread: Phaser.GameObjects.Graphics;
+  private neuronThread!: Phaser.GameObjects.Graphics;
 
   private threatenedIndex: number | null = null;
-  private chainText: Phaser.GameObjects.Text;
-  private staticOverlay: Phaser.GameObjects.TileSprite;
+  private chainText!: Phaser.GameObjects.Text;
+  private staticOverlay!: Phaser.GameObjects.TileSprite;
 
   private staticStrength = 0;
 
-  private gameOverText: Phaser.GameObjects.Text;
+  private gameOverText!: Phaser.GameObjects.Text;
 
-  private gameOverLine: Phaser.GameObjects.Text;
+  private gameOverLine!: Phaser.GameObjects.Text;
 
-  private gameOverHint: Phaser.GameObjects.Text;
+  private gameOverHint!: Phaser.GameObjects.Text;
 
-  private contactOffer: Phaser.GameObjects.Text;
-  private previewTiles: Phaser.GameObjects.Image[];
+  private contactOffer!: Phaser.GameObjects.Text;
+  private previewTiles!: Phaser.GameObjects.Image[];
 
-  private piecesText: Phaser.GameObjects.Text;
+  private piecesText!: Phaser.GameObjects.Text;
   private shownPivotType = -1;
   private shownSatelliteType = -1;
   private shownChain = -1;
   private nextFpsRefresh = 0;
-  private timestep: FixedTimestep;
+  private timestep!: FixedTimestep;
   // Not `input`: that shadows Phaser's own `Scene.input` plugin.
-  private inputTranslator: InputTranslator;
+  private inputTranslator!: InputTranslator;
   private lastPiecesSpawned = 0;
-  private restartKey: Phaser.Input.Keyboard.Key;
-  private hardDropKey: Phaser.Input.Keyboard.Key;
-  private pauseKey: Phaser.Input.Keyboard.Key;
+  private restartKey!: Phaser.Input.Keyboard.Key;
+  private hardDropKey!: Phaser.Input.Keyboard.Key;
+  private pauseKey!: Phaser.Input.Keyboard.Key;
 
   private paused = false;
 
-  private pauseScrim: Phaser.GameObjects.Rectangle;
-  private pauseText: Phaser.GameObjects.Text;
-  private pauseHint: Phaser.GameObjects.Text;
+  private pauseScrim!: Phaser.GameObjects.Rectangle;
+  private pauseText!: Phaser.GameObjects.Text;
+  private pauseHint!: Phaser.GameObjects.Text;
 
-  private popTiles: Phaser.GameObjects.Image[];
-  private fallTiles: Phaser.GameObjects.Image[];
+  private popTiles!: Phaser.GameObjects.Image[];
+  private fallTiles!: Phaser.GameObjects.Image[];
 
-  private shadowBodies: Phaser.GameObjects.Image[];
+  private shadowBodies!: Phaser.GameObjects.Image[];
 
-  private shadowEyes: Phaser.GameObjects.Image[];
+  private shadowEyes!: Phaser.GameObjects.Image[];
 
   private animatedShadowCells = new Set<number>();
 
   private pulsingCells = new Set<number>();
 
-  private revealPhoto: Phaser.GameObjects.Image;
+  private revealPhoto!: Phaser.GameObjects.Image;
 
   private shadowArrival: { cellIndex: number; age: number } | null = null;
 
-  private shadowSpeech: Phaser.GameObjects.Text;
+  private shadowSpeech!: Phaser.GameObjects.Text;
 
   private spokenShadowLines: string[] = [];
 
@@ -307,7 +307,7 @@ export class BoardScene extends Scene {
 
   private shownShadowTaken = 0;
 
-  private connections: ConnectionSlot[];
+  private connections!: ConnectionSlot[];
 
   private runOver: 'topped-out' | 'out-of-pieces' | 'won' | null = null;
 
@@ -315,9 +315,9 @@ export class BoardScene extends Scene {
 
   private objectiveHeld = false;
 
-  private boardFrame: Phaser.GameObjects.Graphics;
+  private boardFrame!: Phaser.GameObjects.Graphics;
 
-  private memoryPanel: Phaser.GameObjects.Graphics;
+  private memoryPanel!: Phaser.GameObjects.Graphics;
 
   private shownLitNeurons = 0;
 
@@ -331,10 +331,10 @@ export class BoardScene extends Scene {
 
   private pendingReveal: { title: string; body: string; memoryIndex: number } | null = null;
 
-  private revealScrim: Phaser.GameObjects.Rectangle;
-  private revealTitle: Phaser.GameObjects.Text;
+  private revealScrim!: Phaser.GameObjects.Rectangle;
+  private revealTitle!: Phaser.GameObjects.Text;
 
-  private revealHint: Phaser.GameObjects.Text;
+  private revealHint!: Phaser.GameObjects.Text;
 
   private revealSkippableIn = 0;
 
@@ -346,10 +346,10 @@ export class BoardScene extends Scene {
 
   private memoryAnswers: string[] = [];
 
-  private answerLine: Phaser.GameObjects.Text;
+  private answerLine!: Phaser.GameObjects.Text;
 
-  private answerEcho: Phaser.GameObjects.Text;
-  private revealBody: Phaser.GameObjects.Text;
+  private answerEcho!: Phaser.GameObjects.Text;
+  private revealBody!: Phaser.GameObjects.Text;
 
   private cellsBeingFilled = new Set<number>();
 
@@ -366,11 +366,11 @@ export class BoardScene extends Scene {
 
   private hitStopRemaining = 0;
 
-  private sparks: Phaser.GameObjects.Particles.ParticleEmitter;
-  private scorePopups: Phaser.GameObjects.Text[];
+  private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private scorePopups!: Phaser.GameObjects.Text[];
   private nextScorePopup = 0;
 
-  private tuning: Tuning;
+  private tuning!: Tuning;
 
   constructor() {
     super('Board');
