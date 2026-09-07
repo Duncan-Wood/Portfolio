@@ -163,7 +163,6 @@ describe('answering the question', () => {
   });
 
   it('stops climbing before it walks out of the hearing range', () => {
-    // A board can hold 72 shadows. Uncapped, the last of them would be inaudible.
     expect(answerVoice(72).startFrequency).toBe(answerVoice(24).startFrequency);
   });
 

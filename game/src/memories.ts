@@ -1,25 +1,12 @@
-/*
- * What a memory is, and the ones the game knows.
- */
-
 interface MemoryNode {
-  /** Two or three words. */
   title: string;
   body: string;
-  /**
-   * A photograph of this in `public/memories/`, without its extension. Optional:
-   * a fragment without one shows its words alone.
-   */
   photo?: string;
 }
 
 export interface Memory {
   title: string;
   nodes: MemoryNode[];
-  /**
-   * Never scored, never validated, never branched on. The effect depends on the
-   * game wanting nothing back.
-   */
   question: string;
 }
 

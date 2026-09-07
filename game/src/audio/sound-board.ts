@@ -3,11 +3,8 @@ import { type Voice } from './voices';
 export class SoundBoard {
   private context: AudioContext | null = null;
 
-  /**
-   * Called from the first keypress, not from scene creation: browsers refuse to
-   * start audio before the user interacts, and a context built earlier is born
-   * `suspended`. Safe to call on every keypress.
-   */
+  // Must be called from a keypress, not scene creation: a context built before
+  // the user interacts is born `suspended`.
   unlock(): void {
     if (this.context === null) {
       this.context = new AudioContext();
@@ -35,7 +32,6 @@ export class SoundBoard {
       oscillator.frequency.exponentialRampToValueAtTime(voice.endFrequency, endAt);
     }
 
-    // Starting or stopping an oscillator at full volume clicks audibly.
     const envelope = context.createGain();
     envelope.gain.setValueAtTime(0, startAt);
     envelope.gain.linearRampToValueAtTime(voice.gain, startAt + 0.005);

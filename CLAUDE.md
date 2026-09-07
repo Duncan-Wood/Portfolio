@@ -10,7 +10,7 @@ This mono-repo contains two independent Vite applications joined only by root sc
 - **Workflow:** Always write the engine unit test *before* implementing the feature.
 - **Game Dev Context:** User is an experienced engineer but new to game dev. Explicitly explain game-specific math/mechanics (e.g., lock delays, DAS/ARR, tween easing).
 - **Communication:** Proactively ask either/or questions (provide 2-4 choices with your recommendation) before building features dependent on design decisions.
-- **Code Comments:** Maximum 1–2 sentences. Only document traps or cross-file invariants. No histories, post-mortems, or legacy references.
+- **Code Comments:** Write none by default. Prefer a clearer name over a comment. The only exception is a silent failure a reader cannot see from the code — a library that no-ops instead of throwing, a rename that empties a field, a constant two files must agree on. One sentence, at the line it concerns. Never a file-level header, never design rationale, never a restatement of the code below it, and never the same comment in two files.
 
 ## Non-Negotiable Architecture (`/game/src/`)
 - `engine/` — Pure game logic only. **CRITICAL: Zero Phaser imports.** Grid, pieces, physics, gravity, chains, scoring. 100% covered via Vitest.

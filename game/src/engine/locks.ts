@@ -23,11 +23,8 @@ export interface Lock {
 
 const SEED_ROWS = 3;
 
-/**
- * `tiles + shadows + neurons` must fit COLUMNS x SEED_ROWS = 18. Overflow is
- * SILENT: the seeder stops, and a board with fewer neurons than its objective
- * counts cannot be solved.
- */
+// `tiles + shadows + neurons` must fit COLUMNS x SEED_ROWS; overflow is silent
+// and leaves the board unsolvable.
 export const LOCKS: readonly Lock[] = [
   {
     objective: 'light every neuron',
@@ -64,11 +61,6 @@ export function lockFor(fragmentsEarned: number): Lock {
   return LOCKS[index];
 }
 
-/**
- * The lock is taken but not read: every lock so far asks the same thing. The
- * parameter is here because the signature is the honest one, and the day a lock
- * asks for something else the call sites already say which lock they mean.
- */
 export function isSolved(_lock: Lock, board: Board): boolean {
   return allLit(board);
 }
@@ -112,10 +104,6 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     return count;
   };
 
-  // Every site must have somewhere a clear could happen beside it, or the board
-  // is impossible rather than hard — neurons are ANCHORS, so nothing can fall
-  // in to help. THREE ways in rather than two, because a shadow is about to
-  // take one on purpose.
   const neurons: { column: number; row: number }[] = [];
 
   for (let wanted = 0; wanted < lock.neurons; wanted += 1) {
@@ -169,8 +157,6 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     if (taken >= lock.shadows) {
       break;
     }
-    // Only a neighbour the neuron can spare: taking its last way in would wall
-    // the neuron off rather than open it.
     const beside = [
       { column: neuron.column, row: neuron.row + 1 },
       { column: neuron.column - 1, row: neuron.row },
@@ -208,8 +194,6 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
   for (const group of findGroups(board)) {
     const cell = group.cells[0];
     const piece = board.pieceAt(cell.column, cell.row);
-    // `(piece + 1) % PIECE_TYPE_COUNT` on a shadow or neuron would quietly turn
-    // it into a tile.
     if (!isColour(piece)) {
       continue;
     }

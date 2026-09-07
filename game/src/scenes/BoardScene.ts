@@ -71,10 +71,6 @@ const GAP = 4;
 
 const FPS_REFRESH_INTERVAL = 250;
 
-/*
- * The shadow's idle, computed per frame from one clock rather than tweened: a
- * tween would fight `drawBoard`, which rewrites every cell every frame.
- */
 const SHADOW_BOB_PIXELS = 2.4;
 const SHADOW_LEAN_DEGREES = 3.2;
 const SHADOW_BREATH = 0.045;
@@ -85,21 +81,12 @@ const PHOTO_MAX_HEIGHT = 250;
 
 const REVEAL_SKIP_GRACE = 420;
 
-/**
- * BEHIND_REVEAL must stay longer than the scrim's fade-in, so the swap is under
- * a cover already fully up, and shorter than `REVEAL_SKIP_GRACE`, so it cannot
- * race a player who skips the fragment.
- */
 const HANDOVER_BEHIND_REVEAL = 300;
 const HANDOVER_IN_THE_OPEN = 900;
 const HANDOVER_DIM = 240;
 
 const ANSWER_LIMIT = 48;
 
-/**
- * The two prompts share one text object, and whichever is set last stays set: a
- * fragment shown after a question must put the skip prompt back.
- */
 const SKIP_PROMPT = 'space';
 const ANSWER_PROMPT = 'type an answer   ·   enter';
 const CARET_PERIOD = 1060;
@@ -178,10 +165,7 @@ function centerOfRow(row: number): number {
   return ORIGIN_Y + (row - FIRST_VISIBLE_ROW) * (CELL_SIZE + GAP) + CELL_SIZE / 2;
 }
 
-/**
- * Show only the part of a tile inside the board. NOT a mask: Phaser 4's
- * `setMask` compiles, runs, and leaves the tile drawn in full.
- */
+// Not a mask: Phaser 4's `setMask` compiles, runs, and leaves the tile drawn in full.
 function drawClippedToBoard(
   tile: Phaser.GameObjects.Image,
   centerX: number,
@@ -212,10 +196,6 @@ function isVisibleRow(row: number): boolean {
   return row >= FIRST_VISIBLE_ROW && row < ROWS;
 }
 
-/**
- * Indexes `cellTiles`, `shadowBodies` and `shadowEyes` alike. The hidden row
- * gets no entry, so everything is offset by `FIRST_VISIBLE_ROW`.
- */
 function visibleCellIndex(column: number, row: number): number {
   return (row - FIRST_VISIBLE_ROW) * COLUMNS + column;
 }
@@ -241,10 +221,6 @@ interface ConnectionSlot {
   chargeColor: number;
 }
 
-/**
- * Module-level rather than an arrow inside the class: an arrow captures `this`,
- * and handing that to the long-lived `Simulation` keeps the whole scene alive.
- */
 function randomPieceType(): number {
   return Math.floor(Math.random() * PIECE_TYPE_COUNT);
 }
@@ -293,21 +269,13 @@ export class BoardScene extends Scene {
   private shownChain = -1;
   private nextFpsRefresh = 0;
   private timestep: FixedTimestep;
-  /**
-   * Named `inputTranslator`, NOT `input` — `input` is Phaser's own `Scene.input`
-   * plugin, and shadowing it breaks `this.input.keyboard`.
-   */
+  // Not `input`: that shadows Phaser's own `Scene.input` plugin.
   private inputTranslator: InputTranslator;
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
   private hardDropKey: Phaser.Input.Keyboard.Key;
   private pauseKey: Phaser.Input.Keyboard.Key;
 
-  /**
-   * A flag of our own rather than Phaser's `scene.pause()`, which stops `update`
-   * altogether — and `update` is what reads the keyboard, so the key that paused
-   * could never unpause.
-   */
   private paused = false;
 
   private pauseScrim: Phaser.GameObjects.Rectangle;
@@ -374,10 +342,6 @@ export class BoardScene extends Scene {
 
   private answerText = '';
 
-  /**
-   * Carried from the fragment that earned the question rather than re-derived:
-   * `nodesRevealed` has already moved past that memory by the time it is answered.
-   */
   private answeringMemory = 0;
 
   private memoryAnswers: string[] = [];
@@ -412,13 +376,7 @@ export class BoardScene extends Scene {
     super('Board');
   }
 
-  /**
-   * Everything drawn is allocated here and never again: the frame loop only
-   * changes texture and position.
-   */
   create(): void {
-    // A COPY of the defaults, so runtime tuning cannot corrupt the shared defaults
-    // the engine tests read.
     this.tuning = { ...DEFAULT_TUNING };
     this.simulation = new Simulation(randomPieceTypes, this.tuning);
     this.timestep = new FixedTimestep();
@@ -434,8 +392,6 @@ export class BoardScene extends Scene {
 
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
 
-    // Creation order IS draw order from here down, so the order of these blocks is
-    // load-bearing.
     this.boardFrame = this.add.graphics();
     const frame = boardFrameCorners();
     this.boardFrame.lineStyle(2, TRACK_COLOR, 0.9);
@@ -509,9 +465,6 @@ export class BoardScene extends Scene {
     for (let index = 0; index < COLUMNS * VISIBLE_ROWS; index += 1) {
       this.fallTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
     }
-    // Twice the board: a purified cell borrows two on top of one per cleared cell.
-    // Borrowing refuses past the end rather than indexing off it, because an
-    // exception escaping `update` kills the game until a reload.
     for (let index = 0; index < COLUMNS * VISIBLE_ROWS * 2; index += 1) {
       this.popTiles.push(this.add.image(0, 0, tileTexture(null)).setVisible(false));
     }
@@ -588,8 +541,6 @@ export class BoardScene extends Scene {
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
 
-    // Typing is the one input that cannot be polled: text is a stream of events, and
-    // sampling it drops characters typed between two frames.
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.typeIntoAnswer(event));
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
@@ -776,15 +727,11 @@ export class BoardScene extends Scene {
       this.setPaused(!this.paused);
     }
 
-    // `JustDown` returns true once per press, so reading it here CONSUMES it and the
-    // same press cannot also reach `readInput` and slam the piece. The `paused` test
-    // must come first for that to hold.
+    // `JustDown` consumes the press, so the `paused` test must come first.
     if (this.paused && Input.Keyboard.JustDown(this.hardDropKey)) {
       this.setPaused(false);
     }
 
-    // R is a LETTER while a question is waiting for one. Ungated, any answer
-    // containing an "r" restarts the run mid-sentence.
     if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.restartKey)) {
       this.restart();
     }
@@ -807,7 +754,6 @@ export class BoardScene extends Scene {
     }
 
     if (this.awaitingAnswer) {
-      // Held, with no clock to run down.
     } else if (this.revealRemaining > 0) {
       this.revealRemaining -= delta;
 
@@ -825,11 +771,8 @@ export class BoardScene extends Scene {
         this.advanceReveal();
       }
     } else if (this.hitStopRemaining > 0) {
-      // Deliberately does NOT call `stepsFor`: asking the accumulator for steps and
-      // discarding them banks the frozen time and pays it out in a burst.
       this.hitStopRemaining -= delta;
     } else if (this.runOver === 'won') {
-      // Held for good. R is the only way on.
     } else {
       for (let step = this.timestep.stepsFor(delta); step > 0; step -= 1) {
         this.simulation.update(FIXED_STEP);
@@ -908,15 +851,10 @@ export class BoardScene extends Scene {
     }
   }
 
-  /**
-   * Without tearing the scene down: `scene.restart()` would rebuild every game
-   * object, pools included. `keepMemory` re-seeds the BOARD only.
-   */
   private restart(keepMemory = false, keepStory = false): void {
     this.setPaused(false);
     this.simulation.restart();
 
-    // Force `newPiece` next frame so the input translator re-latches a held key.
     this.lastPiecesSpawned = -1;
 
     this.tweens.killTweensOf(this.popTiles);
@@ -936,9 +874,6 @@ export class BoardScene extends Scene {
     this.cellsBeingFilled.clear();
     this.threatenedIndex = null;
 
-    // BEFORE `startLock`, and load-bearing: the lock a board seeds is derived from
-    // fragments earned, so seeding while this still holds the finished run's count
-    // opens a new run on the LAST lock of the memory.
     if (!keepMemory) {
       this.shownLitNeurons = 0;
       this.nodesRevealed = 0;
@@ -953,8 +888,6 @@ export class BoardScene extends Scene {
       slot.trace.setVisible(false);
     }
 
-    // `runOver` first, because it is what lets the ending's delayed callbacks know
-    // they have been overtaken.
     this.runOver = null;
     this.tweens.killTweensOf([
       this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
@@ -1006,9 +939,6 @@ export class BoardScene extends Scene {
       this.memoryAnswers = [];
     }
 
-    // EVERY cell, not only the ones a shadow stood on. `killAll` stops tweens
-    // mid-flight, and a cell left part-way through a flare keeps that scale forever
-    // — `drawBoard` only swaps textures, so nothing puts it back.
     this.tweens.killTweensOf(this.cellTiles);
     for (let index = 0; index < this.cellTiles.length; index += 1) {
       this.restoreCell(index);
@@ -1108,10 +1038,6 @@ export class BoardScene extends Scene {
     );
   }
 
-  /**
-   * The only genuinely Phaser-specific input logic, and why it stayed in the
-   * scene: resolving both keys held needs `timeDown`, a Phaser Key property.
-   */
   private pressedDirection(): HorizontalDirection | null {
     const { left, right } = this.cursors;
     if (left.isDown && right.isDown) {
@@ -1130,11 +1056,6 @@ export class BoardScene extends Scene {
     return direction === -1 ? this.simulation.moveLeft() : this.simulation.moveRight();
   }
 
-  /**
-   * Every visible cell, unconditionally, every frame. Knowingly wasteful and
-   * negligible: a dirty flag would add cache invalidation for the cascade to keep
-   * correct and save nothing.
-   */
   private drawBoard(): void {
     for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
       for (let column = 0; column < COLUMNS; column += 1) {
@@ -1271,9 +1192,6 @@ export class BoardScene extends Scene {
       return;
     }
 
-    // A SOLVED board hands over. Without this it sits there until the pieces run
-    // out, at which point the failure branch below is skipped BECAUSE it is solved
-    // — nothing schedules the re-seed, and only R gets out.
     if (this.lockSolved) {
       if (this.simulation.resolving || this.revealPending) {
         return;
@@ -1293,9 +1211,6 @@ export class BoardScene extends Scene {
       return;
     }
 
-    // Not while a cascade is still running: the last piece's chain can light the
-    // neuron that solves the board, and calling it failed first takes a win away on
-    // the frame it was won.
     if (!this.simulation.outOfPieces || this.simulation.resolving || this.storyHolding) {
       return;
     }
@@ -1307,10 +1222,6 @@ export class BoardScene extends Scene {
     this.loseTheBoard();
   }
 
-  /**
-   * Reusing `shadowEyes[index]` is safe: a threatened cell is by definition one
-   * the shadow has not taken, and `animateShadow` only touches cells it holds.
-   */
   private drawThreat(): void {
     const clearPrevious = () => {
       if (this.threatenedIndex !== null) {
@@ -1431,11 +1342,6 @@ export class BoardScene extends Scene {
     });
   }
 
-  /**
-   * The idle writes position, angle, scale and alpha every frame, so a cell that
-   * stops holding a shadow keeps the lean it was mid-way through. Resetting every
-   * cell instead would flatten the landing bounce, a tween on these same objects.
-   */
   private restoreCell(index: number): void {
     const column = index % COLUMNS;
     const row = FIRST_VISIBLE_ROW + Math.floor(index / COLUMNS);
@@ -1493,17 +1399,11 @@ export class BoardScene extends Scene {
   }
 
   private drawConnections(delta: number): void {
-    // Test `runOver`, which covers all three endings — `simulation.toppedOut` is
-    // only one of them. Once a run is over the traces are being put out or lit one
-    // at a time, and recomputing from board state here would undo each one.
     if (this.runOver !== null) {
       return;
     }
 
     for (const slot of this.connections) {
-      // `isColour` is the same question `findGroups` asks, so the two layers cannot
-      // disagree. Without it two shadow cells side by side hold the same value,
-      // "connect", and tint from a palette entry that does not exist.
       const pieceType = this.settledPieceAt(slot.column, slot.row);
       const linked = isColour(pieceType)
         && pieceType === this.settledPieceAt(slot.toColumn, slot.toRow);
@@ -1589,9 +1489,6 @@ export class BoardScene extends Scene {
       });
     }
 
-    // Deliberately does NOT bank a fragment: `checkLock` owns that, and a full meter
-    // is the same instant as a solved lock, so asking in both places would surface
-    // two fragments for one board.
   }
 
   private locate(total: number): { memoryIndex: number; nodeIndex: number } | null {
@@ -1605,9 +1502,6 @@ export class BoardScene extends Scene {
       remaining -= nodes;
     }
 
-    // `null` rather than an index one past the end, so both callers have to say what
-    // they do when there is nothing left: reading off the end throws, and a frame
-    // that throws stops the render loop for the rest of the session.
     return null;
   }
 
@@ -1641,8 +1535,6 @@ export class BoardScene extends Scene {
       ? { title: '', body: memory.question, memoryIndex }
       : null;
 
-    // Spent, and re-arming `drawProgress`, which short-circuits on an unchanged
-    // count — left full, a player who banked two fragments never sees the second.
     this.shownLitNeurons = 0;
     this.redrawMemoryPanel(0);
 
@@ -1831,8 +1723,6 @@ export class BoardScene extends Scene {
   }
 
   private showReveal(title: string, body: string, duration: number, photo?: string): void {
-    // Reset first: `openTheRun` borrows this object for the shadow's voice, and
-    // every fragment after the opening would otherwise inherit its violet.
     this.revealBody.setColor(REVEAL_BODY_COLOR);
     this.revealRemaining = duration;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
@@ -1875,7 +1765,6 @@ export class BoardScene extends Scene {
     drawBrain(this.memoryPanel, BRAIN_BOX, this.nodesRevealed, progress);
   }
 
-  /** The piece in a cell, treating one mid-animation as not yet arrived. */
   private settledPieceAt(column: number, row: number): number | null {
     if (this.cellsBeingFilled.has(visibleCellIndex(column, row))) {
       return null;
@@ -2186,9 +2075,6 @@ export class BoardScene extends Scene {
   }
 
   private dropTiles(moves: readonly TileMove[]): void {
-    // A previous drop still in flight owns pooled tiles and suppressed cells this
-    // one is about to reuse. Ending it first keeps a slow `fallDuration` from
-    // stranding a cell as permanently empty.
     this.tweens.killTweensOf(this.fallTiles);
     for (const tile of this.fallTiles) {
       tile.setVisible(false);
@@ -2227,8 +2113,6 @@ export class BoardScene extends Scene {
   }
 
   private drawPair(): void {
-    // In all of these states `pair` still points at the pair whose tiles are already
-    // part of the board, so drawing it paints a ghost duplicate.
     if (this.simulation.resolving || this.simulation.toppedOut || this.runOver === 'won') {
       for (const tile of this.pairTiles) {
         tile.setVisible(false);

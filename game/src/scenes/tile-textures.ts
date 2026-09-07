@@ -23,10 +23,6 @@ export const TRACE_TEXTURE = 'trace';
 
 const TRACE_OVERLAP = 11;
 
-/**
- * A dim pair is baked into the body as well: this overlay is only drawn for a
- * settled shadow, so one in mid-fall would otherwise have no eyes.
- */
 export const SHADOW_EYES_TEXTURE = 'shadow-eyes';
 
 export function shadowBodyTexture(strength: number): string {
@@ -209,13 +205,8 @@ export function memoryArtTexture(key: string): string {
   return `memory-art-${key}`;
 }
 
-/** Twice the display width, for retina. */
 const MEMORY_ART_WIDTH = 660;
 
-/**
- * Panes and leading only: `drawShape` centres on a single coordinate and cannot
- * be offset into a cell.
- */
 function bakeMemoryArt(
   graphics: Phaser.GameObjects.Graphics,
   key: string,
@@ -253,10 +244,6 @@ function bakeMemoryArt(
   graphics.generateTexture(memoryArtTexture(key), art.columns * cell, art.rows.length * cell);
 }
 
-/**
- * Must run before anything references a key: an image or emitter built against a
- * missing texture renders as a placeholder and never recovers.
- */
 export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number): void {
   const graphics = scene.add.graphics();
 
@@ -352,10 +339,6 @@ function bakeShadow(
   graphics.generateTexture(shadowBodyTexture(strength), size, size);
 }
 
-/**
- * Final colours rather than white-and-tinted: a tint flattens the halo into the
- * core.
- */
 function bakeShadowEyes(graphics: Phaser.GameObjects.Graphics, size: number): void {
   graphics.clear();
 
@@ -425,13 +408,8 @@ function drawMouth(graphics: Phaser.GameObjects.Graphics, size: number): void {
   }
 }
 
-/**
- * Tips must never go negative: `generateTexture` crops at the texture edge, so a
- * spike given a negative y is silently flattened rather than drawn taller.
- *
- * Must stay the same length as `MAX_SHADOW_STRENGTH` — `drawCrown` indexes
- * straight into it.
- */
+// Tips must never go negative — `generateTexture` crops at the texture edge —
+// and the length must stay equal to `MAX_SHADOW_STRENGTH`.
 const CROWNS = [
   {
     tips: [[0.22, 0.25], [0.38, 0.17], [0.58, 0.16], [0.76, 0.27]],

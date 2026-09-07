@@ -1,12 +1,3 @@
-/*
- * RULES ANY REWRITE HAS TO KEEP. Second person, at the player. It never
- * threatens: the character is the one who stops without finishing, and a shadow
- * that snarls is a monster, which is not what quits on you. The register is
- * RECOGNITION, never permission — a line granting permission reads as the game
- * reassuring the player, and a line stating a thesis is equally true of every
- * run, so it lands like a fortune cookie.
- */
-
 export const SHADOW_LINES: readonly (readonly string[])[] = [
   [
     'You were doing well.',

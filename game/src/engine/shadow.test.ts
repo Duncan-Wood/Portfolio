@@ -10,8 +10,6 @@ const BLUE = 1;
 const simulation = () => new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
 
 const settle = (game: Simulation) => {
-  // Bounded. With gravity off a pair never falls on its own, so an unbounded
-  // wait here does not fail a test — it hangs the whole run.
   for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
     game.update(DEFAULT_TUNING.fallInterval);
   }
@@ -59,8 +57,6 @@ describe('shadow as an obstacle', () => {
     board.place(2, ROWS - 1, RED);
     board.place(3, ROWS - 1, SHADOW);
 
-    // Three reds and a shadow is three reds. Without this the shadow would be the
-    // fourth member and would clear itself.
     expect(findGroups(board)).toHaveLength(0);
   });
 
@@ -78,12 +74,6 @@ describe('shadow as an obstacle', () => {
   });
 });
 
-/**
- * A tile in every column the spawning pair is not standing in.
- *
- * The shadow POSSESSES a tile rather than filling a space, so a bare board gives
- * it nothing to arrive on, and the columns the pair occupies are skipped.
- */
 const withTilesToTake = (game: Simulation) => {
   const standing = game.pair.cells().map((cell) => cell.column);
   for (let column = 0; column < COLUMNS; column += 1) {
@@ -140,8 +130,6 @@ describe('shadow encroaching while the player stalls', () => {
   it('never takes the cell the falling pair is standing in', () => {
     const game = simulation();
 
-    // One tile in every column but the spawn column, so the column the pair is
-    // falling down is the emptiest — which is the one the shadow reaches for.
     game.board.place(0, ROWS - 1, RED);
     game.board.place(1, ROWS - 1, BLUE);
     game.board.place(3, ROWS - 1, BLUE);
@@ -153,16 +141,10 @@ describe('shadow encroaching while the player stalls', () => {
     }
     const standing = game.pair.cells();
 
-    // The rule this pins: the shadow only ever takes a cell that ALREADY holds a
-    // colour, and the pair only ever occupies empty ones. Nothing structurally
-    // stops it reaching into the cells the pair is standing in.
     expect(() => game.update(DEFAULT_TUNING.shadowInterval)).not.toThrow();
 
-    // It still arrived — the pair's column being in scope is the point.
     expect(game.shadowOnBoard).toBe(1);
 
-    // Those cells hold the pair, which locked during that same update — the point
-    // is that they hold a COLOUR and not a shadow that got there first.
     for (const cell of standing) {
       expect(isShadow(game.board.pieceAt(cell.column, cell.row))).toBe(false);
     }
@@ -186,8 +168,6 @@ describe('shadow encroaching while the player stalls', () => {
 
   it('does not tick the arrival counter when there was nothing to take', () => {
     const game = simulation();
-    // A board the player has just cleared. The shadow needs a tile to possess, so
-    // there is simply no arrival — and it does NOT end the run.
     game.board.reset();
 
     game.update(DEFAULT_TUNING.shadowInterval);
@@ -203,8 +183,6 @@ describe('shadow encroaching while the player stalls', () => {
 
     game.update(DEFAULT_TUNING.shadowInterval);
 
-    // The cell it took was already occupied, so the count of filled cells is
-    // unchanged. This is what stops the antagonist being garbage-dropping.
     expect(game.shadowOnBoard).toBe(before + 1);
   });
 
@@ -328,15 +306,6 @@ describe('pushing the shadow back', () => {
 });
 
 describe('a long run with the shadow in it', () => {
-  /*
-   * A soak, not a unit test. `Board.place` throws on an occupied write by
-   * design, so any state where two things want the same cell is a crash in
-   * front of a player rather than a wrong number — and the shadow arrives on a
-   * timer, so it interleaves with falling, locking, cascading and spawning in
-   * orders no hand-written case covers.
-   *
-   * Seeded, so a failure is reproducible.
-   */
   const playSeeded = (seed: number) => {
     let state = seed;
     const random = () => {
@@ -344,8 +313,6 @@ describe('a long run with the shadow in it', () => {
       return state / 2147483648;
     };
 
-    // A far shorter fuse than the real dial, so the shadow lands repeatedly inside
-    // a run this length.
     const game = new Simulation(
       () => [Math.floor(random() * 4), Math.floor(random() * 4)],
       { ...DEFAULT_TUNING, shadowInterval: 500 },
@@ -383,7 +350,6 @@ describe('a long run with the shadow in it', () => {
       }
     }
 
-    // A soak that never sees a shadow proved nothing about the shadow.
     expect(sawShadow).toBe(true);
     expect(sawLocks).toBeGreaterThan(30);
   });

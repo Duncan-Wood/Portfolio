@@ -20,10 +20,6 @@ import { DEFAULT_TUNING } from '../tuning';
 const RED = 0;
 const BLUE = 1;
 
-/**
- * Four reds in a row along the bottom, with whatever is passed sitting beside
- * them. One clear, one shadow, nothing else to explain a result.
- */
 const boardWithShadowBeside = (shadow: number): Board => {
   const board = new Board();
   for (let column = 0; column < 4; column += 1) {
@@ -36,8 +32,6 @@ const boardWithShadowBeside = (shadow: number): Board => {
 const shadowOnTeal = (strength: number) => shadowCell(strength, BLUE);
 
 const settleAll = (game: Simulation) => {
-  // Bounded. With gravity off a pair never falls on its own, so an unbounded
-  // wait here does not fail a test — it hangs the whole run.
   for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
     game.update(DEFAULT_TUNING.fallInterval);
   }
@@ -97,8 +91,6 @@ describe('the shadow number space', () => {
   it('never lets a shadow form a group, whatever it is standing on', () => {
     const board = new Board();
     for (let column = 0; column < 4; column += 1) {
-      // Four shadows all holding the same colour. If the held colour leaked into
-      // matching, this would clear itself.
       board.place(column, ROWS - 1, shadowCell(1, RED));
     }
 
@@ -145,7 +137,6 @@ describe('a link damages shadow by its depth', () => {
 
     for (let hit = 0; hit < MAX_SHADOW_STRENGTH; hit += 1) {
       expect(board.pieceAt(4, ROWS - 1)).not.toBeNull();
-      // Lay the four reds again where the last clear took them from.
       for (let column = 0; column < 4; column += 1) {
         if (board.isEmpty(column, ROWS - 1)) {
           board.place(column, ROWS - 1, RED);
@@ -166,9 +157,6 @@ describe('a link damages shadow by its depth', () => {
   });
 
   it('hits a shadow once per link however many cleared cells touch it', () => {
-    // A shadow in a pocket with cleared tiles above, left and below it. Counted per
-    // adjacent cell this would take three hits, and a fat single clear would beat a
-    // chain.
     const board = new Board();
     board.place(0, ROWS - 1, RED);
     board.place(1, ROWS - 1, RED);
@@ -213,17 +201,7 @@ describe('arrivals get stronger the longer a run hesitates', () => {
     return found.sort();
   };
 
-  /**
-   * Stall out one arrival, keeping a supply of tiles for it to take.
-   *
-   * One `shadowInterval` is fifteen rows of gravity, so a game left alone tops out
-   * from its own stack long before the shadow escalates; and a board swept
-   * completely clean gives it nothing to arrive on. Sweeping the stack but
-   * re-seeding the bottom row leaves exactly one variable.
-   */
   const stallOneArrival = (game: Simulation) => {
-    // Four rotating colours, so no two neighbours match and the seed row can never
-    // form a group that would purify the shadows these tests are counting.
     for (let column = 0; column < COLUMNS; column += 1) {
       if (game.board.isEmpty(column, ROWS - 1)) {
         game.board.place(column, ROWS - 1, column % PIECE_TYPE_COUNT);
@@ -299,15 +277,12 @@ describe('arrivals get stronger the longer a run hesitates', () => {
 
     game.update(DEFAULT_TUNING.shadowInterval);
 
-    // One more filled cell would mean it dropped junk on the board. It takes.
     expect(game.shadowOnBoard).toBe(1);
     expect(filled()).toBe(before);
   });
 
   it('does nothing at all when there is no tile to take', () => {
     const game = stalling();
-    // A board the player has just cleared. The arrival is simply skipped, and it
-    // must not end the run.
     game.board.reset();
 
     game.update(DEFAULT_TUNING.shadowInterval);
@@ -332,8 +307,6 @@ describe('arrivals get stronger the longer a run hesitates', () => {
 
 describe('light gives back what the shadow took', () => {
   it('restores the colour underneath, not the colour that reached it', () => {
-    // Red clears beside a shadow standing on teal. The cell comes back TEAL: driving
-    // the shadow off returns what it took, it does not mint something new.
     const board = boardWithShadowBeside(shadowOnTeal(1));
 
     clearStep(board, 0);
@@ -359,13 +332,10 @@ describe('light gives back what the shadow took', () => {
     const cell = board.pieceAt(4, ROWS - 1) as number;
     expect(isShadow(cell)).toBe(true);
     expect(shadowStrength(cell)).toBe(1);
-    // It got weaker; it did not change what it is standing on.
     expect(shadowHolding(cell)).toBe(BLUE);
   });
 
   it('lets a restored tile complete a group and extend the cascade', () => {
-    // Three teals around a shadow standing on teal. Freeing it makes the fourth — a
-    // chain that grew because it drove the shadow back.
     const board = new Board();
     for (let column = 0; column < 4; column += 1) {
       board.place(column, ROWS - 1, RED);
@@ -382,9 +352,6 @@ describe('light gives back what the shadow took', () => {
   });
 
   it('still empties the cell outright when the question is answered', () => {
-    // Play GIVES BACK what the shadow took; an answer BANISHES it. Restoring a whole
-    // board of held colour at once would hand back a wall of tiles the player never
-    // placed.
     const game = new Simulation(() => [RED, RED], DEFAULT_TUNING);
     game.board.place(0, ROWS - 1, shadowCell(1, RED));
     game.board.place(1, ROWS - 1, shadowCell(2, BLUE));
@@ -463,14 +430,11 @@ describe('the shadow tells you where it is reaching', () => {
 describe('answering leaves the board standing up', () => {
   it('drops the tiles that were resting on what it drove off', () => {
     const game = new Simulation(() => [RED, RED], DEFAULT_TUNING);
-    // A shadow on the floor with an ordinary tile stacked on top of it.
     game.board.place(0, ROWS - 1, shadowCell(1, RED));
     game.board.place(0, ROWS - 2, BLUE);
 
     game.answerQuestion();
 
-    // Without a settle the blue hangs in mid-air until the next lock snaps it down
-    // with no animation.
     expect(game.board.pieceAt(0, ROWS - 1)).toBe(BLUE);
     expect(game.board.isEmpty(0, ROWS - 2)).toBe(true);
   });

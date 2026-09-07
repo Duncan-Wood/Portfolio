@@ -1,4 +1,3 @@
-
 export type HorizontalDirection = -1 | 1;
 
 interface InputTuning {
@@ -20,16 +19,11 @@ export class InputTranslator {
 
   private autoRepeatTimer = 0;
 
-  /**
-   * A key already down when a new pair spawns is suppressed until it is released
-   * and pressed again. Soft drop is many times gravity here, so a pair spawning
-   * under a held Down key would cross the board before the player reacted.
-   */
   private softDropAwaitingRelease = false;
 
   private shiftAwaitingRelease = false;
 
-  /** Read at the moment needed: destructuring would kill live tuning. */
+  // Read at the moment needed; destructuring kills live tuning.
   constructor(private tuning: InputTuning) {}
 
   update(frame: InputFrame, attemptShift: ShiftAttempt): boolean {
@@ -47,10 +41,6 @@ export class InputTranslator {
     return frame.softDropHeld && !this.softDropAwaitingRelease;
   }
 
-  /**
-   * DAS / ARR: one press moves one column, holding waits `autoShiftDelay` then
-   * repeats every `autoRepeatInterval`.
-   */
   private updateShift(frame: InputFrame, attemptShift: ShiftAttempt): void {
     const { direction } = frame;
 
@@ -75,8 +65,6 @@ export class InputTranslator {
 
     while (this.autoRepeatTimer <= 0) {
       if (!attemptShift(direction)) {
-        // Zeroed rather than left negative, which would bank repeats and jump
-        // the pair several columns the moment the way cleared.
         this.autoRepeatTimer = 0;
         return;
       }

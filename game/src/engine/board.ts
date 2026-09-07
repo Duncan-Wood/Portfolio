@@ -1,9 +1,5 @@
 import { COLUMNS, ROWS, isAnchored } from './grid';
 
-/**
- * `null`, not `0`: piece type 0 is a real colour, so `if (!pieceAt())` would
- * treat it as empty.
- */
 const EMPTY = null;
 
 export interface TileMove {
@@ -19,7 +15,6 @@ export class Board {
     return column >= 0 && column < COLUMNS && row >= 0 && row < ROWS;
   }
 
-  /** Total: reading off-board returns `EMPTY` rather than throwing. */
   pieceAt(column: number, row: number): number | null {
     return this.isInside(column, row) ? this.cells[row * COLUMNS + column] : EMPTY;
   }
@@ -32,11 +27,7 @@ export class Board {
     return !this.isInside(column, row) || !this.isEmpty(column, row);
   }
 
-  /**
-   * Throws rather than ignoring a bad write: an overwrite destroys a tile the
-   * player built with, silently. Callers ask first — `FallingPair` via `fits`,
-   * the simulation via the topping-out rule.
-   */
+  // Throws rather than ignoring a bad write; callers ask first via `fits`.
   place(column: number, row: number, pieceType: number): void {
     if (!this.isInside(column, row)) {
       throw new RangeError(`Cannot place a piece outside the board at ${column},${row}`);
@@ -55,13 +46,6 @@ export class Board {
     this.cells[row * COLUMNS + column] = EMPTY;
   }
 
-  /**
-   * The scan runs bottom-up, reading upward and writing downward, so it can never
-   * overwrite a tile it has not yet visited and needs no temporary copy.
-   *
-   * An ANCHORED cell stays put and nothing falls past it: tiles above come to rest
-   * ON it while the ones below compact among themselves.
-   */
   settle(): TileMove[] {
     const moves: TileMove[] = [];
 
@@ -92,12 +76,6 @@ export class Board {
     return moves;
   }
 
-  /**
-   * Where a tile dropped down this column comes to rest, or `-1` if nothing can
-   * enter it. From the TOP down: scanning up from the floor for the deepest empty
-   * cell is only correct if a column has no floating gaps, and anchored cells break
-   * that.
-   */
   landingRow(column: number): number {
     let landing = -1;
 

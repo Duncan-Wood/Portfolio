@@ -37,10 +37,6 @@ export class Simulation {
 
   softDropping = false;
 
-  /**
-   * Compared rather than `FallingPair` identity: the engine promises the number
-   * ticks, never that the object is reallocated.
-   */
   piecesSpawned = 0;
 
   score = 0;
@@ -49,7 +45,6 @@ export class Simulation {
 
   toppedOut = false;
 
-  /** How many pieces this board gives you, or `0` for no limit. */
   pieceBudget = 0;
 
   chainLength = 0;
@@ -72,40 +67,20 @@ export class Simulation {
     return held;
   }
 
-  /**
-   * Since anything last CLEARED, not since the last input: a player can shuffle a
-   * piece back and forth all day and still be stalling.
-   */
   private stallTimer = 0;
 
   connectionsMade = 0;
 
-  /**
-   * The board is in its post-beat state by the time a frame renders, so the scene
-   * cannot see what popped by looking. The engine leaves the result here rather
-   * than calling into the scene, which keeps it free of callbacks.
-   */
   beatsPlayed = 0;
 
   lastBeat: CascadeBeat | null = null;
 
-  /**
-   * Separate from `piecesSpawned`: a lock that starts a cascade and one that tops
-   * the board out both commit a pair without spawning another, so a landing
-   * inferred from the spawn counter misses the ones that matter most.
-   */
   piecesLocked = 0;
 
   lastLanded: readonly PairCell[] = [];
 
   upcoming!: [number, number];
 
-  /**
-   * A FRACTION of the current interval, never elapsed milliseconds. Banking
-   * milliseconds lets a rate change re-price the bank: time accumulated against a
-   * slow gravity step, spent at the soft-drop rate, is several rows of fall in one
-   * frame. A fraction cannot burst, so `fallInterval` is safe to change mid-fall.
-   */
   fallProgress = 0;
 
   private resolveTimer = 0;
@@ -116,20 +91,12 @@ export class Simulation {
 
   constructor(
     private nextPieceTypes: PieceTypeSupplier,
-    /**
-     * Read as `this.tuning.x` at the moment needed, never destructured into a local,
-     * or live tuning stops working.
-     */
+    // Read as `this.tuning.x` at the moment needed; destructuring kills live tuning.
     private tuning: Tuning = DEFAULT_TUNING,
   ) {
-    // `pair` and `upcoming` carry definite assignment assertions because
-    // TypeScript cannot see through this call.
     this.restart();
   }
 
-  /**
-   * Does NOT clamp `delta`. Bounding it is the caller's job — `FixedTimestep`.
-   */
   update(delta: number): void {
     if (this.toppedOut) {
       return;
@@ -169,8 +136,6 @@ export class Simulation {
 
     while (this.fallProgress >= 1) {
       if (!this.pair.fall(this.board)) {
-        // Discard the banked progress, or the pair drops a row instantly the
-        // moment it can move again — after sliding sideways over a gap, say.
         this.fallProgress = 0;
         break;
       }
@@ -203,11 +168,6 @@ export class Simulation {
     this.pair = this.spawn();
   }
 
-  /**
-   * All three refuse while a cascade resolves or after a top-out: in both states
-   * `pair` still points at tiles now sitting on the board, so moving it would write
-   * them a second time.
-   */
   moveLeft(): boolean {
     return this.acceptsInput ? this.afterInput(this.pair.moveLeft(this.board)) : false;
   }
@@ -220,10 +180,6 @@ export class Simulation {
     return this.acceptsInput ? this.afterInput(this.pair.rotateClockwise(this.board)) : false;
   }
 
-  /**
-   * Deliberately not routed through `afterInput`: that resets the lock timer to
-   * give the player more time, and this is the input that says the opposite.
-   */
   hardDrop(): number {
     if (!this.acceptsInput) {
       return 0;
@@ -238,7 +194,6 @@ export class Simulation {
     return distance;
   }
 
-  /** `Infinity` when unbudgeted, and floored at zero because it is drawn. */
   get piecesRemaining(): number {
     return this.pieceBudget === 0
       ? Infinity
@@ -286,13 +241,6 @@ export class Simulation {
     this.recordBeat({ kind: 'clear', link, connections });
   }
 
-  /**
-   * WHAT was typed never reaches here and must not: the engine is told THAT an
-   * answer happened, never what it said.
-   *
-   * Returns the cells deepest first, so the scene can play the wave rising out of
-   * the stack — the board is empty by the time anything renders.
-   */
   answerQuestion(): { driven: readonly ShadowHit[]; settled: readonly TileMove[] } {
     const driven: ShadowHit[] = [];
 
@@ -341,11 +289,6 @@ export class Simulation {
     return Math.min(this.stallTimer / this.tuning.shadowInterval, 1);
   }
 
-  /**
-   * No column is off limits, the falling pair's included: possession only takes an
-   * occupied cell and the pair only locks into empty ones. If there is nothing to
-   * take, nothing happens — topping out is `spawnOrTopOut`'s job.
-   */
   private encroach(): void {
     const target = this.threatenedCell;
     if (target === null) {
@@ -354,8 +297,6 @@ export class Simulation {
 
     const { column: chosenColumn, row: chosenRow } = target;
 
-    // The first few are freed by an ordinary clear and the late ones are not.
-    // `shadowTaken` is still 0 here, which makes the opening tier the weakest.
     const strength = Math.min(
       1 + Math.floor(this.shadowTaken / this.tuning.arrivalsPerShadowStrength),
       MAX_SHADOW_STRENGTH,
@@ -374,11 +315,6 @@ export class Simulation {
     this.beatsPlayed += 1;
   }
 
-  /**
-   * Peek before committing to a cascade: if the lock matched nothing the next pair
-   * spawns immediately. Shared by the lock delay and `hardDrop`, so they cannot
-   * drift.
-   */
   private lockPair(): void {
     this.lastLanded = this.pair.lock(this.board);
     this.piecesLocked += 1;
@@ -394,11 +330,6 @@ export class Simulation {
     this.spawnOrTopOut();
   }
 
-  /**
-   * The candidate is built and asked whether it fits rather than testing the spawn
-   * cells by hand: `FallingPair` owns where a satellite sits at each orientation.
-   * Asking first is what keeps `place` able to throw on an occupied cell.
-   */
   private spawnOrTopOut(): void {
     if (!this.nextPair().fitsOn(this.board)) {
       this.toppedOut = true;
@@ -415,10 +346,6 @@ export class Simulation {
     return moved;
   }
 
-  /**
-   * Resetting `fallProgress` is what stops soft-drop progress leaking across a
-   * lock into the next piece.
-   */
   private spawn(): FallingPair {
     const next = this.nextPair();
     this.upcoming = this.nextPieceTypes();

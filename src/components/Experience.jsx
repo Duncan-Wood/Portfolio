@@ -1,14 +1,3 @@
-/**
- * Work history, most recent end date first.
- *
- * Content lives as a plain array rather than as hand-written JSX so that adding
- * a role means editing data, not markup — the rendering below is written once
- * and applies to every entry. The same pattern is used in `Projects.jsx` and
- * `Skills.jsx`.
- *
- * Kept deliberately in sync with `README.md` and the PDF résumé; those are three
- * separate copies of the same facts, so a change to one needs the others.
- */
 const experienceData = [
   {
     role: "Software Engineer",
@@ -36,8 +25,6 @@ const experienceData = [
 const Experience = () => {
   return (
     <div
-      // Scroll target for the nav link of the same name; renaming it
-      // silently breaks that link. See nav.jsx.
       id="experience"
       className="m-10"
     >

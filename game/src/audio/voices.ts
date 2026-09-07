@@ -1,9 +1,3 @@
-/*
- * What each sound IS, with no idea how to make one. Nothing here touches
- * `AudioContext`, so the decisions that carry the feel are unit tests rather
- * than something only judgeable by ear. `sound-board.ts` plays them.
- */
-
 type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 export interface Voice {
@@ -12,21 +6,14 @@ export interface Voice {
   endFrequency: number;
   duration: number;
   gain: number;
-  /** For arpeggios. */
   delay: number;
-  /** -1 hard left to 1 hard right. Omitted is centred. */
   pan?: number;
 }
 
 export const BASE_POP_FREQUENCY = 440;
 
-/** How much higher each further link pops. Roughly a semitone. */
 const POP_RATIO = 1.06;
 
-/**
- * Chains have no theoretical ceiling, and an uncapped climb walks out of hearing
- * range exactly when the player has earned the most.
- */
 export const MAX_POP_FREQUENCY = BASE_POP_FREQUENCY * 4;
 
 export function popVoice(linkIndex: number): Voice {
@@ -54,7 +41,6 @@ export function landVoice(): Voice {
   };
 }
 
-/** Louder and lower the further it fell, like the screen shake. */
 export function hardDropVoice(distance: number): Voice {
   const weight = Math.min(distance, 12) / 12;
 
@@ -68,7 +54,6 @@ export function hardDropVoice(distance: number): Voice {
   };
 }
 
-/** A long fall, so it reads as a loss. */
 export function topOutVoice(): Voice {
   return {
     waveform: 'sawtooth',
@@ -80,10 +65,6 @@ export function topOutVoice(): Voice {
   };
 }
 
-/**
- * One node lighting. Climbs a full octave across the set, so pitch alone says
- * how close the board is to solved.
- */
 export function nodeVoice(padIndex: number, padCount: number): Voice {
   const frequency = 330 * 2 ** (padIndex / padCount);
 
@@ -97,11 +78,6 @@ export function nodeVoice(padIndex: number, padCount: number): Voice {
   };
 }
 
-/**
- * The only voice in the bass: every other sound is an event the player caused,
- * and this is the one that happens TO them. Sawtooth so it sounds wrong beside
- * four clean waveforms, and quiet because it arrives unprompted.
- */
 export function shadowArrivalVoice(): Voice {
   return {
     waveform: 'sawtooth',
@@ -113,12 +89,6 @@ export function shadowArrivalVoice(): Voice {
   };
 }
 
-/**
- * The inverse of the arrival — short, high and rising where that one is long,
- * low and falling — so the counter-play is audible as the answer to it.
- *
- * Once per link rather than per cell, or it stacks into a chord over the pop.
- */
 export function shadowRecedeVoice(cellsPushed: number): Voice {
   const weight = Math.min(cellsPushed, 4) / 4;
 
@@ -132,12 +102,6 @@ export function shadowRecedeVoice(cellsPushed: number): Voice {
   };
 }
 
-/**
- * A shadow hit hard enough to hurt and not hard enough to shift. The recede
- * rises because it reports something leaving; this reports something STAYING,
- * so it falls, and a square rather than a triangle makes it a knock rather than
- * a chime. The player has to hear that they connected without hearing they won.
- */
 export function shadowStruckVoice(cellsStruck: number): Voice {
   const weight = Math.min(cellsStruck, 4) / 4;
 
@@ -151,13 +115,6 @@ export function shadowStruckVoice(cellsStruck: number): Voice {
   };
 }
 
-/**
- * One cell of the wave answering the question sends across the board. Climbs a
- * semitone per cell and staggers, so a board full of shadow walks up out of the
- * stack rather than landing as one chord.
- *
- * Louder than a pop: this happens perhaps twice a session.
- */
 export function answerVoice(index: number): Voice {
   const frequency = 330 * 2 ** (Math.min(index, 24) / 12);
 
@@ -171,10 +128,6 @@ export function answerVoice(index: number): Voice {
   };
 }
 
-/**
- * The exact inverse of `answerVoice` — same interval, same stagger, opposite
- * direction — so losing reads as the answer beat run backwards.
- */
 export function connectionLostVoice(index: number): Voice {
   const frequency = 330 * 2 ** (-Math.min(index, 24) / 12);
 
@@ -188,10 +141,6 @@ export function connectionLostVoice(index: number): Voice {
   };
 }
 
-/**
- * An ascending arpeggio, one note per link, over the pops that already happened.
- * Silent for a single link: every clear is technically a one-link chain.
- */
 export function chainVoices(chainLength: number): Voice[] {
   if (chainLength < 2) {
     return [];

@@ -11,17 +11,11 @@ const BLUE = 1;
 const simulation = () => new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
 
 const dropToFloor = (game: Simulation) => {
-  // Bounded. With gravity off a pair never falls on its own, so an unbounded
-  // wait here does not fail a test — it hangs the whole run.
   for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
     game.update(fallInterval);
   }
 };
 
-/**
- * Fills the spawn column below the spawn row, cycling colours so the fill never
- * forms a group of its own.
- */
 const fillUnderSpawn = (game: Simulation) => {
   for (let row = SPAWN_ROW + 1; row < ROWS; row += 1) {
     game.board.place(SPAWN_COLUMN, row, (row % 3) + 1);
@@ -276,7 +270,6 @@ describe('switching between gravity and soft drop', () => {
 describe('resolving a chain over time', () => {
   const buildTwoLinkChain = () => {
     const game = simulation();
-    // B clears first; the stranded R above it falls in to complete the R group.
     game.board.place(0, ROWS - 1, RED);
     game.board.place(0, ROWS - 2, RED);
     game.board.place(0, ROWS - 3, RED);
@@ -371,8 +364,6 @@ describe('resolving a chain over time', () => {
     game.update(DEFAULT_TUNING.settleDelay);
     game.update(DEFAULT_TUNING.chainLinkDelay);
 
-    // Five cells at x1, then five more at x2. Cleared as two separate pieces
-    // the same ten cells would have paid ten.
     expect(afterFirstLink).toBe(5);
     expect(game.connectionsMade).toBe(15);
   });
@@ -385,7 +376,6 @@ describe('resolving a chain over time', () => {
     game.update(DEFAULT_TUNING.settleDelay);
     game.update(DEFAULT_TUNING.chainLinkDelay);
 
-    // Same two links: the meter went 5 -> 15, the score went 50 -> 150.
     expect(game.connectionsMade).toBe(15);
     expect(game.score).toBe(50 + 100);
   });
@@ -567,11 +557,6 @@ describe('topping out', () => {
     expect(game.rotate()).toBe(false);
   });
 
-  /**
-   * The board must be frozen exactly as the player left it. Were a pair still to
-   * spawn, `Board.place` would either throw on the occupied spawn cell or
-   * overwrite it.
-   */
   it('leaves the final board untouched', () => {
     const game = lockIntoAFullColumn();
     const finalBoard = snapshot(game);
@@ -583,22 +568,15 @@ describe('topping out', () => {
     expect(snapshot(game)).toEqual(finalBoard);
   });
 
-  /**
-   * The other route into the rule: a chain finishes and the pair after it has
-   * nowhere to go, reaching `spawnOrTopOut` with `resolving` already cleared. The
-   * lock-path tests above pass with this call site broken.
-   */
   it('tops out at the end of a cascade', () => {
     const game = simulation();
 
-    // Out of the spawn column, so the fill below can seal it completely.
     game.moveLeft();
     game.moveLeft();
     for (let row = SPAWN_ROW; row < ROWS; row += 1) {
       game.board.place(SPAWN_COLUMN, row, (row % 3) + 2);
     }
 
-    // Three reds for the pair's red pivot to complete a group of four.
     for (let row = ROWS - 3; row < ROWS; row += 1) {
       game.board.place(0, row, RED);
     }
@@ -682,7 +660,6 @@ describe('restarting', () => {
 });
 
 describe('reporting each cascade beat to the scene', () => {
-  /** A red trio under the spawn column, so the pair's red pivot completes four. */
   const chainingGame = () => {
     const game = simulation();
     stackUnderSpawn(game, RED, 3);
@@ -706,10 +683,6 @@ describe('reporting each cascade beat to the scene', () => {
     expect(game.beatsPlayed).toBe(before + 1);
   });
 
-  /**
-   * The cascade ending is not a beat. Counting it would have the scene reach for a
-   * `lastBeat` describing the previous one and replay it.
-   */
   it('does not count the step that finds nothing left to clear', () => {
     const game = chainingGame();
     game.update(DEFAULT_TUNING.chainLinkDelay);
@@ -746,8 +719,6 @@ describe('reporting each cascade beat to the scene', () => {
 
   it('hands the scene the tiles that just fell', () => {
     const game = chainingGame();
-    // The red pivot completes the trio and pops with it, leaving the blue
-    // satellite stranded one row above the hole it now has to fall through.
     const strandedRow = game.pair.row - 1;
 
     game.update(DEFAULT_TUNING.chainLinkDelay);
@@ -896,14 +867,8 @@ describe('reporting where a pair came to rest', () => {
     ]);
   });
 
-  /**
-   * A half that settles into a hole ends up somewhere neither the pair's last
-   * position nor a scan of the column's topmost tile would find.
-   */
   it('reports where a half ended up after settling, not where it was placed', () => {
     const game = new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
-    // A ledge one column over, so the horizontal pair straddles a gap and its
-    // right half keeps falling after the left half stops.
     game.board.place(SPAWN_COLUMN, ROWS - 1, 3);
     game.rotate();
     game.hardDrop();
@@ -1006,14 +971,10 @@ describe('the piece budget', () => {
 
 describe('a board that has run out of pieces', () => {
   it('still lets the last piece\'s cascade play out', () => {
-    // `outOfPieces` goes true inside the lock, before the chain it started has
-    // resolved. Stopping the clock at the top of `update` would freeze the board on
-    // its very last piece.
     const simulation = new Simulation(() => [0, 0]);
     simulation.pieceBudget = 2;
     simulation.restart();
 
-    // Both pairs down the same column: four of colour 0 stacked is a group.
     simulation.hardDrop();
     simulation.hardDrop();
 
@@ -1042,10 +1003,6 @@ describe('a board that has run out of pieces', () => {
   });
 });
 
-/*
- * A pair that will not fall on its own within the life of a test, so the rule
- * under test is the lock rather than the falling speed.
- */
 const THINKING = { ...DEFAULT_TUNING, fallInterval: 100_000 };
 
 describe('the shadow waits for the player to start', () => {

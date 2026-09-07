@@ -85,9 +85,6 @@ describe('a lock is a board with something to work out', () => {
   });
 
   it('opens with a shadow standing beside a neuron', () => {
-    // The discovery the whole board is built around: freeing a shadow gives back
-    // the tile it took, so the thing in your way is also the thing you needed.
-    // Seeded rather than left to chance on the first lock.
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.3, 0.7, 0.5, 0.15, 0.85]));
 
@@ -202,9 +199,6 @@ describe('the run escalates across the memory it is unlocking', () => {
   });
 
   it('asks for a board that fits, so nothing it seeds is silently dropped', () => {
-    // `seedLock` fills at most SEED_ROWS deep and stops when it runs out of floor.
-    // A lock whose numbers overflow that seeds fewer neurons than its objective
-    // counts, which is unwinnable.
     for (const lock of LOCKS) {
       expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * 3);
     }

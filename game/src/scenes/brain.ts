@@ -18,10 +18,6 @@ function writtenNodeCount(): number {
   return MEMORIES.reduce((total, memory) => total + memory.nodes.length, 0);
 }
 
-/**
- * One polygon rather than arcs: Phaser steps an arc at a fixed 1/100 turn and
- * pays for it every frame.
- */
 const OUTLINE: readonly { x: number; y: number }[] = [
   { x: 0.50, y: 0.04 }, { x: 0.62, y: 0.06 }, { x: 0.68, y: 0.13 }, { x: 0.79, y: 0.13 },
   { x: 0.86, y: 0.21 }, { x: 0.84, y: 0.30 }, { x: 0.93, y: 0.37 }, { x: 0.92, y: 0.47 },

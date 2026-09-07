@@ -1,9 +1,5 @@
 import { Board } from './board';
 
-/**
- * A literal union rather than `number`, so an out-of-range orientation is a
- * compile error rather than an `undefined` read past `SATELLITE_OFFSETS`.
- */
 export type Orientation = 0 | 1 | 2 | 3;
 
 export interface PairCell {
@@ -48,11 +44,6 @@ export class FallingPair {
     return this.moveTo(board, this.column + 1, this.row, this.orientation);
   }
 
-  /**
-   * Rotate clockwise, with a WALL KICK: if the satellite would land inside a wall,
-   * retry shifted one column away from it, or rotating while flush against a wall
-   * refuses and the button appears broken.
-   */
   rotateClockwise(board: Board): boolean {
     const rotated = ((this.orientation + 1) % 4) as Orientation;
     const kick = -SATELLITE_OFFSETS[rotated].column;
@@ -75,11 +66,6 @@ export class FallingPair {
     return this.fits(board, this.column, this.row, this.orientation);
   }
 
-  /**
-   * The `settle()` is what makes the halves independent: if the pivot lands on the
-   * stack while the satellite is over a hole, the satellite keeps falling alone.
-   * That is why the resting cells are returned rather than assumed.
-   */
   lock(board: Board): PairCell[] {
     const placed = this.cells();
     for (const cell of placed) {
@@ -96,7 +82,6 @@ export class FallingPair {
     });
   }
 
-  /** The single mutation point: the check happens before the write. */
   private moveTo(board: Board, column: number, row: number, orientation: Orientation): boolean {
     if (!this.fits(board, column, row, orientation)) {
       return false;
