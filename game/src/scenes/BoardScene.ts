@@ -36,6 +36,8 @@ import {
   tileTexture,
 } from './tile-textures';
 import { brainNodeAt, drawBrain } from './brain';
+import { MEMORY_ART, type MemoryGrid } from '../memory-art';
+import { revealOrder } from '../memory-reveal';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
@@ -85,18 +87,20 @@ const SHADOW_LEAN_DEGREES = 3.2;
 const SHADOW_BREATH = 0.045;
 const SHADOW_ARRIVAL_DURATION = 340;
 
-const PHOTO_MAX_WIDTH = 330;
-const PHOTO_MAX_HEIGHT = 250;
+const PHOTO_MAX_WIDTH = 368;
+const PHOTO_MAX_HEIGHT = 300;
+const REVEAL_GAP = 26;
 
 const REVEAL_SKIP_GRACE = 420;
 
 const HANDOVER_BEHIND_REVEAL = 300;
 const HANDOVER_IN_THE_OPEN = 900;
 const HANDOVER_DIM = 240;
+const OUT_OF_PIECES_PAUSE = 2600;
 
 const ANSWER_LIMIT = 48;
 
-const SKIP_PROMPT = 'space';
+const SKIP_PROMPT = 'space  \u00b7  continue';
 const ANSWER_PROMPT = 'type an answer   ·   enter';
 const CARET_PERIOD = 1060;
 
@@ -137,6 +141,9 @@ const MEMORY_PANEL_HEIGHT = 450;
 const MEMORY_PANEL_LEFT = 476;
 
 const ANSWER_ECHO_LEFT = MEMORY_PANEL_LEFT;
+
+const MEMORY_PICTURE_DARKEN = 0.88;
+const MEMORY_PICTURE_FILL_MS = 620;
 
 const BRAIN_BOX = {
   left: ORIGIN_X + BOARD_WIDTH + 14,
@@ -342,7 +349,9 @@ export class BoardScene extends Scene {
 
   private connections: ConnectionSlot[];
 
-  private runOver: 'topped-out' | 'out-of-pieces' | 'won' | null = null;
+  private runOver: 'topped-out' | 'won' | null = null;
+
+  private shadowGroundHeld = 0;
 
   private runReadouts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
 
@@ -354,9 +363,21 @@ export class BoardScene extends Scene {
 
   private shownLitNeurons = 0;
 
+  private panelRank: number[] = [];
+
+  private panelArt: MemoryGrid | null = null;
+
+  private panelKey: string | null = null;
+
+  private shownPanelCells = 0;
+
+  private shownPanelProgress = -1;
+
+  private panelFill: Phaser.Tweens.Tween | null = null;
+
   private nodesRevealed = 0;
 
-  private revealRemaining = 0;
+  private revealHolding = false;
 
   private revealPending = false;
 
@@ -828,9 +849,7 @@ export class BoardScene extends Scene {
     }
 
     if (this.awaitingAnswer) {
-    } else if (this.revealRemaining > 0) {
-      this.revealRemaining -= delta;
-
+    } else if (this.revealHolding) {
       if (this.revealSkippableIn > 0) {
         this.revealSkippableIn -= delta;
         if (this.revealSkippableIn <= 0) {
@@ -838,10 +857,7 @@ export class BoardScene extends Scene {
           this.tweens.add({ targets: this.revealHint, alpha: 1, duration: 260 });
         }
       } else if (Input.Keyboard.JustDown(this.hardDropKey)) {
-        this.revealRemaining = 0;
-      }
-
-      if (this.revealRemaining <= 0) {
+        this.revealHolding = false;
         this.advanceReveal();
       }
     } else if (this.hitStopRemaining > 0) {
@@ -973,6 +989,9 @@ export class BoardScene extends Scene {
     this.gameOverLine.setVisible(false);
     this.gameOverHint.setVisible(false);
     this.memoryPanel.setAlpha(1);
+    this.panelKey = null;
+    this.shownPanelCells = 0;
+    this.shownPanelProgress = -1;
     this.tweens.killAll();
     this.staticStrength = 0;
     this.staticOverlay.setVisible(false);
@@ -1044,7 +1063,7 @@ export class BoardScene extends Scene {
     this.nextScorePopup = 0;
 
     if (!keepStory) {
-      this.revealRemaining = 0;
+      this.revealHolding = false;
       this.pendingReveal = null;
       this.revealPending = false;
     }
@@ -1058,7 +1077,7 @@ export class BoardScene extends Scene {
 
   private openTheRun(): void {
     if (playedBefore()) {
-      this.showReveal('', SHADOW_OPENING_LINE, this.holdFor(SHADOW_OPENING_LINE, 1100));
+      this.showReveal('', SHADOW_OPENING_LINE);
       this.revealBody.setColor('#b07dff');
     }
     rememberPlayed();
@@ -1275,6 +1294,8 @@ export class BoardScene extends Scene {
       if (this.lockEndingIn <= 0) {
         this.lockEndingIn = 0;
         this.restart(true, this.storyHolding);
+        this.simulation.shadowTaken = this.shadowGroundHeld;
+        this.shadowGroundHeld = 0;
       }
       return;
     }
@@ -1288,7 +1309,7 @@ export class BoardScene extends Scene {
         return;
       }
 
-      if (this.revealRemaining > 0) {
+      if (this.revealHolding) {
         this.holdObjective(HANDOVER_DIM);
         this.lockEndingIn = HANDOVER_BEHIND_REVEAL;
         return;
@@ -1302,11 +1323,25 @@ export class BoardScene extends Scene {
       return;
     }
 
-    this.lockEndingIn = 2600;
-    this.runOver = 'out-of-pieces';
+    this.reseedAfterRunningOut();
+  }
+
+  // The shadow keeps what it took; only `startLock` reseeds the board itself.
+  private reseedAfterRunningOut(): void {
+    this.lockEndingIn = OUT_OF_PIECES_PAUSE;
+    this.shadowGroundHeld = this.simulation.shadowTaken;
     this.objectiveText.setText('out of pieces').setAlpha(1);
     this.soundBoard.play(connectionLostVoice(0));
-    this.loseTheBoard();
+
+    this.staticOverlay.setVisible(true).setAlpha(0);
+    this.tweens.addCounter({
+      from: 1,
+      to: 0,
+      duration: OUT_OF_PIECES_PAUSE,
+      onUpdate: (tween) => {
+        this.staticStrength = tween.getValue() ?? 0;
+      },
+    });
   }
 
   private drawThreat(): void {
@@ -1558,13 +1593,22 @@ export class BoardScene extends Scene {
     const total = neuronsOn(this.simulation.board).length;
     const lit = total === 0 ? 0 : total - unlitCount(this.simulation.board);
 
+    // Score moves the picture between neurons; neurons keep it honest at the end.
+    const fromNeurons = total === 0 ? 0 : lit / total;
+    const fillScore = lockFor(this.nodesRevealed).fillScore;
+    const progress = Math.max(fromNeurons, Math.min(this.simulation.score / fillScore, 1));
+
+    if (progress !== this.shownPanelProgress) {
+      this.shownPanelProgress = progress;
+      this.redrawMemoryPanel(progress);
+    }
+
     if (lit === this.shownLitNeurons) {
       return;
     }
 
     const gainedFrom = this.shownLitNeurons;
     this.shownLitNeurons = lit;
-    this.redrawMemoryPanel(total === 0 ? 0 : lit / total);
 
     this.sparks.setParticleTint(TRACK_LIT_COLOR);
     for (let node = gainedFrom; node < lit; node += 1) {
@@ -1632,14 +1676,10 @@ export class BoardScene extends Scene {
       : null;
 
     this.shownLitNeurons = 0;
+    this.shownPanelProgress = -1;
     this.redrawMemoryPanel(0);
 
-    this.showReveal(
-      node.title,
-      node.body,
-      this.holdFor(node.body, this.tuning.fragmentDuration),
-      node.photo,
-    );
+    this.showReveal(node.title, node.body, node.photo);
   }
 
   private holdFor(text: string, floor: number): number {
@@ -1647,7 +1687,7 @@ export class BoardScene extends Scene {
   }
 
   private get storyHolding(): boolean {
-    return this.revealRemaining > 0 || this.awaitingAnswer;
+    return this.revealHolding || this.awaitingAnswer;
   }
 
   private advanceReveal(): void {
@@ -1668,12 +1708,14 @@ export class BoardScene extends Scene {
     this.answeringMemory = memoryIndex;
 
     this.revealTitle.setVisible(false);
+    this.revealPhoto.setVisible(false);
     this.revealBody.setText(question);
     this.revealHint.setText(ANSWER_PROMPT);
 
     this.tweens.killTweensOf([this.revealScrim, this.revealBody, this.revealHint, this.answerLine]);
-    this.revealScrim.setVisible(true).setAlpha(0.9);
+    this.revealScrim.setVisible(true).setAlpha(1);
     this.answerLine.setText('').setVisible(true).setAlpha(1);
+    this.layOutReveal();
 
     for (const part of [this.revealBody, this.revealHint]) {
       part.setVisible(true).setAlpha(0);
@@ -1812,32 +1854,57 @@ export class BoardScene extends Scene {
       1,
     );
 
-    image
-      .setScale(fit)
-      .setPosition(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 - 90 - (image.height * fit) / 2)
-      .setVisible(true);
+    image.setScale(fit).setVisible(true);
   }
 
-  private showReveal(title: string, body: string, duration: number, photo?: string): void {
+  // Fixed offsets cannot hold a body whose length varies; the card is a stack.
+  private layOutReveal(): void {
+    const centerX = ORIGIN_X + BOARD_WIDTH / 2;
+    const photoHeight = this.revealPhoto.visible ? this.revealPhoto.displayHeight : 0;
+    const titleHeight = this.revealTitle.visible ? this.revealTitle.height : 0;
+    const bodyHeight = this.revealBody.height;
+    const hintHeight = this.revealHint.height;
+
+    const parts: { target: Phaser.GameObjects.Components.Transform; height: number }[] = [];
+    if (photoHeight > 0) parts.push({ target: this.revealPhoto, height: photoHeight });
+    if (titleHeight > 0) parts.push({ target: this.revealTitle, height: titleHeight });
+    parts.push({ target: this.revealBody, height: bodyHeight });
+    if (this.awaitingAnswer) parts.push({ target: this.answerLine, height: this.answerLine.height });
+    parts.push({ target: this.revealHint, height: hintHeight });
+
+    const total = parts.reduce((sum, part) => sum + part.height, 0)
+      + REVEAL_GAP * (parts.length - 1);
+
+    let y = CANVAS_HEIGHT / 2 - total / 2;
+    for (const part of parts) {
+      part.target.setPosition(centerX, y + part.height / 2);
+      y += part.height + REVEAL_GAP;
+    }
+  }
+
+  private showReveal(title: string, body: string, photo?: string): void {
     this.revealBody.setColor(REVEAL_BODY_COLOR);
-    this.revealRemaining = duration;
+    this.revealHolding = true;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
     this.revealHint.setText(SKIP_PROMPT).setVisible(false);
-    this.showRevealPicture(photo);
-    this.revealTitle.setText(title);
-    this.revealTitle.setVisible(title !== '');
-    this.revealBody.setText(body);
 
     this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody, this.revealPhoto]);
-    this.revealScrim.setVisible(true).setAlpha(0);
-    this.tweens.add({ targets: this.revealScrim, alpha: 0.9, duration: 240 });
 
-    for (const text of [this.revealTitle, this.revealBody]) {
-      if (text === this.revealTitle && text.text === '') {
+    this.showRevealPicture(photo);
+    this.revealTitle.setText(title).setVisible(title !== '');
+    this.revealBody.setText(body).setVisible(true);
+
+    this.layOutReveal();
+
+    this.revealScrim.setVisible(true).setAlpha(0);
+    this.tweens.add({ targets: this.revealScrim, alpha: 1, duration: 240 });
+
+    for (const part of [this.revealTitle, this.revealBody, this.revealPhoto]) {
+      if (!part.visible) {
         continue;
       }
-      text.setVisible(true).setAlpha(0);
-      this.tweens.add({ targets: text, alpha: 1, duration: 340, delay: 160 });
+      part.setAlpha(0);
+      this.tweens.add({ targets: part, alpha: 1, duration: 340, delay: 160 });
     }
   }
 
@@ -1857,8 +1924,101 @@ export class BoardScene extends Scene {
     });
   }
 
+  private upcomingArt(): { key: string; art: MemoryGrid } | null {
+    const at = this.locate(this.nodesRevealed);
+    if (at === null) {
+      return null;
+    }
+
+    const photo = MEMORIES[at.memoryIndex].nodes[at.nodeIndex].photo;
+    const art = photo === undefined ? undefined : MEMORY_ART[photo];
+
+    return art === undefined ? null : { key: photo as string, art: art.panel };
+  }
+
   private redrawMemoryPanel(progress: number): void {
-    drawBrain(this.memoryPanel, BRAIN_BOX, this.nodesRevealed, progress);
+    const upcoming = this.upcomingArt();
+
+    if (upcoming === null) {
+      this.panelArt = null;
+      this.panelKey = null;
+      drawBrain(this.memoryPanel, BRAIN_BOX, this.nodesRevealed, progress);
+      return;
+    }
+
+    const { key, art } = upcoming;
+    const cells = art.columns * art.rows.length;
+
+    if (key !== this.panelKey) {
+      this.panelKey = key;
+      this.panelArt = art;
+      this.panelRank = [];
+      revealOrder(art.columns, art.rows.length)
+        .forEach((cell, rank) => { this.panelRank[cell] = rank; });
+      this.shownPanelCells = 0;
+    }
+
+    const target = Math.round(Math.max(0, Math.min(progress, 1)) * cells);
+
+    this.panelFill?.remove();
+    this.panelFill = this.tweens.addCounter({
+      from: this.shownPanelCells,
+      to: target,
+      duration: MEMORY_PICTURE_FILL_MS,
+      ease: 'Cubic.easeOut',
+      onUpdate: (tween) => {
+        this.shownPanelCells = tween.getValue() ?? target;
+        this.drawMemoryPicture();
+      },
+      onComplete: () => {
+        this.shownPanelCells = target;
+        this.drawMemoryPicture();
+      },
+    });
+
+    this.drawMemoryPicture();
+  }
+
+  private drawMemoryPicture(): void {
+    const art = this.panelArt;
+    if (art === null) {
+      return;
+    }
+
+    const size = Math.min(BRAIN_BOX.width / art.columns, BRAIN_BOX.height / art.rows.length);
+    const left = BRAIN_BOX.left + (BRAIN_BOX.width - size * art.columns) / 2;
+    const top = BRAIN_BOX.top + (BRAIN_BOX.height - size * art.rows.length) / 2;
+    const reached = this.shownPanelCells;
+
+    this.memoryPanel.clear();
+
+    for (let row = 0; row < art.rows.length; row += 1) {
+      const line = art.rows[row];
+      for (let column = 0; column < art.columns; column += 1) {
+        const mark = line[column];
+        if (mark === undefined || mark === '.') {
+          continue;
+        }
+
+        const code = Number(mark);
+        if (!Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
+          continue;
+        }
+
+        const shaded = code >= PIECE_TYPE_COUNT;
+        const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
+        const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
+        const lit = this.panelRank[row * art.columns + column] < reached;
+
+        this.memoryPanel.fillStyle(lit ? face : mix(face, 0x000000, MEMORY_PICTURE_DARKEN), 1);
+        this.memoryPanel.fillRect(
+          left + column * size,
+          top + row * size,
+          Math.max(1, size - 1),
+          Math.max(1, size - 1),
+        );
+      }
+    }
   }
 
   private settledPieceAt(column: number, row: number): number | null {
