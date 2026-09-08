@@ -8,7 +8,7 @@ import {
   STILL_CONNECTED,
   SHADOW_LINES,
   closingLine,
-  recoveredLine,
+  RECOVERED_LINE,
   shadowLine,
 } from './shadow-voice';
 
@@ -149,9 +149,8 @@ describe('what a finished memory says', () => {
     expect(STILL_CONNECTED.toLowerCase()).toContain('connected');
   });
 
-  it('names the memory that was recovered rather than congratulating in general', () => {
-    expect(recoveredLine('High School')).toContain('High School');
-    expect(recoveredLine('College')).toContain('College');
+  it('fits the two lines the ending has room for', () => {
+    expect(RECOVERED_LINE.length).toBeLessThanOrEqual(80);
   });
 
   it('offers a way to reach a person without turning into a pitch', () => {

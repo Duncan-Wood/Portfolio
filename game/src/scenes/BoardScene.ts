@@ -13,6 +13,7 @@ import {
   shadowStrength,
 } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
+import { HAT_FULL_CHARGE } from '../engine/hat';
 import { type TileMove } from '../engine/board';
 import { type ChainLink, type ShadowHit } from '../engine/matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
@@ -38,6 +39,7 @@ import { brainNodeAt, drawBrain } from './brain';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { MEMORIES } from '../memories';
+import { hatEarned, playedBefore, rememberHat, rememberPlayed } from '../progress';
 import {
   CONNECTION_LOST,
   REACH_OUT_LINE,
@@ -45,7 +47,7 @@ import {
   SHADOW_OPENING_LINE,
   STILL_CONNECTED,
   closingLine,
-  recoveredLine,
+  RECOVERED_LINE,
   shadowLine,
   type UnfinishedBusiness,
 } from '../shadow-voice';
@@ -55,6 +57,7 @@ import { SoundBoard } from '../audio/sound-board';
 import {
   chainVoices,
   hardDropVoice,
+  hatVoice,
   landVoice,
   answerVoice,
   connectionLostVoice,
@@ -94,6 +97,14 @@ const CARET_PERIOD = 1060;
 const BLINK_DURATION = 90;
 const BLINK_INTERVAL = 2300;
 
+const HAT_METER_Y = 790;
+const HAT_METER_WIDTH = 104;
+const HAT_METER_HEIGHT = 12;
+const HAT_PROMPT = 'press F';
+const HAT_BEAM_WIDTH = 10;
+const HAT_BEAM_DURATION = 220;
+const HAT_BEAM_HIT_DURATION = 420;
+
 const SPARK_TEXTURE = 'spark';
 
 const STATIC_TEXTURE = 'static';
@@ -109,6 +120,10 @@ export const CANVAS_HEIGHT = 900;
 const ORIGIN_X = 40;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE + (VISIBLE_ROWS - 1) * GAP;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
+
+const CONTACT_OFFER_Y = CANVAS_HEIGHT / 2 + 84;
+const HINT_ALONE_Y = CANVAS_HEIGHT / 2 + 84;
+const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
 const MEMORY_PANEL_HEIGHT = 450;
@@ -264,6 +279,18 @@ export class BoardScene extends Scene {
   private previewTiles: Phaser.GameObjects.Image[];
 
   private piecesText: Phaser.GameObjects.Text;
+
+  private hatKey: Phaser.Input.Keyboard.Key;
+
+  private hatMeter: Phaser.GameObjects.Rectangle;
+
+  private hatBeam: Phaser.GameObjects.Rectangle;
+
+  private hatPrompt: Phaser.GameObjects.Text;
+
+  private hatParts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
+
+  private shownHatCharge = -1;
   private shownPivotType = -1;
   private shownSatelliteType = -1;
   private shownChain = -1;
@@ -311,7 +338,7 @@ export class BoardScene extends Scene {
 
   private runOver: 'topped-out' | 'out-of-pieces' | 'won' | null = null;
 
-  private runReadouts: Phaser.GameObjects.Text[] = [];
+  private runReadouts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
 
   private objectiveHeld = false;
 
@@ -528,6 +555,46 @@ export class BoardScene extends Scene {
       color: '#6b5a80',
     }).setOrigin(0.5, 0.5);
 
+    const hatLabel = this.add.text(PREVIEW_CENTER_X, HAT_METER_Y - 24, 'HAT', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#7a5f96',
+    }).setOrigin(0.5, 0.5);
+
+    const hatTrack = this.add.rectangle(
+      PREVIEW_CENTER_X,
+      HAT_METER_Y,
+      HAT_METER_WIDTH,
+      HAT_METER_HEIGHT,
+      TRACK_COLOR,
+    );
+
+    this.hatPrompt = this.add.text(PREVIEW_CENTER_X, HAT_METER_Y + 22, HAT_PROMPT, {
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: '#c98cff',
+    }).setOrigin(0.5, 0.5).setVisible(false);
+
+    this.hatMeter = this.add.rectangle(
+      PREVIEW_CENTER_X - HAT_METER_WIDTH / 2,
+      HAT_METER_Y,
+      0,
+      HAT_METER_HEIGHT,
+      TRACK_LIT_COLOR,
+    ).setOrigin(0, 0.5);
+
+    this.hatParts = [hatLabel, hatTrack, this.hatMeter];
+    this.runReadouts.push(...this.hatParts);
+
+    this.simulation.hatUnlocked = hatEarned();
+    for (const part of this.hatParts) {
+      part.setVisible(this.simulation.hatUnlocked);
+    }
+
+    this.hatBeam = this.add.rectangle(0, 0, HAT_BEAM_WIDTH, 0, TRACK_LIT_COLOR)
+      .setVisible(false)
+      .setBlendMode(BlendModes.ADD);
+
     this.previewTiles = [
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y, tileTexture(null)),
@@ -540,6 +607,7 @@ export class BoardScene extends Scene {
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
+    this.hatKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.F);
 
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.typeIntoAnswer(event));
 
@@ -623,11 +691,11 @@ export class BoardScene extends Scene {
 
     this.gameOverHint = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2 + 78,
-      'r — again',
+      HINT_ALONE_Y,
+      'restart',
       {
         fontFamily: 'monospace',
-        fontSize: '15px',
+        fontSize: '14px',
         color: '#8ea3b0',
         backgroundColor: '#221038',
         padding: { x: 10, y: 5 },
@@ -636,14 +704,14 @@ export class BoardScene extends Scene {
 
     this.contactOffer = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2 + 112,
+      CONTACT_OFFER_Y,
       REACH_OUT_LINE,
       {
         fontFamily: 'monospace',
-        fontSize: '15px',
-        color: '#c98cff',
-        backgroundColor: '#2b1644',
-        padding: { x: 12, y: 6 },
+        fontSize: '19px',
+        color: '#221038',
+        backgroundColor: '#c98cff',
+        padding: { x: 18, y: 10 },
       },
     )
       .setOrigin(0.5, 0.5)
@@ -733,7 +801,7 @@ export class BoardScene extends Scene {
     }
 
     if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.restartKey)) {
-      this.restart();
+      this.restart(this.moreToReach);
     }
 
     if (!this.paused && !this.simulation.toppedOut && !this.storyHolding
@@ -805,6 +873,7 @@ export class BoardScene extends Scene {
     this.drawPair();
     this.drawPreview();
     this.refreshChain();
+    this.refreshHat();
     this.refreshAnswerLine(time);
     this.refreshStatic();
     this.refreshGameOver();
@@ -853,7 +922,7 @@ export class BoardScene extends Scene {
 
   private restart(keepMemory = false, keepStory = false): void {
     this.setPaused(false);
-    this.simulation.restart();
+    this.simulation.restart(keepMemory);
 
     this.lastPiecesSpawned = -1;
 
@@ -901,6 +970,7 @@ export class BoardScene extends Scene {
     this.tweens.killAll();
     this.staticStrength = 0;
     this.staticOverlay.setVisible(false);
+    this.hatBeam.setVisible(false);
     this.cameras.main.filters.external.clear();
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
     for (const slot of this.connections) {
@@ -956,6 +1026,10 @@ export class BoardScene extends Scene {
     this.soundedPiecesLocked = this.simulation.piecesLocked;
     this.slamDistance = null;
     this.shownChain = -1;
+    this.shownHatCharge = -1;
+    for (const part of this.hatParts) {
+      part.setVisible(this.simulation.hatUnlocked);
+    }
     this.shownPivotType = -1;
     this.shownSatelliteType = -1;
     this.shownToppedOut = false;
@@ -977,8 +1051,11 @@ export class BoardScene extends Scene {
   }
 
   private openTheRun(): void {
-    this.showReveal('', SHADOW_OPENING_LINE, this.holdFor(SHADOW_OPENING_LINE, 1100));
-    this.revealBody.setColor('#b07dff');
+    if (playedBefore()) {
+      this.showReveal('', SHADOW_OPENING_LINE, this.holdFor(SHADOW_OPENING_LINE, 1100));
+      this.revealBody.setColor('#b07dff');
+    }
+    rememberPlayed();
 
     this.holdObjective(0);
   }
@@ -1014,6 +1091,10 @@ export class BoardScene extends Scene {
   private readInput(delta: number): void {
     if (Input.Keyboard.JustDown(this.cursors.up)) {
       this.simulation.rotate();
+    }
+
+    if (Input.Keyboard.JustDown(this.hatKey)) {
+      this.fireTheHat();
     }
 
     if (Input.Keyboard.JustDown(this.hardDropKey)) {
@@ -1491,6 +1572,10 @@ export class BoardScene extends Scene {
 
   }
 
+  private get moreToReach(): boolean {
+    return this.locate(this.nodesRevealed) !== null;
+  }
+
   private locate(total: number): { memoryIndex: number; nodeIndex: number } | null {
     let remaining = total;
 
@@ -1530,6 +1615,10 @@ export class BoardScene extends Scene {
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
+
+    if (node.grantsHat === true) {
+      this.grantHat();
+    }
 
     this.pendingReveal = nodeIndex === memory.nodes.length - 1
       ? { title: '', body: memory.question, memoryIndex }
@@ -2023,6 +2112,87 @@ export class BoardScene extends Scene {
     return borrowed;
   }
 
+  private fireTheHat(): void {
+    if (!this.simulation.canFireHat) {
+      return;
+    }
+
+    const firedFrom = this.simulation.pair.row;
+    const column = this.simulation.pair.column;
+    const hit = this.simulation.fireHat();
+
+    const x = centerOfColumn(column);
+    const fromY = centerOfRow(Math.max(firedFrom, FIRST_VISIBLE_ROW));
+    const toY = centerOfRow(hit === null ? ROWS - 1 : hit.row);
+
+    this.soundBoard.play(hatVoice());
+
+    this.tweens.killTweensOf(this.hatBeam);
+    this.hatBeam
+      .setPosition(x, (fromY + toY) / 2)
+      .setSize(HAT_BEAM_WIDTH, Math.abs(toY - fromY) + CELL_SIZE)
+      .setAlpha(1)
+      .setVisible(true);
+    this.tweens.add({
+      targets: this.hatBeam,
+      alpha: 0,
+      duration: hit === null ? HAT_BEAM_DURATION : HAT_BEAM_HIT_DURATION,
+      onComplete: () => this.hatBeam.setVisible(false),
+    });
+
+    if (hit === null) {
+      return;
+    }
+
+    this.hitStopRemaining = this.tuning.hitStopDuration;
+    this.cameras.main.shake(180, this.tuning.shakeIntensity * 2);
+
+    const tile = this.popTiles[0];
+    this.tweens.killTweensOf(tile);
+    tile
+      .setPosition(x, toY)
+      .setTexture(shadowBodyTexture(hit.strength))
+      .setScale(1)
+      .setAngle(0)
+      .setAlpha(1)
+      .setVisible(true);
+    this.tweens.add({
+      targets: tile,
+      scale: 1.7,
+      alpha: 0,
+      duration: 340,
+      ease: 'Quad.easeOut',
+      onComplete: () => tile.setVisible(false),
+    });
+
+    this.sparks.setParticleTint(TRACK_LIT_COLOR);
+    this.sparks.emitParticleAt(x, toY, SPARKS_PER_CELL * 2);
+  }
+
+  private refreshHat(): void {
+    this.hatPrompt.setVisible(this.simulation.canFireHat && !this.storyHolding);
+
+    if (this.simulation.hatCharge === this.shownHatCharge) {
+      return;
+    }
+
+    this.shownHatCharge = this.simulation.hatCharge;
+    const filled = (this.simulation.hatCharge / HAT_FULL_CHARGE) * HAT_METER_WIDTH;
+    this.hatMeter.setSize(filled, HAT_METER_HEIGHT);
+  }
+
+  private grantHat(): void {
+    rememberHat();
+    this.simulation.hatUnlocked = true;
+    this.simulation.hatCharge = HAT_FULL_CHARGE;
+    this.shownHatCharge = -1;
+
+    for (const part of this.hatParts) {
+      part.setVisible(true).setAlpha(0);
+      this.tweens.add({ targets: part, alpha: 1, duration: 420 });
+    }
+  }
+
   private bounceLanding(): void {
     for (const cell of this.simulation.lastLanded) {
       if (!isVisibleRow(cell.row)) {
@@ -2215,6 +2385,7 @@ export class BoardScene extends Scene {
         return;
       }
       this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
+      this.gameOverHint.setY(HINT_ALONE_Y);
 
       for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint]) {
         text.setVisible(true).setAlpha(0);
@@ -2265,9 +2436,9 @@ export class BoardScene extends Scene {
         return;
       }
 
-      const finished = MEMORIES[Math.max(0, this.answeringMemory)];
+      this.gameOverHint.setY(HINT_BELOW_OFFER_Y);
       this.gameOverText.setText(STILL_CONNECTED);
-      this.gameOverLine.setText(recoveredLine(finished.title));
+      this.gameOverLine.setText(RECOVERED_LINE);
 
       for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer]) {
         text.setVisible(true).setAlpha(0);

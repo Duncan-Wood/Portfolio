@@ -3,7 +3,7 @@ import { Link as ScrollLink } from "react-scroll";
 import purple_leaf_stroke from "../assets/design/purple-leaf-stroke.png";
 
 // `to` must match a section id rendered by StandardPortfolio; nothing enforces it.
-const scrollLinks = [
+export const scrollLinks = [
   { to: "home", label: "Duncan Wood", image: purple_leaf_stroke },
   { to: "about", label: "About" },
   { to: "experience", label: "Experience" },

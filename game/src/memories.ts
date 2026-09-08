@@ -2,6 +2,7 @@ interface MemoryNode {
   title: string;
   body: string;
   photo?: string;
+  grantsHat?: boolean;
 }
 
 export interface Memory {
@@ -30,6 +31,7 @@ export const MEMORIES: Memory[] = [
       {
         title: 'The Hat',
         photo: 'the-hat',
+        grantsHat: true,
         body: 'I auditioned to be a sheriff in a play and wore a cowboy hat.',
       },
       {

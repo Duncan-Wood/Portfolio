@@ -7,6 +7,7 @@ import {
   isShadow,
   shadowCell,
   shadowHolding,
+  shadowStrength,
 } from './grid';
 import { Board, type TileMove } from './board';
 import { FallingPair, type PairCell } from './falling-pair';
@@ -18,6 +19,7 @@ import {
   type GroupCell,
   type ShadowHit,
 } from './matching';
+import { HAT_FULL_CHARGE, chargeFor } from './hat';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
 export const SPAWN_COLUMN = Math.floor((COLUMNS - 1) / 2);
@@ -48,6 +50,10 @@ export class Simulation {
   pieceBudget = 0;
 
   chainLength = 0;
+
+  hatCharge = 0;
+
+  hatUnlocked = false;
 
   shadowTaken = 0;
 
@@ -143,10 +149,13 @@ export class Simulation {
     }
   }
 
-  restart(): void {
+  restart(keepHatCharge = false): void {
     this.board.reset();
 
     this.score = 0;
+    if (!keepHatCharge) {
+      this.hatCharge = 0;
+    }
     this.connectionsMade = 0;
     this.chainLength = 0;
     this.stallTimer = 0;
@@ -235,10 +244,54 @@ export class Simulation {
     const connections = link.cellsCleared * (this.chainLength + 1);
 
     this.score += scoreLink(link, this.chainLength);
+    if (this.hatUnlocked) {
+      this.hatCharge = Math.min(
+        this.hatCharge + chargeFor(link, this.chainLength),
+        HAT_FULL_CHARGE,
+      );
+    }
     this.connectionsMade += connections;
     this.chainLength += 1;
     this.settlePending = true;
     this.recordBeat({ kind: 'clear', link, connections });
+  }
+
+  get hatReady(): boolean {
+    return this.hatUnlocked && this.hatCharge >= HAT_FULL_CHARGE;
+  }
+
+  get canFireHat(): boolean {
+    return this.acceptsInput && this.hatReady;
+  }
+
+  fireHat(): ShadowHit | null {
+    if (!this.canFireHat) {
+      return null;
+    }
+
+    const { column } = this.pair;
+
+    for (let row = this.pair.row; row < ROWS; row += 1) {
+      const cell = this.board.pieceAt(column, row);
+      if (!isShadow(cell)) {
+        continue;
+      }
+
+      const holding = shadowHolding(cell as number);
+      const strength = shadowStrength(cell as number);
+
+      this.board.clear(column, row);
+      this.board.place(column, row, holding);
+      this.hatCharge = 0;
+
+      if (findGroups(this.board).length > 0) {
+        this.beginResolving();
+      }
+
+      return { column, row, strength, turnedTo: holding };
+    }
+
+    return null;
   }
 
   answerQuestion(): { driven: readonly ShadowHit[]; settled: readonly TileMove[] } {
@@ -320,14 +373,18 @@ export class Simulation {
     this.piecesLocked += 1;
 
     if (findGroups(this.board).length > 0) {
-      this.resolving = true;
-      this.chainLength = 0;
-      this.resolveTimer = 0;
-      this.settlePending = false;
+      this.beginResolving();
       return;
     }
 
     this.spawnOrTopOut();
+  }
+
+  private beginResolving(): void {
+    this.resolving = true;
+    this.chainLength = 0;
+    this.resolveTimer = 0;
+    this.settlePending = false;
   }
 
   private spawnOrTopOut(): void {

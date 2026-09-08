@@ -3,16 +3,27 @@ export const SHADOW_LINES: readonly (readonly string[])[] = [
     'You were doing well.',
     'There it is.',
     'I know this part.',
+    'You are getting distracted.',
+    'This is not going anywhere.',
+    'What is the point of this?',
   ],
   [
     'You will stop before this is finished.',
     'You always do.',
     'This is usually where you find something else to do.',
+    'This is kind of pretentious.',
+    'Are you not bored?',
+    'You will never feel finished.',
   ],
   [
     'It was never the game that was hard.',
     'This is the part you do not tell anyone about.',
     'I am not the thing stopping you.',
+    'This is not substantial.',
+    'You are not talented enough for this.',
+    'This is not working.',
+    'No one will remember this.',
+    'You are coming off as fake.',
   ],
 ];
 
@@ -24,11 +35,9 @@ export const SHADOW_OPENING_LINE = 'You stopped here before.';
 
 export const STILL_CONNECTED = 'STILL CONNECTED';
 
-export function recoveredLine(memoryTitle: string): string {
-  return `${memoryTitle} is yours again.`;
-}
+export const RECOVERED_LINE = 'You\'ve found ways to start connecting outside yourself.';
 
-export const REACH_OUT_LINE = 'say hello';
+export const REACH_OUT_LINE = 'reach out to me';
 
 export interface UnfinishedBusiness {
   reaching: string | null;
