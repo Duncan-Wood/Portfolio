@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isColour, isNeuron, isShadow } from './grid';
 import { lightAdjacent, neuronsOn, unlitCount } from './neurons';
 import { Board } from './board';
-import { LOCKS, isSolved, lockFor, seedLock } from './locks';
+import { LOCKS, SEED_ROWS, isSolved, lockFor, seedLock } from './locks';
 import { MEMORIES } from '../memories';
 
 const fixed = (values: number[]) => {
   let index = 0;
   return () => values[index++ % values.length];
 };
+
+const WITH_SHADOWS = LOCKS.find((lock) => lock.shadows > 0)!;
 
 const cellsOn = (board: Board) => {
   const found: { column: number; row: number; piece: number }[] = [];
@@ -28,6 +30,23 @@ describe('a lock is a board with something to work out', () => {
     for (const lock of LOCKS) {
       expect(lock.objective.length).toBeGreaterThan(0);
       expect(lock.objective).toMatch(/[a-z]/);
+    }
+  });
+
+  it('never asks for more seeded cells than the seed area holds', () => {
+    for (const lock of LOCKS) {
+      expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * SEED_ROWS);
+    }
+  });
+
+  it('has a lock for every fragment, so difficulty does not plateau', () => {
+    const fragments = MEMORIES.reduce((total, memory) => total + memory.nodes.length, 0);
+    expect(LOCKS.length).toBeGreaterThanOrEqual(fragments);
+  });
+
+  it('gives every lock a score that fills the memory picture', () => {
+    for (const lock of LOCKS) {
+      expect(lock.fillScore).toBeGreaterThan(0);
     }
   });
 
@@ -86,7 +105,7 @@ describe('a lock is a board with something to work out', () => {
 
   it('opens with a shadow standing beside a neuron', () => {
     const board = new Board();
-    seedLock(board, LOCKS[0], fixed([0.3, 0.7, 0.5, 0.15, 0.85]));
+    seedLock(board, WITH_SHADOWS, fixed([0.3, 0.7, 0.5, 0.15, 0.85]));
 
     const beside = neuronsOn(board).some(({ column, row }) =>
       [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) =>
@@ -109,7 +128,7 @@ describe('a lock is a board with something to work out', () => {
 
   it('does not care whether the shadows are gone', () => {
     const board = new Board();
-    seedLock(board, LOCKS[0], fixed([0.3, 0.7, 0.5]));
+    seedLock(board, WITH_SHADOWS, fixed([0.3, 0.7, 0.5]));
 
     for (const { column, row } of neuronsOn(board)) {
       lightAdjacent(board, [{ column, row: row - 1 }]);
@@ -117,7 +136,12 @@ describe('a lock is a board with something to work out', () => {
 
     expect(unlitCount(board)).toBe(0);
     expect(cellsOn(board).some((cell) => isShadow(cell.piece))).toBe(true);
-    expect(isSolved(LOCKS[0], board)).toBe(true);
+    expect(isSolved(WITH_SHADOWS, board)).toBe(true);
+  });
+
+  it('opens on a lock with nothing opposing the player', () => {
+    expect(LOCKS[0].shadows).toBe(0);
+    expect(LOCKS[0].neurons).toBe(1);
   });
 
   it('seeds colour under every shadow, since a shadow possesses a tile', () => {

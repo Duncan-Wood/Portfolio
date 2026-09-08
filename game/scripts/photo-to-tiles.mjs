@@ -2,32 +2,44 @@
 /*
  * Run: node scripts/photo-to-tiles.mjs
  *
- * The source photographs are real people who did not agree to appear on a public
- * portfolio. They must never be committed — only the colour indices this writes.
+ * Reads the gitignored photographs in storyboard/memory-images and rewrites
+ * src/memory-art.ts. Only the colour indices are committed, never the photos.
+ *
+ * Each piece colour supplies two tones — its dark edge shade and its bright face —
+ * so luma maps onto nine steps rather than five. Nine tones over ~40 cells
+ * resolves an object against a contrasting ground and still does not resolve a
+ * face; shoot objects, not people.
  */
 
 import { execFileSync } from 'node:child_process';
-import { readdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO = join(HERE, '..', '..');
+const SOURCES = join(HERE, '..', '..', 'storyboard', 'memory-images');
 const OUT = join(HERE, '..', 'src', 'memory-art.ts');
 
-const RAMP = ['.', '3', '0', '1', '2'];
+// Ordered by the real luma of each face: empty, then the four dark shades, then
+// the four bright ones. Codes 4..7 are the dark shade of piece 0..3.
+const RAMP = ['.', '7', '4', '5', '6', '3', '0', '1', '2'];
+const CONTRAST = ['-normalize', '-sigmoidal-contrast', '4,50%'];
 
-const SINGLE = 16;
-const CROWD_CELL = 10;
-const CROWD_COLUMNS = 5;
-const CROWD_ROWS = 4;
+// `panelColumns` is the chunky version the sidebar fills in block by block; the
+// blocks have to be big enough to see arriving.
+const PANEL_COLUMNS = 22;
 
-function quantize(file, at) {
+const PICTURES = {
+  'the-build': { file: 'puter.jpg', columns: 110, rows: 147 },
+};
+
+function quantize({ file, columns, rows, crop = [] }) {
   const raw = execFileSync('magick', [
-    file, '-resize', `${at}x${at}!`, '-colorspace', 'sRGB', '-depth', '8', 'txt:-',
-  ], { encoding: 'utf8', maxBuffer: 1 << 24 });
+    join(SOURCES, file), '-auto-orient', ...crop, ...CONTRAST,
+    '-resize', `${columns}x${rows}!`, '-colorspace', 'sRGB', '-depth', '8', 'txt:-',
+  ], { encoding: 'utf8', maxBuffer: 1 << 26 });
 
-  const grid = Array.from({ length: at }, () => new Array(at).fill('.'));
+  const grid = Array.from({ length: rows }, () => new Array(columns).fill('.'));
 
   for (const line of raw.split('\n')) {
     const match = line.match(/^(\d+),(\d+):\s*\((\d+),(\d+),(\d+)/);
@@ -36,75 +48,45 @@ function quantize(file, at) {
     }
     const [, x, y, r, g, b] = match;
     const luma = (0.299 * +r + 0.587 * +g + 0.114 * +b) / 255;
-    const lifted = Math.pow(luma, 0.75);
-    const step = Math.min(RAMP.length - 1, Math.floor(lifted * RAMP.length));
-    grid[+y][+x] = RAMP[step];
+    grid[+y][+x] = RAMP[Math.min(RAMP.length - 1, Math.floor(luma * RAMP.length))];
   }
 
-  return grid.map((row) => row.join(''));
+  return { columns, rows: grid.map((row) => row.join('')) };
 }
-
-function sample(folder, count) {
-  const files = readdirSync(folder)
-    .filter((name) => /\.(jpe?g|png)$/i.test(name))
-    .sort()
-    .map((name) => join(folder, name));
-
-  if (files.length <= count) {
-    return files;
-  }
-  const stride = files.length / count;
-  return Array.from({ length: count }, (_, i) => files[Math.floor(i * stride)]);
-}
-
-function crowd(folder) {
-  const faces = sample(folder, CROWD_COLUMNS * CROWD_ROWS)
-    .map((file) => quantize(file, CROWD_CELL));
-
-  const columns = CROWD_COLUMNS * CROWD_CELL + (CROWD_COLUMNS - 1);
-  const rows = [];
-
-  for (let band = 0; band < CROWD_ROWS; band += 1) {
-    for (let line = 0; line < CROWD_CELL; line += 1) {
-      const across = [];
-      for (let column = 0; column < CROWD_COLUMNS; column += 1) {
-        const face = faces[band * CROWD_COLUMNS + column];
-        across.push(face === undefined ? '.'.repeat(CROWD_CELL) : face[line]);
-      }
-      rows.push(across.join('.'));
-    }
-    if (band < CROWD_ROWS - 1) {
-      rows.push('.'.repeat(columns));
-    }
-  }
-
-  return { columns, rows };
-}
-
-const PICTURES = {
-  'the-hat': () => crowd(join(REPO, 'cowboy_hat')),
-};
 
 const built = {};
-for (const [key, make] of Object.entries(PICTURES)) {
+for (const [key, picture] of Object.entries(PICTURES)) {
   try {
-    built[key] = make();
-    process.stdout.write(`${key}: ${built[key].columns} wide, ${built[key].rows.length} tall\n`);
+    const panelRows = Math.round(PANEL_COLUMNS * picture.rows / picture.columns);
+    built[key] = {
+      ...quantize(picture),
+      panel: quantize({ ...picture, columns: PANEL_COLUMNS, rows: panelRows }),
+    };
+    process.stdout.write(
+      `${key}: ${picture.columns}x${picture.rows}, panel ${PANEL_COLUMNS}x${panelRows}\n`);
   } catch (error) {
     process.stderr.write(`${key}: skipped (${error.message.split('\n')[0]})\n`);
   }
 }
 
-const body = Object.entries(built).map(([key, art]) => {
-  const rows = art.rows.map((row) => `    '${row}',`).join('\n');
-  return `  '${key}': {\n    columns: ${art.columns},\n    rows: [\n${rows}\n    ],\n  },`;
-}).join('\n');
+const grid = (art, indent) => {
+  const rows = art.rows.map((row) => `${indent}  '${row}',`).join('\n');
+  return `${indent}columns: ${art.columns},\n${indent}rows: [\n${rows}\n${indent}],`;
+};
+
+const body = Object.entries(built).map(([key, art]) => (
+  `  '${key}': {\n${grid(art, '    ')}\n    panel: {\n${grid(art.panel, '      ')}\n    },\n  },`
+)).join('\n');
 
 writeFileSync(OUT, `// GENERATED by \`scripts/photo-to-tiles.mjs\` — do not edit by hand.
 
-export interface MemoryArt {
+export interface MemoryGrid {
   columns: number;
   rows: readonly string[];
+}
+
+export interface MemoryArt extends MemoryGrid {
+  panel: MemoryGrid;
 }
 
 export const MEMORY_ART: Readonly<Record<string, MemoryArt>> = {

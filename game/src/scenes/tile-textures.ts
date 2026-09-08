@@ -225,18 +225,22 @@ function bakeMemoryArt(
         continue;
       }
 
-      const pieceType = Number(mark);
-      if (!Number.isInteger(pieceType) || pieceType >= PIECE_TYPE_COUNT) {
+      const code = Number(mark);
+      if (!Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
         continue;
       }
 
+      const shaded = code >= PIECE_TYPE_COUNT;
+      const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
+      const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
+      const edge = mix(colour, 0x000000, shaded ? 0.8 : 0.62);
+
       const x = column * cell;
       const y = row * cell;
-      const colour = PIECE_COLORS[pieceType];
 
-      graphics.fillStyle(mix(colour, 0x000000, 0.62), 1);
+      graphics.fillStyle(edge, 1);
       graphics.fillRect(x, y, cell, cell);
-      graphics.fillStyle(colour, 1);
+      graphics.fillStyle(face, 1);
       graphics.fillRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2);
     }
   }

@@ -19,19 +19,31 @@ export interface Lock {
   shadows: number;
   tiles: number;
   pieces: number;
+
+  /** Score that fills the memory picture. Solving fills it regardless. */
+  fillScore: number;
 }
 
-const SEED_ROWS = 3;
+export const SEED_ROWS = 3;
 
 // `tiles + shadows + neurons` must fit COLUMNS x SEED_ROWS; overflow is silent
 // and leaves the board unsolvable.
 export const LOCKS: readonly Lock[] = [
   {
     objective: 'light every neuron',
+    neurons: 1,
+    shadows: 0,
+    tiles: 13,
+    pieces: 14,
+    fillScore: 80,
+  },
+  {
+    objective: 'light every neuron',
     neurons: 3,
     shadows: 1,
     tiles: 11,
     pieces: 12,
+    fillScore: 180,
   },
   {
     objective: 'light every neuron',
@@ -39,20 +51,23 @@ export const LOCKS: readonly Lock[] = [
     shadows: 2,
     tiles: 11,
     pieces: 11,
+    fillScore: 180,
   },
   {
     objective: 'light every neuron',
     neurons: 4,
     shadows: 2,
     tiles: 10,
-    pieces: 12,
+    pieces: 11,
+    fillScore: 220,
   },
   {
     objective: 'light every neuron',
-    neurons: 4,
-    shadows: 2,
-    tiles: 10,
+    neurons: 5,
+    shadows: 3,
+    tiles: 9,
     pieces: 10,
+    fillScore: 280,
   },
 ];
 
