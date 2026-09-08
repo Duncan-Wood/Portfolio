@@ -186,7 +186,7 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
 
     const piece = board.pieceAt(beside.column, beside.row) as number;
     board.clear(beside.column, beside.row);
-    board.place(beside.column, beside.row, shadowCell(1, piece));
+    board.place(beside.column, beside.row, shadowCell(piece));
     taken += 1;
   }
 
@@ -201,7 +201,7 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
       }
 
       board.clear(column, row);
-      board.place(column, row, shadowCell(1, piece));
+      board.place(column, row, shadowCell(piece));
       taken += 1;
     }
   }

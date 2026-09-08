@@ -3,7 +3,6 @@ import {
   COLUMNS,
   FIRST_VISIBLE_ROW,
   HIDDEN_ROWS,
-  MAX_SHADOW_STRENGTH,
   PIECE_TYPE_COUNT,
   ROWS,
   VISIBLE_ROWS,
@@ -65,8 +64,8 @@ describe('the neuron', () => {
 
   it('does not claim a shadow or a colour as one of its own', () => {
     expect(isNeuron(0)).toBe(false);
-    expect(isNeuron(shadowCell(1, 0))).toBe(false);
-    expect(isNeuron(shadowCell(MAX_SHADOW_STRENGTH, PIECE_TYPE_COUNT - 1))).toBe(false);
+    expect(isNeuron(shadowCell(0))).toBe(false);
+    expect(isNeuron(shadowCell(PIECE_TYPE_COUNT - 1))).toBe(false);
     expect(isNeuron(null)).toBe(false);
   });
 
@@ -74,7 +73,7 @@ describe('the neuron', () => {
     expect(isAnchored(neuronCell(false))).toBe(true);
     expect(isAnchored(neuronCell(true))).toBe(true);
     expect(isAnchored(0)).toBe(false);
-    expect(isAnchored(shadowCell(1, 0))).toBe(false);
+    expect(isAnchored(shadowCell(0))).toBe(false);
     expect(isAnchored(null)).toBe(false);
   });
 });

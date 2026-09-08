@@ -1,7 +1,7 @@
 /*
- *   0..3   │   4..7    │   8..11   │  12   13
- * colours  │ shadow s1 │ shadow s2 │ neuron
- *          │ over 0..3 │ over 0..3 │ dark, lit
+ *   0..3   │   4..7    │   8    9
+ * colours  │  shadow   │  neuron
+ *          │ over 0..3 │ dark, lit
  *
  * Read cells with the predicates below, never by comparing to a band constant.
  */
@@ -20,30 +20,21 @@ export const PIECE_TYPE_COUNT = 4;
 
 export const SHADOW = PIECE_TYPE_COUNT;
 
-export const MAX_SHADOW_STRENGTH = 2;
-
-const SHADOW_VALUES = MAX_SHADOW_STRENGTH * PIECE_TYPE_COUNT;
-
 export function isShadow(pieceType: number | null): pieceType is number {
   return pieceType !== null
     && pieceType >= SHADOW
-    && pieceType < SHADOW + SHADOW_VALUES;
+    && pieceType < SHADOW + PIECE_TYPE_COUNT;
 }
 
-export function shadowCell(strength: number, holding: number): number {
-  const tier = Math.min(Math.max(strength, 1), MAX_SHADOW_STRENGTH) - 1;
-  return SHADOW + tier * PIECE_TYPE_COUNT + holding;
-}
-
-export function shadowStrength(pieceType: number): number {
-  return Math.floor((pieceType - SHADOW) / PIECE_TYPE_COUNT) + 1;
+export function shadowCell(holding: number): number {
+  return SHADOW + holding;
 }
 
 export function shadowHolding(pieceType: number): number {
-  return (pieceType - SHADOW) % PIECE_TYPE_COUNT;
+  return pieceType - SHADOW;
 }
 
-export const NEURON = SHADOW + SHADOW_VALUES;
+export const NEURON = SHADOW + PIECE_TYPE_COUNT;
 
 const NEURON_VALUES = 2;
 

@@ -12,7 +12,6 @@ const linkClearing = (cellsCleared: number): ChainLink => ({
   groups: [],
   cellsCleared,
   shadowPurified: [],
-  shadowDamaged: [],
   neuronsLit: [],
 });
 
@@ -82,7 +81,7 @@ describe('charging by playing', () => {
 
 describe('firing', () => {
   const shadowAt = (game: Simulation, row: number, holding: number) => {
-    game.board.place(SPAWN_COLUMN, row, shadowCell(2, holding));
+    game.board.place(SPAWN_COLUMN, row, shadowCell(holding));
   };
 
   it('strips the shadow, gives back its colour, and spends the charge', () => {
@@ -91,7 +90,7 @@ describe('firing', () => {
     shadowAt(game, ROWS - 1, RED);
 
     expect(game.fireHat()).toEqual({
-      column: SPAWN_COLUMN, row: ROWS - 1, strength: 2, turnedTo: RED,
+      column: SPAWN_COLUMN, row: ROWS - 1, turnedTo: RED,
     });
     expect(game.board.pieceAt(SPAWN_COLUMN, ROWS - 1)).toBe(RED);
     expect(game.hatCharge).toBe(0);
@@ -110,7 +109,7 @@ describe('firing', () => {
   it('only fires down its own column, and a miss costs nothing', () => {
     const game = simulation();
     game.hatCharge = HAT_FULL_CHARGE;
-    game.board.place(SPAWN_COLUMN + 1, ROWS - 1, shadowCell(2, RED));
+    game.board.place(SPAWN_COLUMN + 1, ROWS - 1, shadowCell(RED));
 
     expect(game.fireHat()).toBeNull();
     expect(isShadow(game.board.pieceAt(SPAWN_COLUMN + 1, ROWS - 1))).toBe(true);
@@ -147,7 +146,7 @@ describe('before the hat is earned', () => {
   it('will not fire even if something hands it a full charge', () => {
     const game = locked();
     game.hatCharge = HAT_FULL_CHARGE;
-    game.board.place(SPAWN_COLUMN, ROWS - 1, shadowCell(2, RED));
+    game.board.place(SPAWN_COLUMN, ROWS - 1, shadowCell(RED));
 
     expect(game.fireHat()).toBeNull();
     expect(isShadow(game.board.pieceAt(SPAWN_COLUMN, ROWS - 1))).toBe(true);

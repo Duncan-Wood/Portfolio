@@ -1,13 +1,11 @@
 import {
   COLUMNS,
   FIRST_VISIBLE_ROW,
-  MAX_SHADOW_STRENGTH,
   ROWS,
   isColour,
   isShadow,
   shadowCell,
   shadowHolding,
-  shadowStrength,
 } from './grid';
 import { Board, type TileMove } from './board';
 import { FallingPair, type PairCell } from './falling-pair';
@@ -232,7 +230,7 @@ export class Simulation {
       return;
     }
 
-    const link = clearStep(this.board, this.chainLength);
+    const link = clearStep(this.board);
     if (link === null) {
       this.resolving = false;
       this.spawnOrTopOut();
@@ -278,7 +276,6 @@ export class Simulation {
       }
 
       const holding = shadowHolding(cell as number);
-      const strength = shadowStrength(cell as number);
 
       this.board.clear(column, row);
       this.board.place(column, row, holding);
@@ -288,7 +285,7 @@ export class Simulation {
         this.beginResolving();
       }
 
-      return { column, row, strength, turnedTo: holding };
+      return { column, row, turnedTo: holding };
     }
 
     return null;
@@ -302,7 +299,7 @@ export class Simulation {
         const cell = this.board.pieceAt(column, row);
         if (isShadow(cell)) {
           this.board.clear(column, row);
-          driven.push({ column, row, strength: 1, turnedTo: shadowHolding(cell) });
+          driven.push({ column, row, turnedTo: shadowHolding(cell) });
         }
       }
     }
@@ -350,14 +347,9 @@ export class Simulation {
 
     const { column: chosenColumn, row: chosenRow } = target;
 
-    const strength = Math.min(
-      1 + Math.floor(this.shadowTaken / this.tuning.arrivalsPerShadowStrength),
-      MAX_SHADOW_STRENGTH,
-    );
-
     const taken = this.board.pieceAt(chosenColumn, chosenRow) as number;
     this.board.clear(chosenColumn, chosenRow);
-    this.board.place(chosenColumn, chosenRow, shadowCell(strength, taken));
+    this.board.place(chosenColumn, chosenRow, shadowCell(taken));
 
     this.lastShadowCell = { column: chosenColumn, row: chosenRow };
     this.shadowTaken += 1;

@@ -102,19 +102,6 @@ export function shadowRecedeVoice(cellsPushed: number): Voice {
   };
 }
 
-export function shadowStruckVoice(cellsStruck: number): Voice {
-  const weight = Math.min(cellsStruck, 4) / 4;
-
-  return {
-    waveform: 'square',
-    startFrequency: 210 + 40 * weight,
-    endFrequency: 120,
-    duration: 70,
-    gain: 0.05 + 0.03 * weight,
-    delay: 0,
-  };
-}
-
 export function answerVoice(index: number): Voice {
   const frequency = 330 * 2 ** (Math.min(index, 24) / 12);
 

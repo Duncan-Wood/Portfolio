@@ -242,7 +242,7 @@ describe('pushing the shadow back', () => {
     const cleared = beats.flatMap((beat) => (beat.kind === 'clear' ? beat.link.shadowPurified : []));
 
     expect(cleared).toEqual([
-      { column: 3, row: ROWS - 2, strength: 1, turnedTo: RED },
+      { column: 3, row: ROWS - 2, turnedTo: RED },
     ]);
   });
 

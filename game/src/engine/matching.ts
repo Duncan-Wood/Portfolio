@@ -6,9 +6,7 @@ import {
   ROWS,
   isColour,
   isShadow,
-  shadowCell,
   shadowHolding,
-  shadowStrength,
 } from './grid';
 
 const MATCH_SIZE = 4;
@@ -26,7 +24,6 @@ export interface GroupCell {
 }
 
 export interface ShadowHit extends GroupCell {
-  strength: number;
   turnedTo?: number;
 }
 
@@ -39,7 +36,6 @@ export interface ChainLink {
   groups: Group[];
   cellsCleared: number;
   shadowPurified: ShadowHit[];
-  shadowDamaged: ShadowHit[];
   neuronsLit: NeuronSite[];
 }
 
@@ -65,7 +61,7 @@ export function findGroups(board: Board): Group[] {
   return groups;
 }
 
-export function clearStep(board: Board, linkIndex: number): ChainLink | null {
+export function clearStep(board: Board): ChainLink | null {
   const groups = findGroups(board);
   if (groups.length === 0) {
     return null;
@@ -79,18 +75,14 @@ export function clearStep(board: Board, linkIndex: number): ChainLink | null {
     }
   }
 
-  const { purified, damaged } = damageShadow(board, groups, linkIndex + 1);
+  const purified = purifyShadow(board, groups);
 
   const neuronsLit = lightAdjacent(board, groups.flatMap((group) => group.cells));
 
-  return { groups, cellsCleared, shadowPurified: purified, shadowDamaged: damaged, neuronsLit };
+  return { groups, cellsCleared, shadowPurified: purified, neuronsLit };
 }
 
-function damageShadow(
-  board: Board,
-  groups: Group[],
-  damage: number,
-): { purified: ShadowHit[]; damaged: ShadowHit[] } {
+function purifyShadow(board: Board, groups: Group[]): ShadowHit[] {
   const touched = new Map<number, GroupCell>();
 
   for (const group of groups) {
@@ -108,51 +100,20 @@ function damageShadow(
   }
 
   const purified: ShadowHit[] = [];
-  const damaged: ShadowHit[] = [];
 
   for (const { column, row } of touched.values()) {
-    const cell = board.pieceAt(column, row) as number;
-    const was = shadowStrength(cell);
-    const holding = shadowHolding(cell);
-    const remaining = was - damage;
+    const holding = shadowHolding(board.pieceAt(column, row) as number);
 
     board.clear(column, row);
-
-    if (remaining <= 0) {
-      board.place(column, row, holding);
-      purified.push({ column, row, strength: was, turnedTo: holding });
-    } else {
-      board.place(column, row, shadowCell(remaining, holding));
-      damaged.push({ column, row, strength: remaining });
-    }
+    board.place(column, row, holding);
+    purified.push({ column, row, turnedTo: holding });
   }
 
-  return { purified, damaged };
-}
-
-export function resolveStep(board: Board, linkIndex = 0): ChainLink | null {
-  board.settle();
-  return clearStep(board, linkIndex);
-}
-
-export function resolveChain(board: Board): ChainLink[] {
-  const links: ChainLink[] = [];
-
-  for (;;) {
-    const link = resolveStep(board, links.length);
-    if (link === null) {
-      return links;
-    }
-    links.push(link);
-  }
+  return purified;
 }
 
 export function scoreLink(link: ChainLink, linkIndex: number): number {
   return link.cellsCleared * 10 * 2 ** linkIndex;
-}
-
-export function scoreChain(links: ChainLink[]): number {
-  return links.reduce((total, link, index) => total + scoreLink(link, index), 0);
 }
 
 // Cells are marked visited when pushed, not popped; marking on pop counts a

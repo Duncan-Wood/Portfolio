@@ -1,8 +1,6 @@
 export interface Tuning {
   shadowInterval: number;
 
-  arrivalsPerShadowStrength: number;
-
   readingPerCharacter: number;
 
   fallInterval: number;
@@ -34,7 +32,6 @@ export interface Tuning {
 
 export const DEFAULT_TUNING: Tuning = {
   shadowInterval: 6000,
-  arrivalsPerShadowStrength: 4,
   readingPerCharacter: 48,
   fallInterval: 400,
   softDropInterval: 50,

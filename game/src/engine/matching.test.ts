@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { Board } from './board';
 import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, neuronCell } from './grid';
-import { clearStep, findGroups, resolveChain, scoreChain } from './matching';
+import { type ChainLink, clearStep, findGroups, scoreLink } from './matching';
+
+const resolveChain = (board: Board): ChainLink[] => {
+  const links: ChainLink[] = [];
+  for (;;) {
+    board.settle();
+    const link = clearStep(board);
+    if (link === null) {
+      return links;
+    }
+    links.push(link);
+  }
+};
+
+const scoreChain = (links: ChainLink[]): number =>
+  links.reduce((total, link, index) => total + scoreLink(link, index), 0);
 
 const PIECE_LETTERS: Record<string, number> = {
   R: 0, B: 1, G: 2, Y: 3, N: neuronCell(false), n: neuronCell(true),
@@ -200,23 +215,23 @@ describe('clearing without settling', () => {
 
   it('removes the matched group', () => {
     const board = hangingTrigger();
-    clearStep(board, 0);
+    clearStep(board);
     expect(board.isEmpty(1, ROWS - 1)).toBe(true);
   });
 
   it('leaves the tile above the hole hanging, so the drop can be seen', () => {
     const board = hangingTrigger();
-    clearStep(board, 0);
+    clearStep(board);
     expect(board.pieceAt(1, ROWS - 4)).toBe(PIECE_LETTERS.R);
   });
 
   it('reports nothing when there is no group to clear', () => {
-    expect(clearStep(boardFrom('R R B B . .'), 0)).toBeNull();
+    expect(clearStep(boardFrom('R R B B . .'))).toBeNull();
   });
 
   it('settling afterwards drops the hanging tile to the floor', () => {
     const board = hangingTrigger();
-    clearStep(board, 0);
+    clearStep(board);
     board.settle();
     expect(board.pieceAt(1, ROWS - 1)).toBe(PIECE_LETTERS.R);
   });
@@ -252,7 +267,7 @@ describe('the hidden row is inert', () => {
     board.place(1, FIRST_VISIBLE_ROW, RED);
     board.place(0, FIRST_VISIBLE_ROW - 1, RED);
 
-    clearStep(board, 0);
+    clearStep(board);
 
     expect(board.pieceAt(0, FIRST_VISIBLE_ROW - 1)).toBe(RED);
   });
@@ -271,7 +286,7 @@ describe('reaching a neuron', () => {
   it('lights one a cleared group was touching', () => {
     const board = boardFrom('N R R R R .');
 
-    const link = clearStep(board, 0);
+    const link = clearStep(board);
 
     expect(link?.neuronsLit).toEqual([{ column: 0, row: ROWS - 1 }]);
   });
@@ -279,7 +294,7 @@ describe('reaching a neuron', () => {
   it('lights every neuron the same clear reached', () => {
     const board = boardFrom('N R R R R N');
 
-    expect(clearStep(board, 0)?.neuronsLit).toHaveLength(2);
+    expect(clearStep(board)?.neuronsLit).toHaveLength(2);
   });
 
   it('leaves a neuron the clear never touched dark', () => {
@@ -288,7 +303,7 @@ describe('reaching a neuron', () => {
       '. R R R R .',
     );
 
-    expect(clearStep(board, 0)?.neuronsLit).toEqual([]);
+    expect(clearStep(board)?.neuronsLit).toEqual([]);
   });
 
   it('reports the neuron on the LINK that reached it, not the first', () => {
@@ -309,6 +324,6 @@ describe('reaching a neuron', () => {
   it('does not report one that was already lit', () => {
     const board = boardFrom('n R R R R .');
 
-    expect(clearStep(board, 0)?.neuronsLit).toEqual([]);
+    expect(clearStep(board)?.neuronsLit).toEqual([]);
   });
 });

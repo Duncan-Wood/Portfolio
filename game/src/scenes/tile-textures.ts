@@ -1,6 +1,6 @@
 import { Math as PhaserMath } from 'phaser';
 import { MEMORY_ART, type MemoryArt } from '../memory-art';
-import { MAX_SHADOW_STRENGTH, PIECE_TYPE_COUNT, isNeuron, isNeuronLit } from '../engine/grid';
+import { PIECE_TYPE_COUNT, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   EMPTY_COLOR,
   NEURON_LIT_COLOR,
@@ -25,9 +25,7 @@ const TRACE_OVERLAP = 11;
 
 export const SHADOW_EYES_TEXTURE = 'shadow-eyes';
 
-export function shadowBodyTexture(strength: number): string {
-  return `shadow-body-${Math.min(Math.max(strength, 1), MAX_SHADOW_STRENGTH)}`;
-}
+export const SHADOW_BODY_TEXTURE = 'shadow-body';
 
 const PIT_OPACITY = 0.8;
 
@@ -260,9 +258,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   bakeNeuron(graphics, size, false);
   bakeNeuron(graphics, size, true);
 
-  for (let strength = 1; strength <= MAX_SHADOW_STRENGTH; strength += 1) {
-    bakeShadow(graphics, size, strength);
-  }
+  bakeShadow(graphics, size);
   bakeShadowEyes(graphics, size);
 
   for (const [key, art] of Object.entries(MEMORY_ART)) {
@@ -274,13 +270,8 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   graphics.destroy();
 }
 
-function bakeShadow(
-  graphics: Phaser.GameObjects.Graphics,
-  size: number,
-  strength: number,
-): void {
+function bakeShadow(graphics: Phaser.GameObjects.Graphics, size: number): void {
   const middle = size / 2;
-  const menace = (strength - 1) / (MAX_SHADOW_STRENGTH - 1);
 
   graphics.clear();
 
@@ -313,7 +304,7 @@ function bakeShadow(
     );
   }
 
-  drawCrown(graphics, size, strength);
+  drawCrown(graphics, size);
 
   graphics.fillCircle(middle, size * HEAD_ROW, size * HEAD_RADIUS);
 
@@ -324,7 +315,7 @@ function bakeShadow(
   drawMouth(graphics, size);
 
   for (const light of [
-    { x: 0.5, y: HEAD_ROW, radius: HEAD_RADIUS, from: 1.2, to: 1.62, alpha: 0.5 + menace * 0.45 },
+    { x: 0.5, y: HEAD_ROW, radius: HEAD_RADIUS, from: 1.2, to: 1.62, alpha: 0.5 },
   ]) {
     graphics.lineStyle(2, SHADOW_EDGE_COLOR, light.alpha);
     graphics.beginPath();
@@ -338,9 +329,9 @@ function bakeShadow(
     graphics.strokePath();
   }
 
-  drawEyes(graphics, size, mix(SHADOW_EYE_GLOW, SHADOW_COLOR, 0.36 - menace * 0.18));
+  drawEyes(graphics, size, mix(SHADOW_EYE_GLOW, SHADOW_COLOR, 0.36));
 
-  graphics.generateTexture(shadowBodyTexture(strength), size, size);
+  graphics.generateTexture(SHADOW_BODY_TEXTURE, size, size);
 }
 
 function bakeShadowEyes(graphics: Phaser.GameObjects.Graphics, size: number): void {
@@ -412,23 +403,15 @@ function drawMouth(graphics: Phaser.GameObjects.Graphics, size: number): void {
   }
 }
 
-// Tips must never go negative — `generateTexture` crops at the texture edge —
-// and the length must stay equal to `MAX_SHADOW_STRENGTH`.
-const CROWNS = [
-  {
-    tips: [[0.22, 0.25], [0.38, 0.17], [0.58, 0.16], [0.76, 0.27]],
-    base: 0.45,
-    valley: 0.35,
-  },
-  {
-    tips: [[0.16, 0.15], [0.29, 0.03], [0.42, 0.11], [0.55, 0.0], [0.68, 0.08], [0.82, 0.18]],
-    base: 0.42,
-    valley: 0.28,
-  },
-] as const;
+// Tips must never go negative: `generateTexture` crops at the texture edge.
+const CROWN = {
+  tips: [[0.22, 0.25], [0.38, 0.17], [0.58, 0.16], [0.76, 0.27]],
+  base: 0.45,
+  valley: 0.35,
+} as const;
 
-function drawCrown(graphics: Phaser.GameObjects.Graphics, size: number, strength: number): void {
-  const { tips, base, valley } = CROWNS[Math.min(strength, MAX_SHADOW_STRENGTH) - 1];
+function drawCrown(graphics: Phaser.GameObjects.Graphics, size: number): void {
+  const { tips, base, valley } = CROWN;
 
   const points = [point(size, 0.1, base)];
   for (let index = 0; index < tips.length; index += 1) {

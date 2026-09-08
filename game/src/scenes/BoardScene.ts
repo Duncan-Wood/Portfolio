@@ -10,12 +10,11 @@ import {
   isShadow,
   neuronCell,
   shadowHolding,
-  shadowStrength,
 } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
 import { HAT_FULL_CHARGE } from '../engine/hat';
 import { type TileMove } from '../engine/board';
-import { type ChainLink, type ShadowHit } from '../engine/matching';
+import { type ChainLink } from '../engine/matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 import {
   GROUND_COLOR,
@@ -32,7 +31,7 @@ import {
   TRACE_TEXTURE,
   bakeTileTextures,
   memoryArtTexture,
-  shadowBodyTexture,
+  SHADOW_BODY_TEXTURE,
   tileTexture,
 } from './tile-textures';
 import { brainNodeAt, drawBrain } from './brain';
@@ -73,7 +72,6 @@ import {
   popVoice,
   shadowArrivalVoice,
   shadowRecedeVoice,
-  shadowStruckVoice,
   topOutVoice,
 } from '../audio/voices';
 
@@ -475,7 +473,7 @@ export class BoardScene extends Scene {
       for (let column = 0; column < COLUMNS; column += 1) {
         this.shadowBodies.push(
           this.add
-            .image(centerOfColumn(column), centerOfRow(row), shadowBodyTexture(1))
+            .image(centerOfColumn(column), centerOfRow(row), SHADOW_BODY_TEXTURE)
             .setVisible(false),
         );
       }
@@ -1174,7 +1172,7 @@ export class BoardScene extends Scene {
         );
 
         if (possessed) {
-          this.animateShadow(index, column, row, shadowStrength(pieceType as number));
+          this.animateShadow(index, column, row);
         } else if (this.animatedShadowCells.delete(index)) {
           this.restoreCell(index);
         }
@@ -1388,7 +1386,7 @@ export class BoardScene extends Scene {
       .setAlpha(closeness * flicker * 0.85);
   }
 
-  private animateShadow(index: number, column: number, row: number, strength: number): void {
+  private animateShadow(index: number, column: number, row: number): void {
     this.animatedShadowCells.add(index);
 
     const phase = column * 2.1 + row * 1.7;
@@ -1408,7 +1406,7 @@ export class BoardScene extends Scene {
 
     this.shadowBodies[index]
       .setVisible(true)
-      .setTexture(shadowBodyTexture(strength))
+      .setTexture(SHADOW_BODY_TEXTURE)
       .setPosition(x, y)
       .setAngle(lean)
       .setScale(breath * (0.5 + 0.5 * risen))
@@ -1816,7 +1814,7 @@ export class BoardScene extends Scene {
       const tile = this.popTiles[index];
       tile
         .setPosition(x, y)
-        .setTexture(shadowBodyTexture(cell.strength))
+        .setTexture(SHADOW_BODY_TEXTURE)
         .setScale(1)
         .setAngle(0)
         .setAlpha(1)
@@ -2169,7 +2167,7 @@ export class BoardScene extends Scene {
 
       husk
         .setPosition(x, y)
-        .setTexture(shadowBodyTexture(cell.strength))
+        .setTexture(SHADOW_BODY_TEXTURE)
         .setScale(1)
         .setAngle(0)
         .setAlpha(1)
@@ -2177,7 +2175,7 @@ export class BoardScene extends Scene {
 
       this.tweens.add({
         targets: husk,
-        scale: 1.45 + cell.strength * 0.22,
+        scale: 1.67,
         alpha: 0,
         duration: this.tuning.popDuration * 1.6,
         ease: 'Quad.easeOut',
@@ -2220,8 +2218,6 @@ export class BoardScene extends Scene {
       this.sparks.emitParticleAt(x, y, SPARKS_PER_CELL);
     }
 
-    borrowed = this.flinchDamagedShadow(link.shadowDamaged, borrowed);
-
     if (purified.length > 0) {
       this.soundBoard.play(shadowRecedeVoice(purified.length));
     }
@@ -2232,51 +2228,6 @@ export class BoardScene extends Scene {
 
     this.showConnectionPopup(sumX / poppedCells, sumY / poppedCells, connections);
     return sumX / poppedCells;
-  }
-
-  private flinchDamagedShadow(damaged: readonly ShadowHit[], from: number): number {
-    let borrowed = from;
-
-    for (const cell of damaged) {
-      if (!isVisibleRow(cell.row)) {
-        continue;
-      }
-
-      const x = centerOfColumn(cell.column);
-      const y = centerOfRow(cell.row);
-
-      const tile = this.popTiles[borrowed];
-      if (tile === undefined) {
-        continue;
-      }
-      borrowed += 1;
-
-      tile
-        .setPosition(x, y)
-        .setTexture(shadowBodyTexture(cell.strength + 1))
-        .setScale(1)
-        .setAngle(0)
-        .setAlpha(0.85)
-        .setVisible(true);
-
-      this.tweens.add({
-        targets: tile,
-        scale: 1.3,
-        alpha: 0,
-        duration: this.tuning.popDuration * 1.2,
-        ease: 'Quad.easeOut',
-        onComplete: () => tile.setVisible(false),
-      });
-
-      this.sparks.setParticleTint(SHADOW_EDGE_COLOR);
-      this.sparks.emitParticleAt(x, y, Math.ceil(SPARKS_PER_CELL / 2));
-    }
-
-    if (damaged.length > 0) {
-      this.soundBoard.play(shadowStruckVoice(damaged.length));
-    }
-
-    return borrowed;
   }
 
   private fireTheHat(): void {
@@ -2318,7 +2269,7 @@ export class BoardScene extends Scene {
     this.tweens.killTweensOf(tile);
     tile
       .setPosition(x, toY)
-      .setTexture(shadowBodyTexture(hit.strength))
+      .setTexture(SHADOW_BODY_TEXTURE)
       .setScale(1)
       .setAngle(0)
       .setAlpha(1)
