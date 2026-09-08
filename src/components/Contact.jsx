@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import emailjs from "emailjs-com";
 
+import { gameProgressPrefill } from "../game-progress";
+
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
 import resume from "../assets/resume.png";
@@ -11,6 +13,7 @@ const Contact = () => {
   const form = useRef();
 
   const [status, setStatus] = useState(null);
+  const [gameProgress] = useState(gameProgressPrefill);
 
   const sendEmail = (e) => {
     e.preventDefault();
@@ -126,7 +129,9 @@ const Contact = () => {
               id="contact__formMessage"
               className="w-full border border-gray-400 p-2 rounded-lg"
               name="message"
-            ></textarea>
+              rows={gameProgress ? 6 : undefined}
+              defaultValue={gameProgress}
+            />
           </div>
           <div className="flex justify-center">
             <button

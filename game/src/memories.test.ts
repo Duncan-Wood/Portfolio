@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MEMORIES } from './memories';
+import { FRAGMENT_COUNT, MEMORIES } from './memories';
 
 describe('the memories', () => {
   it('has at least one to pay out', () => {
@@ -21,5 +21,9 @@ describe('the memories', () => {
         expect(node.body).not.toBe('');
       }
     }
+  });
+
+  it('has a fragment count the contact form can divide by', () => {
+    expect(FRAGMENT_COUNT).toBeGreaterThan(0);
   });
 });

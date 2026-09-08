@@ -46,3 +46,8 @@ export const MEMORIES: Memory[] = [
     question: 'What have you been putting off?',
   },
 ];
+
+export const FRAGMENT_COUNT = MEMORIES.reduce(
+  (total, memory) => total + memory.nodes.length,
+  0,
+);

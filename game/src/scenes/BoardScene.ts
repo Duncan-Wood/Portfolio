@@ -38,8 +38,14 @@ import {
 import { brainNodeAt, drawBrain } from './brain';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
-import { MEMORIES } from '../memories';
-import { hatEarned, playedBefore, rememberHat, rememberPlayed } from '../progress';
+import { FRAGMENT_COUNT, MEMORIES } from '../memories';
+import {
+  hatEarned,
+  playedBefore,
+  rememberFragmentsReached,
+  rememberHat,
+  rememberPlayed,
+} from '../progress';
 import {
   CONNECTION_LOST,
   REACH_OUT_LINE,
@@ -1615,6 +1621,7 @@ export class BoardScene extends Scene {
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
+    rememberFragmentsReached(this.nodesRevealed, FRAGMENT_COUNT);
 
     if (node.grantsHat === true) {
       this.grantHat();
