@@ -35,6 +35,8 @@ import {
   tileTexture,
 } from './tile-textures';
 import { brainNodeAt, drawBrain } from './brain';
+import { CRASHED, CRASH_LINE } from '../crash';
+import { reportCrash } from '../crash-reporter';
 import { MEMORY_ART, type MemoryGrid } from '../memory-art';
 import { revealOrder } from '../memory-reveal';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
@@ -370,6 +372,8 @@ export class BoardScene extends Scene {
   private shownPanelCells = 0;
 
   private shownPanelProgress = -1;
+
+  private crashed = false;
 
   private panelFill: Phaser.Tweens.Tween | null = null;
 
@@ -816,6 +820,43 @@ export class BoardScene extends Scene {
   }
 
   update(time: number, delta: number): void {
+    if (this.crashed) {
+      if (Input.Keyboard.JustDown(this.restartKey)) {
+        this.recoverFromCrash();
+      }
+      return;
+    }
+
+    try {
+      this.step(time, delta);
+    } catch (error) {
+      this.crash(error);
+    }
+  }
+
+  private crash(error: unknown): void {
+    this.crashed = true;
+    reportCrash(error);
+
+    this.setPaused(false);
+    this.revealHolding = false;
+    this.awaitingAnswer = false;
+
+    this.gameOverText.setText(CRASHED).setVisible(true).setAlpha(1);
+    this.gameOverLine.setText(CRASH_LINE).setVisible(true).setAlpha(1);
+    this.gameOverHint.setY(HINT_ALONE_Y).setVisible(true).setAlpha(1);
+    this.revealScrim.setVisible(true).setAlpha(1);
+  }
+
+  private recoverFromCrash(): void {
+    this.crashed = false;
+    this.gameOverText.setVisible(false);
+    this.gameOverLine.setVisible(false);
+    this.revealScrim.setVisible(false);
+    this.restart(this.moreToReach);
+  }
+
+  private step(time: number, delta: number): void {
     if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.pauseKey)) {
       this.setPaused(!this.paused);
     }

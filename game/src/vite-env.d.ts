@@ -9,6 +9,7 @@ declare global {
 
   interface ImportMetaEnv {
     readonly VITE_GAME_CODE?: string;
+    readonly VITE_SENTRY_DSN?: string;
   }
 
   interface Window {
