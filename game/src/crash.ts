@@ -3,8 +3,19 @@ export const CRASHED = 'SOMETHING BROKE';
 // PLACEHOLDER: the meta line belongs to the game's voice, not to me.
 export const CRASH_LINE = 'That one was a bug, not you.';
 
-export function reportingEnabled(dsn: string | undefined, production: boolean): boolean {
+export function reportingEnabled(dsn: string | undefined, production: boolean): dsn is string {
   return production && dsn !== undefined && dsn.trim() !== '';
+}
+
+// A DSN set to the wrong value reports nothing and says nothing; the shape is
+// worth checking so that mistake is loud rather than silent.
+export function looksLikeDsn(dsn: string): boolean {
+  try {
+    const parsed = new URL(dsn);
+    return parsed.username !== '' && /^\/\d+$/.test(parsed.pathname);
+  } catch {
+    return false;
+  }
 }
 
 export function crashSignature(error: unknown): string {

@@ -1,5 +1,5 @@
 import { captureException, init } from '@sentry/browser';
-import { CrashLog, reportingEnabled } from './crash';
+import { CrashLog, looksLikeDsn, reportingEnabled } from './crash';
 
 const log = new CrashLog();
 
@@ -8,6 +8,11 @@ let reporting = false;
 export function startCrashReporting(): void {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!reportingEnabled(dsn, import.meta.env.PROD)) {
+    return;
+  }
+
+  if (!looksLikeDsn(dsn)) {
+    console.error('VITE_SENTRY_DSN is set but is not a DSN, so no crash will be reported.');
     return;
   }
 
