@@ -926,7 +926,9 @@ export class BoardScene extends Scene {
     this.panelKey = null;
     this.shownPanelCells = 0;
     this.shownPanelProgress = -1;
-    this.tweens.killAll();
+    if (!keepStory) {
+      this.tweens.killAll();
+    }
     this.staticStrength = 0;
     this.staticOverlay.setVisible(false);
     this.cameras.main.filters.external.clear();
@@ -956,11 +958,6 @@ export class BoardScene extends Scene {
         part.setAlpha(1);
       }
     }
-    if (!keepStory) {
-      }
-    if (!keepMemory) {
-    }
-
     this.tweens.killTweensOf(this.cellTiles);
     for (let index = 0; index < this.cellTiles.length; index += 1) {
       this.restoreCell(index);
