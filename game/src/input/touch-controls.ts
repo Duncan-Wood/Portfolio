@@ -1,6 +1,6 @@
 import { type HorizontalDirection } from './input-translator';
 
-export type TouchAction = 'left' | 'right' | 'rotate' | 'drop';
+export type TouchAction = 'left' | 'right' | 'rotate' | 'drop' | 'pause' | 'restart';
 
 export class TouchControls {
   private held: TouchAction[] = [];
@@ -14,7 +14,7 @@ export class TouchControls {
 
     this.held.push(action);
 
-    if (action === 'rotate' || action === 'drop') {
+    if (action !== 'left' && action !== 'right') {
       this.pending.add(action);
     }
   }
@@ -47,5 +47,13 @@ export class TouchControls {
 
   takeDrop(): boolean {
     return this.pending.delete('drop');
+  }
+
+  takePause(): boolean {
+    return this.pending.delete('pause');
+  }
+
+  takeRestart(): boolean {
+    return this.pending.delete('restart');
   }
 }

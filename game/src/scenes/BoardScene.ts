@@ -129,6 +129,10 @@ const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
 
+// The side panel below the memory picture, empty since the hat meter left it.
+const SIDE_COMMAND_Y = 640;
+const SIDE_COMMAND_GAP = 96;
+
 const MEMORY_PICTURE_DARKEN = 0.88;
 const MEMORY_PICTURE_FILL_MS = 620;
 
@@ -351,6 +355,8 @@ export class BoardScene extends Scene {
 
   private crashed = false;
 
+  private sideCommands: Phaser.GameObjects.Text[] = [];
+
   private panelFill: Phaser.Tweens.Tween | null = null;
 
   private nodesRevealed = 0;
@@ -549,6 +555,23 @@ export class BoardScene extends Scene {
       color: '#6b5a80',
     }).setOrigin(0.5, 0.5);
 
+    if (TOUCH_PRIMARY) {
+      this.sideCommands = (['pause', 'restart'] as const).map((action, index) => this.add
+        .text(PREVIEW_CENTER_X, SIDE_COMMAND_Y + index * SIDE_COMMAND_GAP, action, {
+          fontFamily: 'monospace',
+          fontSize: '20px',
+          color: '#9d86b8',
+          backgroundColor: '#2b1644',
+          padding: { x: 26, y: 26 },
+        })
+        .setOrigin(0.5, 0.5)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerup', () => {
+          this.touch.press(action);
+          this.touch.release(action);
+        }));
+    }
+
     this.previewTiles = [
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y, tileTexture(null)),
@@ -571,7 +594,8 @@ export class BoardScene extends Scene {
       (_pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
         this.soundBoard.unlock();
 
-        if (over.includes(this.contactOffer)) {
+        if (over.includes(this.contactOffer)
+          || this.sideCommands.some((command) => over.includes(command))) {
           return;
         }
 
@@ -738,7 +762,8 @@ export class BoardScene extends Scene {
 
   update(time: number, delta: number): void {
     if (this.crashed) {
-      if (Input.Keyboard.JustDown(this.restartKey) || this.touch.takeDrop()) {
+      if (Input.Keyboard.JustDown(this.restartKey) || this.touch.takeRestart()
+        || this.touch.takeDrop()) {
         this.recoverFromCrash();
       }
       return;
@@ -773,7 +798,7 @@ export class BoardScene extends Scene {
   }
 
   private step(time: number, delta: number): void {
-    if (Input.Keyboard.JustDown(this.pauseKey)) {
+    if (Input.Keyboard.JustDown(this.pauseKey) || this.touch.takePause()) {
       this.setPaused(!this.paused);
     }
 
@@ -783,6 +808,7 @@ export class BoardScene extends Scene {
     }
 
     if (Input.Keyboard.JustDown(this.restartKey)
+      || this.touch.takeRestart()
       || (this.runOver !== null && this.touch.takeDrop())) {
       this.restart(this.moreToReach);
     }
