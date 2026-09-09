@@ -3,6 +3,11 @@
 const SENTRY_HOST = "o4511803623211008.ingest.us.sentry.io";
 const ALLOWED_PROJECTS = new Set(["4512052958527488"]);
 
+// Netlify allows 6MB; a real envelope is well under 100KB. Generous enough that
+// a genuine crash report is never dropped, small enough that nobody can make
+// this chew megabytes per request.
+export const MAX_ENVELOPE_CHARS = 512 * 1024;
+
 // Without this the endpoint would forward anywhere anyone asked it to.
 export function upstreamFor(headerLine) {
   let header;
@@ -37,7 +42,16 @@ export default async function tunnel(request) {
     return new Response("method not allowed", { status: 405 });
   }
 
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_ENVELOPE_CHARS) {
+    return new Response("envelope too large", { status: 413 });
+  }
+
   const envelope = await request.text();
+  if (envelope.length > MAX_ENVELOPE_CHARS) {
+    return new Response("envelope too large", { status: 413 });
+  }
+
   const upstream = upstreamFor(envelope.slice(0, envelope.indexOf("\n")));
 
   if (upstream === null) {

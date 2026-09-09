@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { upstreamFor } from "./functions/tunnel.mjs";
+import tunnel, { MAX_ENVELOPE_CHARS, upstreamFor } from "./functions/tunnel.mjs";
 
 const DSN = "https://b822c40c02f0075b1cc91d67d2f48ea4@o4511803623211008.ingest.us.sentry.io/4512052958527488";
 const header = (extra) => JSON.stringify({ event_id: "abc", ...extra });
@@ -35,5 +35,32 @@ describe("deciding where an envelope may be forwarded", () => {
 
   it("refuses a non-string DSN", () => {
     expect(upstreamFor(header({ dsn: 42 }))).toBe(null);
+  });
+});
+
+describe("refusing before doing any work", () => {
+  const post = (body, headers) =>
+    tunnel(new Request("https://example.com/.netlify/functions/tunnel", {
+      method: "POST", body, headers,
+    }));
+
+  it("refuses anything but POST", async () => {
+    const response = await tunnel(new Request("https://example.com/.netlify/functions/tunnel"));
+    expect(response.status).toBe(405);
+  });
+
+  it("refuses an oversized body without reading it, when the size is declared", async () => {
+    const response = await post("small", { "content-length": String(MAX_ENVELOPE_CHARS + 1) });
+    expect(response.status).toBe(413);
+  });
+
+  it("refuses an oversized body even when the declared size lies", async () => {
+    const response = await post("x".repeat(MAX_ENVELOPE_CHARS + 1));
+    expect(response.status).toBe(413);
+  });
+
+  it("still accepts an envelope of ordinary size", async () => {
+    const response = await post('{"dsn":"https://k@evil.example.com/1"}\n');
+    expect(response.status).toBe(400);
   });
 });
