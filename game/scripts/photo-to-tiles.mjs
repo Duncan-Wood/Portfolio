@@ -44,7 +44,12 @@ const PICTURES = {
     rows: 82,
     crop: ['-crop', '2775x2056+105+1104', '+repage'],
   },
-  'the-notebook': { file: 'journal_&_pen.jpg', columns: 110, rows: 147 },
+  'the-notebook': {
+    file: 'notebook_and_pen.jpg',
+    columns: 110,
+    rows: 112,
+    crop: ['-crop', '2400x2440+390+760', '+repage'],
+  },
 };
 
 function quantize({ file, columns, rows, crop = [] }) {
