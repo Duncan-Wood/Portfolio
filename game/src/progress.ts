@@ -1,3 +1,5 @@
+import { clearStored, readStored, storedKeys, writeStored } from './storage';
+
 const SAVED_PREFIX = 'connected.';
 const BUILD_KEY = 'connected.build';
 const PLAYED_KEY = 'connected.played';
@@ -10,11 +12,11 @@ const LOG_KEY = 'connected.log';
 const RESUME_KEY = 'connected.resume';
 
 export function playedBefore(): boolean {
-  return localStorage.getItem(PLAYED_KEY) === 'true';
+  return readStored(PLAYED_KEY) === 'true';
 }
 
 export function rememberPlayed(): void {
-  localStorage.setItem(PLAYED_KEY, 'true');
+  writeStored(PLAYED_KEY, 'true');
 }
 
 export interface SurfacedFragment {
@@ -39,7 +41,7 @@ export function rememberFragment(
 ): void {
   let log: SurfacedFragment[] = [];
   try {
-    const held: unknown = JSON.parse(localStorage.getItem(LOG_KEY) ?? '[]');
+    const held: unknown = JSON.parse(readStored(LOG_KEY) ?? '[]');
     if (Array.isArray(held)) {
       log = held as SurfacedFragment[];
     }
@@ -47,8 +49,8 @@ export function rememberFragment(
     log = [];
   }
 
-  localStorage.setItem(LOG_KEY, JSON.stringify(loggedWith(log, index, entry)));
-  localStorage.setItem(FRAGMENTS_TOTAL_KEY, String(total));
+  writeStored(LOG_KEY, JSON.stringify(loggedWith(log, index, entry)));
+  writeStored(FRAGMENTS_TOTAL_KEY, String(total));
 }
 
 export function resumePoint(saved: number, total: number): number {
@@ -56,28 +58,28 @@ export function resumePoint(saved: number, total: number): number {
 }
 
 export function resumeAt(total: number): number {
-  return resumePoint(Number(localStorage.getItem(RESUME_KEY)), total);
+  return resumePoint(Number(readStored(RESUME_KEY)), total);
 }
 
 export function rememberResume(nodesRevealed: number, total: number): void {
   if (resumePoint(nodesRevealed, total) === 0) {
-    localStorage.removeItem(RESUME_KEY);
+    clearStored(RESUME_KEY);
     return;
   }
 
-  localStorage.setItem(RESUME_KEY, String(nodesRevealed));
+  writeStored(RESUME_KEY, String(nodesRevealed));
 }
 
 export function forgetProgressFromAnOlderBuild(): void {
-  if (!import.meta.env.DEV || localStorage.getItem(BUILD_KEY) === __BUILD_ID__) {
+  if (!import.meta.env.DEV || readStored(BUILD_KEY) === __BUILD_ID__) {
     return;
   }
 
-  for (const key of Object.keys(localStorage)) {
+  for (const key of storedKeys()) {
     if (key.startsWith(SAVED_PREFIX)) {
-      localStorage.removeItem(key);
+      clearStored(key);
     }
   }
 
-  localStorage.setItem(BUILD_KEY, __BUILD_ID__);
+  writeStored(BUILD_KEY, __BUILD_ID__);
 }

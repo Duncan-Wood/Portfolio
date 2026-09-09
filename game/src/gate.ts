@@ -1,3 +1,5 @@
+import { readStored, writeStored } from './storage';
+
 const UNLOCKED_KEY = 'connected.unlocked';
 
 export function gateRequired(expected: string | undefined): expected is string {
@@ -10,7 +12,7 @@ export function gateOpens(entered: string, expected: string): boolean {
 }
 
 export function openGate(expected: string | undefined): Promise<void> {
-  if (!gateRequired(expected) || localStorage.getItem(UNLOCKED_KEY) === 'true') {
+  if (!gateRequired(expected) || readStored(UNLOCKED_KEY) === 'true') {
     return Promise.resolve();
   }
 
@@ -46,7 +48,7 @@ export function openGate(expected: string | undefined): Promise<void> {
         return;
       }
 
-      localStorage.setItem(UNLOCKED_KEY, 'true');
+      writeStored(UNLOCKED_KEY, 'true');
       form.remove();
       unlock();
     });
