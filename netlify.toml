@@ -1,0 +1,6 @@
+[build]
+  command = "npm --prefix game ci && npm run build"
+  publish = "build"
+
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SENTRY_DSN,VITE_GAME_CODE"

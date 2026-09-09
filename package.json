@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=24"
   },
   "dependencies": {
     "emailjs-com": "^3.2.0",
@@ -13,8 +13,9 @@
     "react-scroll": "^1.8.9"
   },
   "scripts": {
-    "start": "vite",
-    "build": "vite build",
+    "start": "concurrently -n web,game -c blue,magenta \"vite\" \"npm --prefix game run dev\"",
+    "start:web": "vite",
+    "build": "vite build && npm --prefix game run build && cp -r game/dist build/game",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
@@ -23,22 +24,22 @@
   "browserslist": [
     "chrome >= 111",
     "edge >= 111",
-    "firefox >= 114",
+    "firefox >= 128",
     "safari >= 16.4",
     "ios_saf >= 16.4"
   ],
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@testing-library/jest-dom": "^5.16.5",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/react": "^13.4.0",
     "@vitejs/plugin-react": "^6.1.0",
-    "autoprefixer": "^10.5.4",
+    "concurrently": "^10.0.5",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.11.0",
     "jsdom": "^27.0.1",
-    "tailwindcss": "^3.3.1",
+    "tailwindcss": "^4.3.3",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
   }

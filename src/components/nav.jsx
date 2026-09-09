@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link as ScrollLink } from "react-scroll";
 import purple_leaf_stroke from "../assets/design/purple-leaf-stroke.png";
 
-const scrollLinks = [
+// `to` must match a section id rendered by StandardPortfolio; nothing enforces it.
+export const scrollLinks = [
   { to: "home", label: "Duncan Wood", image: purple_leaf_stroke },
   { to: "about", label: "About" },
   { to: "experience", label: "Experience" },
@@ -50,6 +51,9 @@ const NavLinks = ({ variant, onNavigate }) => {
       >
         Resume
       </a>
+      <a href="/game/" onClick={onNavigate} className={className()}>
+        Play
+      </a>
     </>
   );
 };
@@ -66,7 +70,7 @@ const Nav = () => {
             <button
               onClick={() => setIsOpen(!isOpen)}
               type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+              className="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white hover:bg-purple-700 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-white"
               aria-controls="mobile-menu"
               aria-expanded={isOpen}
             >

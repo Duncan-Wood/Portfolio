@@ -1,0 +1,82 @@
+import { COLUMNS, ROWS, isAnchored } from './grid';
+
+const EMPTY = null;
+
+export interface TileMove {
+  column: number;
+  fromRow: number;
+  toRow: number;
+}
+
+export class Board {
+  private cells: (number | null)[] = new Array(COLUMNS * ROWS).fill(EMPTY);
+
+  isInside(column: number, row: number): boolean {
+    return column >= 0 && column < COLUMNS && row >= 0 && row < ROWS;
+  }
+
+  pieceAt(column: number, row: number): number | null {
+    return this.isInside(column, row) ? this.cells[row * COLUMNS + column] : EMPTY;
+  }
+
+  isEmpty(column: number, row: number): boolean {
+    return this.pieceAt(column, row) === EMPTY;
+  }
+
+  isBlocked(column: number, row: number): boolean {
+    return !this.isInside(column, row) || !this.isEmpty(column, row);
+  }
+
+  // Throws rather than ignoring a bad write; callers ask first via `fits`.
+  place(column: number, row: number, pieceType: number): void {
+    if (!this.isInside(column, row)) {
+      throw new RangeError(`Cannot place a piece outside the board at ${column},${row}`);
+    }
+
+    if (!this.isEmpty(column, row)) {
+      throw new RangeError(`Cannot place a piece over the one already at ${column},${row}`);
+    }
+    this.cells[row * COLUMNS + column] = pieceType;
+  }
+
+  clear(column: number, row: number): void {
+    if (!this.isInside(column, row)) {
+      throw new RangeError(`Cannot clear a cell outside the board at ${column},${row}`);
+    }
+    this.cells[row * COLUMNS + column] = EMPTY;
+  }
+
+  settle(): TileMove[] {
+    const moves: TileMove[] = [];
+
+    for (let column = 0; column < COLUMNS; column += 1) {
+      let target = ROWS - 1;
+
+      for (let row = ROWS - 1; row >= 0; row -= 1) {
+        const pieceType = this.pieceAt(column, row);
+        if (pieceType === EMPTY) {
+          continue;
+        }
+
+        if (isAnchored(pieceType)) {
+          target = row - 1;
+          continue;
+        }
+
+        if (row !== target) {
+          moves.push({ column, fromRow: row, toRow: target });
+        }
+
+        this.cells[row * COLUMNS + column] = EMPTY;
+        this.cells[target * COLUMNS + column] = pieceType;
+        target -= 1;
+      }
+    }
+
+    return moves;
+  }
+
+  reset(): void {
+    this.cells.fill(EMPTY);
+  }
+}

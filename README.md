@@ -48,4 +48,4 @@ Software engineer with a background in writing and rhetoric — I turn ambiguous
 
 ---
 
-This repository is a React + Vite + Tailwind CSS site. See [`CLAUDE.md`](./CLAUDE.md) and [`docs/`](./docs/) for the build plan and conventions.
+This repository is a React + Vite + Tailwind CSS site, plus **Connected**, a Phaser 4 + TypeScript game served at `/game` that tells the same story as this CV, the other way round.

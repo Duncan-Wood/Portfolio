@@ -24,7 +24,10 @@ const experienceData = [
 
 const Experience = () => {
   return (
-    <div id="experience" className="m-10">
+    <div
+      id="experience"
+      className="m-10"
+    >
       <h2 className="text-3xl font-bold mb-10 text-center">Experience</h2>
       <div className="max-w-3xl mx-auto space-y-8">
         {experienceData.map((job) => (

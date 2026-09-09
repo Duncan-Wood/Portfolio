@@ -1,12 +1,19 @@
 import { useRef, useState } from "react";
 import emailjs from "emailjs-com";
+
+import { gameProgressPrefill } from "../game-progress";
+
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
 import resume from "../assets/resume.png";
 
 const Contact = () => {
+  // The inputs' `name` attributes must match the EmailJS template; a rename
+  // silently empties that field in the delivered email.
   const form = useRef();
+
   const [status, setStatus] = useState(null);
+  const [gameProgress] = useState(gameProgressPrefill);
 
   const sendEmail = (e) => {
     e.preventDefault();
@@ -30,7 +37,10 @@ const Contact = () => {
   };
 
   return (
-    <div id='contact' className="bg-white p-8 rounded-lg shadow-lg">
+    <div
+      id='contact'
+      className="bg-white p-8 rounded-lg shadow-lg"
+    >
       <div
         id="contact-header"
         className="flex flex-col items-center justify-center"
@@ -119,11 +129,13 @@ const Contact = () => {
               id="contact__formMessage"
               className="w-full border border-gray-400 p-2 rounded-lg"
               name="message"
-            ></textarea>
+              rows={gameProgress ? 6 : undefined}
+              defaultValue={gameProgress}
+            />
           </div>
           <div className="flex justify-center">
             <button
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-sm"
               type="submit"
               value="Send"
             >

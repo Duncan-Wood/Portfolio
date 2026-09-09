@@ -1,37 +1,33 @@
-# Portfolio
+# System Context & Constraints
 
-## Project Discovery
+## Repository Structure
+This mono-repo contains two independent Vite applications joined only by root scripts and a dev proxy:
+- `/` — React Portfolio (Stable, default landing page, crawlable).
+- `/game` — Phaser 4 + TypeScript Game (Active development workspace).
 
-Single-project repository: a personal portfolio single-page app.
+## Critical Rules & Working Style
+- **Velocity:** Move slow. Focus on high quality and deep understanding over speed. One stage at a time. Do not build ahead.
+- **Workflow:** Always write the engine unit test *before* implementing the feature.
+- **Game Dev Context:** User is an experienced engineer but new to game dev. Explicitly explain game-specific math/mechanics (e.g., lock delays, DAS/ARR, tween easing).
+- **Communication:** Proactively ask either/or questions (provide 2-4 choices with your recommendation) before building features dependent on design decisions.
+- **Code Comments:** Write none by default. Prefer a clearer name over a comment. The only exception is a silent failure a reader cannot see from the code — a library that no-ops instead of throwing, a rename that empties a field, a constant two files must agree on. One sentence, at the line it concerns. Never a file-level header, never design rationale, never a restatement of the code below it, and never the same comment in two files.
 
-### Stack
-- **Language:** JavaScript (JSX), React 18
-- **Frameworks/libraries:** Vite 8 (`vite.config.mjs`), Tailwind CSS 3 (with PostCSS + Autoprefixer), `react-router-dom` 6, `react-scroll`, `emailjs-com` (contact form)
-- **Package manager:** npm (`package-lock.json`). Node >= 22.12, which Vite 8 requires — see `.nvmrc`
-- **Testing:** Vitest (jsdom), React Testing Library
+## Non-Negotiable Architecture (`/game/src/`)
+- `engine/` — Pure game logic only. **CRITICAL: Zero Phaser imports.** Grid, pieces, physics, gravity, chains, scoring. 100% covered via Vitest.
+- `scenes/` — Phaser rendering, audio, particles, and hardware input detection. No core business logic.
+- `input/` — Pure TypeScript DAS/ARR and key latching rules. **Phaser-free** to ensure game feel is fully testable.
+- `fixed-timestep.ts` — Frame delta clamping and discrete step returns.
+- `tuning.ts` — Game feel dials (exposed via `window.tuning` in development).
+- **Performance Budget:** Build for 60fps and low input latency on low-end hardware. Favor computationally cheaper rendering techniques.
 
-### Commands
-- Install: `npm install`
-- Dev server: `npm start`
-- Build: `npm run build`
-- Test: `npm test`
+## Git & Deployment Protocol
+- **Commits:** NEVER commit or stage code without explicit user approval for that exact diff. Author commits as the user with zero AI attribution. Split large tasks into reviewable chunks.
+- **Root Commands:** 
+  - `npm start` (Runs both dev environments at `:3000` and `:3000/game/`).
+  - `npm run build` (Builds both into `build/`).
+  - Preview production build using `npx serve build`. **NEVER use `serve -s build`** (breaks the `/game` routing asset catching).
+- **Sub-package Commands:** Run `npm test`, `npm run typecheck`, and `npm run dev` strictly from inside `/game`. Root tests intentionally ignore the game directory.
 
-### Layout
-- `index.html` — the entry point Vite starts from; it names `src/index.jsx` directly
-- `src/` — application source; entry `src/index.jsx`, root `src/App.jsx`
-- `src/components/` — page sections (`Main`, `About`, `Projects`, `Skills`, `Contact`, `home`, `nav`)
-- `src/assets/` — images
-- `public/` — files copied to the build root untouched (`manifest.json`, `favicon.ico`, `resume.pdf`); `_redirects` present for SPA redirect hosting
-- `tailwind.config.js`, `postcss.config.js` — styling config
-
-## Build workflow
-
-This portfolio is being rebuilt in phases with a human-review loop. Before working on it, read:
-- `docs/README.md` — the process (loop + which command to run when).
-- `docs/plans/story-portfolio/build-preferences.md` — standing voice/design preferences; respect these every phase.
-- `docs/plans/story-portfolio/build-phase-outline.md` — the phased plan and current status.
-- `docs/human-review.md` — Duncan's round-by-round feedback; read the newest section each round.
-
-## Coding Standards
-
-Coding standards live in `docs/coding-standards/`. They are exposed to Claude Code through a small set of per-file-type index files under `.claude/rules/coding-standards/`. Each index file is a path-scoped rule that lists the standards relevant to one file type, with a short description of each. When Claude reads a file matching an index's `paths:` glob, Claude loads only the index and then decides which (if any) standards to open. The full text of a standard is never loaded automatically. Standards do not appear in the available-skills picker. Humans continue to browse `docs/coding-standards/` for the canonical readable form.
+## Known Traps & Quirks
+- **Hidden Tabs:** Chrome pauses `requestAnimationFrame` when the tab is hidden. Do not trust or debug execution metrics unless the window is focused and visible.
+- **Fatal Crashes:** Any unhandled exception escaping `BoardScene.update` halts Phaser's rAF chain permanently. If the FPS frozen display reads alive but `game.loop.frame` stalls, an exception was thrown (frequently via `Board.place` on an occupied tile).

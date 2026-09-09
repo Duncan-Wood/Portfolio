@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    <title>Connected</title>
+    <style>
+      /* `background` must match GROUND_COLOR in `src/palette.ts`. */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #221038;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: manipulation;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      #game-container {
+        flex: 1;
+        /* Without this the flex child refuses to shrink and pushes the footer off-screen. */
+        min-height: 0;
+        width: 100%;
+      }
+
+      #gate {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        height: 100%;
+        padding: 24px;
+        box-sizing: border-box;
+        font-family: monospace;
+        color: #e9dcff;
+        text-align: center;
+      }
+
+      #gate label {
+        font-size: 14px;
+        line-height: 1.6;
+        max-width: 30ch;
+        color: #9d86b8;
+      }
+
+      #gate input {
+        font: inherit;
+        font-size: 18px;
+        width: 14ch;
+        padding: 8px 10px;
+        text-align: center;
+        color: #e9dcff;
+        background: #2b1644;
+        border: 1px solid #4a2f6b;
+        border-radius: 6px;
+      }
+
+      #gate input:focus-visible {
+        outline: none;
+        border-color: #c98cff;
+      }
+
+      #gate.wrong input {
+        border-color: #e4572e;
+      }
+
+      #gate button {
+        font: inherit;
+        font-size: 13px;
+        padding: 8px 18px;
+        color: #221038;
+        background: #c98cff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      #touch {
+        display: none;
+        flex: none;
+        gap: 10px;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        justify-content: center;
+      }
+
+      #touch button {
+        flex: 1 1 0;
+        max-width: 108px;
+        min-height: 68px;
+        font-size: 24px;
+        color: #e9dcff;
+        background: #2b1644;
+        border: 1px solid #4a2f6b;
+        border-radius: 12px;
+        touch-action: none;
+      }
+
+      #touch button:active {
+        background: #4a2f6b;
+        border-color: #c98cff;
+      }
+
+      #controls {
+        flex: none;
+        align-self: center;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px 18px;
+        padding: 10px 12px 0;
+        font-family: monospace;
+        font-size: 12px;
+        line-height: 1;
+        color: #6b5a80;
+      }
+
+      #controls b {
+        font-weight: normal;
+        color: #9d86b8;
+      }
+
+      #to-standard {
+        flex: none;
+        align-self: center;
+        font-family: monospace;
+        font-size: 12px;
+        line-height: 1;
+        white-space: nowrap;
+        color: #6b5a80;
+        text-decoration: none;
+        padding: 9px 12px 11px;
+        border-radius: 6px;
+        transition: color 120ms ease, background-color 120ms ease;
+      }
+
+      @media (pointer: coarse) {
+        #touch {
+          display: flex;
+        }
+
+        #controls {
+          display: none;
+        }
+      }
+
+      #to-standard:hover,
+      #to-standard:focus-visible {
+        color: #c98cff;
+        background: #2b1644;
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <div id="touch" aria-hidden="true">
+      <button type="button" data-action="left" aria-label="move left">&#9664;</button>
+      <button type="button" data-action="rotate" aria-label="rotate">&#8635;</button>
+      <button type="button" data-action="drop" aria-label="drop">&#11015;</button>
+      <button type="button" data-action="right" aria-label="move right">&#9654;</button>
+    </div>
+    <div id="controls">
+      <span><b>&larr;&rarr;</b> move</span>
+      <span><b>&uarr;</b> rotate</span>
+      <span><b>&darr;</b> faster</span>
+      <span><b>space</b> drop</span>
+      <span><b>esc</b> pause</span>
+      <span><b>r</b> restart</span>
+    </div>
+    <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

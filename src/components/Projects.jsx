@@ -178,7 +178,10 @@ const Projects = () => {
     : personalProjects.slice(0, PERSONAL_PREVIEW_COUNT);
 
   return (
-    <div id="projects" className="m-10">
+    <div
+      id="projects"
+      className="m-10"
+    >
       <h2 className="text-3xl font-bold mb-10 text-center">Projects</h2>
 
       <section className="mb-14">

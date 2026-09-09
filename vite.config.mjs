@@ -1,28 +1,29 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
 
-  // Netlify publishes `build`. Vite's default is `dist`.
   build: {
     outDir: "build",
   },
 
   server: {
-    // Vite's default is 5173, which is the game's dev server port. Strict, so a
-    // port that is already taken fails loudly instead of silently serving on
-    // 3001 and making every note that says :3000 wrong.
     port: 3000,
     strictPort: true,
+    proxy: {
+      // The game's Vite serves only under `base: '/game/'`; a bare `/game` 404s.
+      "/game": {
+        target: "http://localhost:5173",
+        ws: true,
+        rewrite: (path) => (path === "/game" ? "/game/" : path),
+      },
+    },
   },
 
   test: {
     environment: "jsdom",
-    globals: true,
-    setupFiles: "./src/setupTests.js",
-    // The game is a separate project with its own config, Node version and
-    // suite. Without this the root runner walks into it once the branches meet.
-    exclude: ["game/**", "node_modules/**", "build/**"],
+    include: ["src/**/*.test.{js,jsx}", "netlify/**/*.test.mjs"],
   },
 });

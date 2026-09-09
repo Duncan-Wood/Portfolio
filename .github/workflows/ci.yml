@@ -12,22 +12,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # From .nvmrc, so the version CI builds on cannot drift from the one the
-      # repository declares — which is the version Vite 8 requires.
+      # Netlify reads the same file for production builds.
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
           cache: npm
 
       - run: npm ci
+
+      - run: npm --prefix game ci
 
       - run: npm run lint
 
       - run: npm test
 
+      - run: npm --prefix game run typecheck
+
+      - run: npm --prefix game test
+
       - run: npm run build
 
-      # The build is what Netlify publishes, so an empty or missing entry point
-      # is the failure that would actually reach a visitor.
-      - name: Check the build produced an entry point
-        run: test -f build/index.html
+      - name: Check both halves landed in the build
+        run: |
+          test -f build/index.html || { echo "portfolio build is missing its entry point"; exit 1; }
+          test -f build/game/index.html || { echo "game did not compose into build/game"; exit 1; }
