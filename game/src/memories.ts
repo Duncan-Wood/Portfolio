@@ -18,43 +18,48 @@ export const MEMORIES: Memory[] = [
         title: 'The Build',
         photo: 'the-build',
         body:
-          'A full tower, built from parts at fourteen, still running today. '
-          + 'It opened a door outward and made it easier never to use one. '
-          + 'The same machine a person hides behind is the one they build on.',
+          'My grandparents bought the parts one Christmas. I was fourteen. '
+          + 'I put it together myself and it still runs.\n\n'
+          + 'It was the first thing I made that worked. It was also where I went '
+          + 'to stop talking to anyone.',
       },
       {
         title: 'No Johns',
         photo: 'no-johns',
         body:
-          'A GameCube controller, worn smooth from years of playing alone. '
-          + 'Melee has a name for the excuse you make after losing. The name is a john. '
-          + 'Some rooms refuse to let anyone finish that sentence.',
+          'I played alone for years. Then a friend pulled me into the Melee '
+          + 'community and I started to grind.\n\n'
+          + 'Melee has a word for the excuse you make after you lose. A john. '
+          + 'You do not get to john.\n\n'
+          + 'We still meet up every year.',
       },
       {
         title: 'The Laptop',
         photo: 'the-laptop',
         body:
-          'A handed-down MacBook, slow enough to be frustrating and good enough '
-          + 'to finish a bootcamp on. Every tool that carries someone is one they '
-          + 'can lean on until they stop walking. A tool becomes a crutch the moment '
-          + 'it cannot be put down.',
+          'My mom’s old MacBook. Slow enough to be annoying, good enough to get '
+          + 'me through a bootcamp. It is where I learned to actually build software.\n\n'
+          + 'I still lean on tools that carry me further than I could go alone. '
+          + 'I keep this one because I could start over on it if I had to.',
       },
       {
         title: 'The Red Kickball',
         photo: 'the-kickball',
         body:
-          'A rubber kickball, from three years of Sunday leagues in a city where '
-          + 'he knew nobody. The friends came from showing up to a game no one was '
-          + 'good at. Belonging is rarely the reward for being impressive.',
+          'I moved to DC three years ago and knew nobody. Someone invited me to '
+          + 'Sunday kickball.\n\n'
+          + 'I was not good at it. Nobody was.\n\n'
+          + 'Three of those teams have asked me to captain.',
       },
       {
         title: 'The Notebook',
         photo: 'the-notebook',
         body:
-          'A notebook, and a pen good enough to make writing feel deliberate. '
-          + 'Everything else within reach offers unlimited material and quietly '
-          + 'takes the choosing away. A blank page is a limit, and limits are where '
-          + 'original work has always come from.',
+          'A notebook, and a pen nice enough that I slow down for it.\n\n'
+          + 'Everything else I own hands me more material than I can use. This '
+          + 'gives me nothing. Only what I can get out of my own head, which is '
+          + 'less than I want it to be.\n\n'
+          + 'Most of what is in it is unfinished.',
       },
     ],
     question: 'What have you been putting off?',
