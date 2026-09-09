@@ -1,7 +1,6 @@
 export const CRASHED = 'SOMETHING BROKE';
 
-// PLACEHOLDER: the meta line belongs to the game's voice, not to me.
-export const CRASH_LINE = 'That one was a bug, not you.';
+export const CRASH_LINE = 'That one was not you. I did say this would not hold together.';
 
 export function reportingEnabled(dsn: string | undefined, production: boolean): dsn is string {
   return production && dsn !== undefined && dsn.trim() !== '';
