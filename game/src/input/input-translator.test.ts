@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type HorizontalDirection, type InputFrame, InputTranslator } from './input-translator';
+import { DEFAULT_TUNING, TOUCH_TUNING } from '../tuning';
 
 const TUNING = { autoShiftDelay: 130, autoRepeatInterval: 40 };
 const FRAME = 16;
@@ -166,5 +167,35 @@ describe('holding a direction across a lock', () => {
     translator.update(frame({ direction: -1 }), attempt);
 
     expect(shifts).toEqual([-1]);
+  });
+});
+
+describe('a thumb holding a direction', () => {
+  const columnsMovedOver = (hold: number, tuning: typeof TOUCH_TUNING) => {
+    const translator = new InputTranslator(tuning);
+    const { shifts, attempt } = recordShifts();
+
+    for (let elapsed = 0; elapsed < hold; elapsed += FRAME) {
+      translator.update(frame({ direction: -1 }), attempt);
+    }
+
+    return shifts.length;
+  };
+
+  it('crosses most of the board on keyboard dials, which is the bug', () => {
+    expect(columnsMovedOver(300, DEFAULT_TUNING)).toBeGreaterThan(4);
+  });
+
+  it('moves one column for a deliberate tap on touch dials', () => {
+    expect(columnsMovedOver(300, TOUCH_TUNING)).toBe(1);
+  });
+
+  it('still repeats when a thumb genuinely holds', () => {
+    expect(columnsMovedOver(900, TOUCH_TUNING)).toBeGreaterThan(4);
+  });
+
+  it('repeats more slowly than the keyboard does', () => {
+    expect(TOUCH_TUNING.autoRepeatInterval)
+      .toBeGreaterThan(DEFAULT_TUNING.autoRepeatInterval);
   });
 });

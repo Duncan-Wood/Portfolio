@@ -1,6 +1,6 @@
 import { type HorizontalDirection } from './input-translator';
 
-export type TouchAction = 'left' | 'right' | 'rotate' | 'softDrop' | 'drop';
+export type TouchAction = 'left' | 'right' | 'rotate' | 'drop';
 
 export class TouchControls {
   private held: TouchAction[] = [];
@@ -39,10 +39,6 @@ export class TouchControls {
     }
 
     return null;
-  }
-
-  get softDropHeld(): boolean {
-    return this.held.includes('softDrop');
   }
 
   takeRotate(): boolean {

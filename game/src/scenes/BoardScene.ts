@@ -14,7 +14,7 @@ import {
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
-import { DEFAULT_TUNING, type Tuning } from '../tuning';
+import { DEFAULT_TUNING, TOUCH_TUNING, type Tuning } from '../tuning';
 import {
   GROUND_COLOR,
   TRACE_COLORS,
@@ -394,7 +394,9 @@ export class BoardScene extends Scene {
   }
 
   create(): void {
-    this.tuning = { ...DEFAULT_TUNING };
+    this.tuning = TOUCH_PRIMARY
+      ? { ...DEFAULT_TUNING, ...TOUCH_TUNING }
+      : { ...DEFAULT_TUNING };
     this.simulation = new Simulation(randomPieceTypes, this.tuning);
     this.timestep = new FixedTimestep();
     this.inputTranslator = new InputTranslator(this.tuning);
@@ -1051,7 +1053,7 @@ export class BoardScene extends Scene {
     this.simulation.softDropping = this.inputTranslator.update(
       {
         direction: this.pressedDirection() ?? this.touch.direction,
-        softDropHeld: this.cursors.down.isDown || this.touch.softDropHeld,
+        softDropHeld: this.cursors.down.isDown,
         newPiece,
         delta,
       },

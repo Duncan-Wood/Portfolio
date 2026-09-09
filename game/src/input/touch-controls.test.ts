@@ -35,19 +35,6 @@ describe('holding a direction', () => {
   });
 });
 
-describe('soft drop', () => {
-  it('is held for as long as the button is', () => {
-    const touch = new TouchControls();
-    expect(touch.softDropHeld).toBe(false);
-
-    touch.press('softDrop');
-    expect(touch.softDropHeld).toBe(true);
-
-    touch.release('softDrop');
-    expect(touch.softDropHeld).toBe(false);
-  });
-});
-
 describe('one-shot actions', () => {
   it('reports a rotate once per press, however many frames read it', () => {
     const touch = new TouchControls();
@@ -78,13 +65,11 @@ describe('one-shot actions', () => {
   it('forgets everything when a finger leaves the screen mid-run', () => {
     const touch = new TouchControls();
     touch.press('left');
-    touch.press('softDrop');
     touch.press('drop');
 
     touch.releaseAll();
 
     expect(touch.direction).toBeNull();
-    expect(touch.softDropHeld).toBe(false);
     expect(touch.takeDrop()).toBe(false);
   });
 });
