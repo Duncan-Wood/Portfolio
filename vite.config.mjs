@@ -24,6 +24,6 @@ export default defineConfig({
 
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{js,jsx}"],
+    include: ["src/**/*.test.{js,jsx}", "netlify/**/*.test.mjs"],
   },
 });

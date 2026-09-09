@@ -18,6 +18,9 @@ export function startCrashReporting(): void {
 
   init({
     dsn,
+    // Same-origin, so no preflight, and it is reserved by Netlify so the SPA
+    // catch-all cannot swallow it. Ad blockers drop the ingest host directly.
+    tunnel: '/.netlify/functions/tunnel',
     release: __BUILD_ID__,
     // No breadcrumbs from the console and no user identifiers: a stranger
     // playing this has not agreed to be measured.
