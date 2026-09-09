@@ -35,7 +35,7 @@ export const SHADOW_OPENING_LINE = 'You stopped here before.';
 
 export const STILL_CONNECTED = 'STILL CONNECTED';
 
-export const RECOVERED_LINE = 'You\'ve found ways to start connecting outside yourself.';
+export const RECOVERED_LINE = 'I kept all of these to be alone with. Most of them did not stay that way.';
 
 export const REACH_OUT_LINE = 'reach out to me';
 

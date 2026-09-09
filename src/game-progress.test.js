@@ -14,28 +14,36 @@ describe("draftFrom", () => {
     expect(draftFrom([], 5, true)).toBe("I played Connected.\n\n");
   });
 
-  it("says how far, then what each one cost", () => {
-    expect(draftFrom([build, johns, laptop], 5, true)).toBe(
-      "I played Connected — 3 of 5.\n\n" +
-        "The Build — 1 try\n" +
-        "No Johns — 4 tries\n" +
-        "The Laptop — 7 tries\n\n"
-    );
-  });
-
-  it("says all rather than a score when they finished", () => {
+  it("answers the losing screen when they surfaced every fragment", () => {
     expect(draftFrom([build, johns], 2, true)).toBe(
-      "I played Connected — all 2.\n\n" + "The Build — 1 try\n" + "No Johns — 4 tries\n\n"
+      "Still connected. No Johns took me 4 tries.\n\n"
     );
   });
 
-  it("says try rather than tries for a first-time clear", () => {
-    expect(draftFrom([build], 5, true)).toContain("The Build — 1 try\n");
+  it("says how far they got when they stopped short", () => {
+    expect(draftFrom([build, johns, laptop], 5, true)).toBe(
+      "I got as far as The Laptop. The Laptop took me 7 tries.\n\n"
+    );
   });
 
-  it("skips an entry with no title, rather than printing a blank row", () => {
-    expect(draftFrom([{ title: "", tries: 0 }, johns], 5, true)).toBe(
-      "I played Connected — 2 of 5.\n\n" + "No Johns — 4 tries\n\n"
+  it("stays a single sentence when nothing cost more than one try", () => {
+    expect(draftFrom([build], 1, true)).toBe("Still connected.\n\n");
+  });
+
+  it("names only the hardest fragment, not a table of every one", () => {
+    const draft = draftFrom([build, johns, laptop], 3, true);
+    expect(draft).toContain("The Laptop took me 7 tries");
+    expect(draft).not.toContain("The Build");
+    expect(draft).not.toContain("No Johns");
+  });
+
+  it("leaves the message box mostly empty for what they came to say", () => {
+    expect(draftFrom([build, johns, laptop], 3, true).split("\n")).toHaveLength(3);
+  });
+
+  it("ignores an entry with no title, rather than counting a blank as progress", () => {
+    expect(draftFrom([{ title: "", tries: 9 }, johns], 5, true)).toBe(
+      "I got as far as No Johns. No Johns took me 4 tries.\n\n"
     );
   });
 

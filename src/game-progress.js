@@ -3,7 +3,6 @@ const LOG_KEY = "connected.log";
 const FRAGMENTS_TOTAL_KEY = "connected.fragmentsTotal";
 const PLAYED_KEY = "connected.played";
 
-// What they came to say is theirs; this only says what happened in the game.
 export function draftFrom(log, total, played) {
   if (!played) {
     return "";
@@ -15,17 +14,19 @@ export function draftFrom(log, total, played) {
     return "I played Connected.\n\n";
   }
 
-  const reached = Array.isArray(log) ? log.length : 0;
-  const head =
-    reached >= total
-      ? `I played Connected — all ${total}.`
-      : `I played Connected — ${reached} of ${total}.`;
+  const finished = surfaced.length >= total;
+  const opening = finished
+    ? "Still connected."
+    : `I got as far as ${surfaced[surfaced.length - 1].title}.`;
 
-  const lines = surfaced.map(
-    ({ title, tries }) => `${title} — ${tries} ${tries === 1 ? "try" : "tries"}`
+  const hardest = surfaced.reduce((worst, entry) =>
+    entry.tries > worst.tries ? entry : worst
   );
 
-  return `${head}\n\n${lines.join("\n")}\n\n`;
+  const cost =
+    hardest.tries > 1 ? ` ${hardest.title} took me ${hardest.tries} tries.` : "";
+
+  return `${opening}${cost}\n\n`;
 }
 
 export function gameProgressPrefill() {

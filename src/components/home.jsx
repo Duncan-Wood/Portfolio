@@ -74,7 +74,7 @@ const Home = () => {
               Or play Connected
             </span>
             <span className="mt-1 text-sm opacity-80">
-              the same story, as a game
+              the part the resume leaves out
             </span>
           </a>
         </div>
