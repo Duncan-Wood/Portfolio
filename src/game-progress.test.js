@@ -1,41 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { progressLine } from "./game-progress";
+import { openingLine, draftFor } from "./game-progress";
 
-describe("progressLine", () => {
+describe("openingLine", () => {
   it("says nothing for someone who never opened the game", () => {
-    expect(progressLine(0, 0)).toBe(null);
+    expect(openingLine(0, 0, false)).toBe(null);
   });
 
-  it("says nothing for someone who played but surfaced nothing", () => {
-    expect(progressLine(0, 4)).toBe(null);
+  it("speaks for someone who played and surfaced nothing, since they can still write", () => {
+    expect(openingLine(0, 5, true)).toBe("I played Connected.");
   });
 
-  it("says nothing when the stored values are not numbers", () => {
-    expect(progressLine(NaN, NaN)).toBe(null);
-    expect(progressLine(3, NaN)).toBe(null);
+  it("counts what they surfaced", () => {
+    expect(openingLine(3, 5, true)).toBe("I played Connected and got 3 of 5.");
   });
 
-  it("reports the count and the percent", () => {
-    expect(progressLine(3, 4)).toBe(
-      "Played Connected — reached 3 of 4 fragments (75%)."
-    );
-  });
-
-  it("reports a finished game", () => {
-    expect(progressLine(4, 4)).toBe(
-      "Played Connected — reached 4 of 4 fragments (100%)."
-    );
-  });
-
-  it("rounds to whole percents", () => {
-    expect(progressLine(1, 3)).toBe(
-      "Played Connected — reached 1 of 3 fragments (33%)."
-    );
+  it("reads plainly for a finished game", () => {
+    expect(openingLine(5, 5, true)).toBe("I played Connected and got 5 of 5.");
   });
 
   it("never claims more fragments than the game has", () => {
-    expect(progressLine(6, 4)).toBe(
-      "Played Connected — reached 4 of 4 fragments (100%)."
+    expect(openingLine(7, 5, true)).toBe("I played Connected and got 5 of 5.");
+  });
+
+  it("says nothing when the stored values are not numbers", () => {
+    expect(openingLine(NaN, NaN, true)).toBe("I played Connected.");
+    expect(openingLine(3, NaN, true)).toBe("I played Connected.");
+  });
+});
+
+describe("draftFor", () => {
+  it("is empty for someone who never played, so the form is untouched", () => {
+    expect(draftFor(null)).toBe("");
+  });
+
+  it("leaves the visitor a line of their own to finish", () => {
+    expect(draftFor("I played Connected and got 3 of 5.")).toBe(
+      "I played Connected and got 3 of 5.\n\nSomething I kept:\n"
     );
   });
 });
