@@ -1,11 +1,6 @@
-// Ad blockers drop requests to *.ingest.sentry.io, so the browser posts
-// envelopes here instead and this forwards them from the server.
 const SENTRY_HOST = "o4511803623211008.ingest.us.sentry.io";
 const ALLOWED_PROJECTS = new Set(["4512052958527488"]);
 
-// Netlify allows 6MB; a real envelope is well under 100KB. Generous enough that
-// a genuine crash report is never dropped, small enough that nobody can make
-// this chew megabytes per request.
 export const MAX_ENVELOPE_CHARS = 512 * 1024;
 
 // Without this the endpoint would forward anywhere anyone asked it to.

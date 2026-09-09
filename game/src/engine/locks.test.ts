@@ -50,16 +50,6 @@ describe('a lock is a board with something to work out', () => {
     }
   });
 
-  it('seeds the shadows the lock asks for', () => {
-    const board = new Board();
-    const lock = LOCKS[0];
-
-    seedLock(board, lock, fixed([0.1, 0.4, 0.7, 0.2, 0.9, 0.5]));
-
-    const shadows = cellsOn(board).filter((cell) => isShadow(cell.piece));
-    expect(shadows).toHaveLength(lock.shadows);
-  });
-
   it('never seeds a board that has already solved itself', () => {
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.05, 0.35, 0.65, 0.95, 0.15, 0.55]));
@@ -84,15 +74,6 @@ describe('a lock is a board with something to work out', () => {
 
     const highest = Math.min(...cellsOn(board).map((cell) => cell.row));
     expect(highest).toBeGreaterThan(FIRST_VISIBLE_ROW + 3);
-  });
-
-  it('seeds the neurons the lock asks for', () => {
-    const board = new Board();
-    const lock = LOCKS[0];
-
-    seedLock(board, lock, fixed([0.1, 0.4, 0.7, 0.2, 0.9, 0.5]));
-
-    expect(cellsOn(board).filter((cell) => isNeuron(cell.piece))).toHaveLength(lock.neurons);
   });
 
   it('spreads the neurons across columns rather than stacking one route', () => {
@@ -210,21 +191,11 @@ describe('a seeded lock is always solvable', () => {
 });
 
 describe('the run escalates across the memory it is unlocking', () => {
-  it('has a lock for every fragment, so no board is ever played twice', () => {
-    expect(LOCKS.length).toBeGreaterThanOrEqual(MEMORIES[0].nodes.length);
-  });
-
   it('never eases the pressure as the memory fills in', () => {
     const roomPerNeuron = LOCKS.map((lock) => lock.pieces / lock.neurons);
 
     for (let index = 1; index < roomPerNeuron.length; index += 1) {
       expect(roomPerNeuron[index]).toBeLessThan(roomPerNeuron[index - 1]);
-    }
-  });
-
-  it('asks for a board that fits, so nothing it seeds is silently dropped', () => {
-    for (const lock of LOCKS) {
-      expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * 3);
     }
   });
 

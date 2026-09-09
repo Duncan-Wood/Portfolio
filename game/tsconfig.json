@@ -2,9 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "strict": true,
-    // Phaser scenes assign their fields in create(), not the constructor.
     "strictPropertyInitialization": false,
-    // Phaser's bundled types do not typecheck; without this the build fails.
     "skipLibCheck": true,
     "isolatedModules": true,
     "noEmit": true,

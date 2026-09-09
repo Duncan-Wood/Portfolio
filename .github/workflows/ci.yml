@@ -1,11 +1,3 @@
-# The last two steps are the point. Both halves have their own suites, but
-# nothing else exercises the seam between them: the root build script builds
-# each and copies the game's output into build/game. Every test can pass with
-# /game broken on the deployed site.
-#
-# Deployment stays Netlify's. A second thing that deploys would mean two
-# answers to what is live.
-
 name: CI
 
 on:

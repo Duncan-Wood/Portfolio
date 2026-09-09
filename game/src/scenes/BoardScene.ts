@@ -130,7 +130,6 @@ const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
 
-// The side panel below the memory picture, empty since the hat meter left it.
 const SIDE_COMMAND_Y = 640;
 const SIDE_COMMAND_GAP = 96;
 
@@ -1544,10 +1543,12 @@ export class BoardScene extends Scene {
       return;
     }
 
-    const total = neuronsOn(this.simulation.board).length;
-    const lit = total === 0 ? 0 : total - unlitCount(this.simulation.board);
+    const neurons = neuronsOn(this.simulation.board);
+    const total = neurons.length;
+    const lit = neurons
+      .filter(({ column, row }) => isNeuronLit(this.simulation.board.pieceAt(column, row) as number))
+      .length;
 
-    // Score moves the picture between neurons; neurons keep it honest at the end.
     const fromNeurons = total === 0 ? 0 : lit / total;
     const fillScore = lockFor(this.nodesRevealed).fillScore;
     const progress = Math.max(fromNeurons, Math.min(this.simulation.score / fillScore, 1));

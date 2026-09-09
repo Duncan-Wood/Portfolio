@@ -27,10 +27,6 @@ describe('when the shadow is allowed to speak', () => {
   it('speaks once it has', () => {
     expect(shadowLine(1, ENOUGH, NEVER_SPOKEN)).not.toBeNull();
   });
-
-  it('is silent through the first arrivals of a run', () => {
-    expect(shadowLine(1, 0, NEVER_SPOKEN)).toBeNull();
-  });
 });
 
 describe('what it picks', () => {

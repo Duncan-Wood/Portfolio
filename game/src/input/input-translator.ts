@@ -23,7 +23,6 @@ export class InputTranslator {
 
   private shiftAwaitingRelease = false;
 
-  // Read at the moment needed; destructuring kills live tuning.
   constructor(private tuning: InputTuning) {}
 
   update(frame: InputFrame, attemptShift: ShiftAttempt): boolean {

@@ -3,6 +3,4 @@
   publish = "build"
 
 [build.environment]
-  # Vite inlines every VITE_ variable into the bundle by design: the DSN is
-  # write-only and the game code gates nothing a reader cannot already see.
   SECRETS_SCAN_OMIT_KEYS = "VITE_SENTRY_DSN,VITE_GAME_CODE"

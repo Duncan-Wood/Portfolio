@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-/*
- * Run: node scripts/photo-to-tiles.mjs
- *
- * Reads the gitignored photographs in storyboard/memory-images and rewrites
- * src/memory-art.ts. Only the colour indices are committed, never the photos.
- *
- * Each piece colour supplies two tones — its dark edge shade and its bright face —
- * so luma maps onto nine steps rather than five. Nine tones over ~40 cells
- * resolves an object against a contrasting ground and still does not resolve a
- * face; shoot objects, not people.
- */
 
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
