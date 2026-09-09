@@ -30,6 +30,8 @@ jobs:
 
       - run: npm --prefix game ci
 
+      - run: npm run lint
+
       - run: npm test
 
       - run: npm --prefix game run typecheck
