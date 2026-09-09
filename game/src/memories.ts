@@ -2,7 +2,6 @@ interface MemoryNode {
   title: string;
   body: string;
   photo?: string;
-  grantsHat?: boolean;
 }
 
 export interface Memory {

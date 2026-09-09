@@ -1,18 +1,9 @@
 const SAVED_PREFIX = 'connected.';
-const HAT_KEY = 'connected.hat';
 const BUILD_KEY = 'connected.build';
 const PLAYED_KEY = 'connected.played';
 // Read by the portfolio's contact form, which shares this origin but not this bundle.
 const FRAGMENTS_KEY = 'connected.fragments';
 const FRAGMENTS_TOTAL_KEY = 'connected.fragmentsTotal';
-
-export function hatEarned(): boolean {
-  return localStorage.getItem(HAT_KEY) === 'true';
-}
-
-export function rememberHat(): void {
-  localStorage.setItem(HAT_KEY, 'true');
-}
 
 export function playedBefore(): boolean {
   return localStorage.getItem(PLAYED_KEY) === 'true';

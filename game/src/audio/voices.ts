@@ -148,14 +148,3 @@ export function chainVoices(chainLength: number): Voice[] {
     };
   });
 }
-
-export function hatVoice(): Voice {
-  return {
-    waveform: 'sawtooth',
-    startFrequency: 2200,
-    endFrequency: 300,
-    duration: 110,
-    gain: 0.18,
-    delay: 0,
-  };
-}

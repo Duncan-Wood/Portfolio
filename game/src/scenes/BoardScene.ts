@@ -12,7 +12,6 @@ import {
   shadowHolding,
 } from '../engine/grid';
 import { Simulation } from '../engine/simulation';
-import { HAT_FULL_CHARGE } from '../engine/hat';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
@@ -34,7 +33,6 @@ import {
   SHADOW_BODY_TEXTURE,
   tileTexture,
 } from './tile-textures';
-import { brainNodeAt, drawBrain } from './brain';
 import { CRASHED, CRASH_LINE } from '../crash';
 import { reportCrash } from '../crash-reporter';
 import { MEMORY_ART, type MemoryGrid } from '../memory-art';
@@ -43,10 +41,8 @@ import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
-  hatEarned,
   playedBefore,
   rememberFragmentsReached,
-  rememberHat,
   rememberPlayed,
 } from '../progress';
 import {
@@ -66,7 +62,6 @@ import { SoundBoard } from '../audio/sound-board';
 import {
   chainVoices,
   hardDropVoice,
-  hatVoice,
   landVoice,
   answerVoice,
   connectionLostVoice,
@@ -107,13 +102,6 @@ const CARET_PERIOD = 1060;
 const BLINK_DURATION = 90;
 const BLINK_INTERVAL = 2300;
 
-const HAT_METER_Y = 790;
-const HAT_METER_WIDTH = 104;
-const HAT_METER_HEIGHT = 12;
-const HAT_PROMPT = 'press F';
-const HAT_BEAM_WIDTH = 10;
-const HAT_BEAM_DURATION = 220;
-const HAT_BEAM_HIT_DURATION = 420;
 
 const SPARK_TEXTURE = 'spark';
 
@@ -145,7 +133,7 @@ const ANSWER_ECHO_LEFT = MEMORY_PANEL_LEFT;
 const MEMORY_PICTURE_DARKEN = 0.88;
 const MEMORY_PICTURE_FILL_MS = 620;
 
-const BRAIN_BOX = {
+const MEMORY_BOX = {
   left: ORIGIN_X + BOARD_WIDTH + 14,
   top: MEMORY_PANEL_TOP - 46,
   width: CANVAS_WIDTH - (ORIGIN_X + BOARD_WIDTH) - 26,
@@ -293,17 +281,6 @@ export class BoardScene extends Scene {
 
   private piecesText: Phaser.GameObjects.Text;
 
-  private hatKey: Phaser.Input.Keyboard.Key;
-
-  private hatMeter: Phaser.GameObjects.Rectangle;
-
-  private hatBeam: Phaser.GameObjects.Rectangle;
-
-  private hatPrompt: Phaser.GameObjects.Text;
-
-  private hatParts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
-
-  private shownHatCharge = -1;
   private shownPivotType = -1;
   private shownSatelliteType = -1;
   private shownChain = -1;
@@ -360,8 +337,6 @@ export class BoardScene extends Scene {
   private boardFrame: Phaser.GameObjects.Graphics;
 
   private memoryPanel: Phaser.GameObjects.Graphics;
-
-  private shownLitNeurons = 0;
 
   private panelRank: number[] = [];
 
@@ -584,46 +559,6 @@ export class BoardScene extends Scene {
       color: '#6b5a80',
     }).setOrigin(0.5, 0.5);
 
-    const hatLabel = this.add.text(PREVIEW_CENTER_X, HAT_METER_Y - 24, 'HAT', {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#7a5f96',
-    }).setOrigin(0.5, 0.5);
-
-    const hatTrack = this.add.rectangle(
-      PREVIEW_CENTER_X,
-      HAT_METER_Y,
-      HAT_METER_WIDTH,
-      HAT_METER_HEIGHT,
-      TRACK_COLOR,
-    );
-
-    this.hatPrompt = this.add.text(PREVIEW_CENTER_X, HAT_METER_Y + 22, HAT_PROMPT, {
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      color: '#c98cff',
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.hatMeter = this.add.rectangle(
-      PREVIEW_CENTER_X - HAT_METER_WIDTH / 2,
-      HAT_METER_Y,
-      0,
-      HAT_METER_HEIGHT,
-      TRACK_LIT_COLOR,
-    ).setOrigin(0, 0.5);
-
-    this.hatParts = [hatLabel, hatTrack, this.hatMeter];
-    this.runReadouts.push(...this.hatParts);
-
-    this.simulation.hatUnlocked = hatEarned();
-    for (const part of this.hatParts) {
-      part.setVisible(this.simulation.hatUnlocked);
-    }
-
-    this.hatBeam = this.add.rectangle(0, 0, HAT_BEAM_WIDTH, 0, TRACK_LIT_COLOR)
-      .setVisible(false)
-      .setBlendMode(BlendModes.ADD);
-
     this.previewTiles = [
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y, tileTexture(null)),
@@ -636,7 +571,6 @@ export class BoardScene extends Scene {
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
-    this.hatKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.F);
 
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.typeIntoAnswer(event));
 
@@ -934,7 +868,6 @@ export class BoardScene extends Scene {
     this.drawPair();
     this.drawPreview();
     this.refreshChain();
-    this.refreshHat();
     this.refreshAnswerLine(time);
     this.refreshStatic();
     this.refreshGameOver();
@@ -983,7 +916,7 @@ export class BoardScene extends Scene {
 
   private restart(keepMemory = false, keepStory = false): void {
     this.setPaused(false);
-    this.simulation.restart(keepMemory);
+    this.simulation.restart();
 
     this.lastPiecesSpawned = -1;
 
@@ -1005,7 +938,6 @@ export class BoardScene extends Scene {
     this.threatenedIndex = null;
 
     if (!keepMemory) {
-      this.shownLitNeurons = 0;
       this.nodesRevealed = 0;
     }
 
@@ -1034,7 +966,6 @@ export class BoardScene extends Scene {
     this.tweens.killAll();
     this.staticStrength = 0;
     this.staticOverlay.setVisible(false);
-    this.hatBeam.setVisible(false);
     this.cameras.main.filters.external.clear();
     this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
     for (const slot of this.connections) {
@@ -1090,10 +1021,6 @@ export class BoardScene extends Scene {
     this.soundedPiecesLocked = this.simulation.piecesLocked;
     this.slamDistance = null;
     this.shownChain = -1;
-    this.shownHatCharge = -1;
-    for (const part of this.hatParts) {
-      part.setVisible(this.simulation.hatUnlocked);
-    }
     this.shownPivotType = -1;
     this.shownSatelliteType = -1;
     this.shownToppedOut = false;
@@ -1155,10 +1082,6 @@ export class BoardScene extends Scene {
   private readInput(delta: number): void {
     if (Input.Keyboard.JustDown(this.cursors.up)) {
       this.simulation.rotate();
-    }
-
-    if (Input.Keyboard.JustDown(this.hatKey)) {
-      this.fireTheHat();
     }
 
     if (Input.Keyboard.JustDown(this.hardDropKey)) {
@@ -1642,23 +1565,6 @@ export class BoardScene extends Scene {
       this.redrawMemoryPanel(progress);
     }
 
-    if (lit === this.shownLitNeurons) {
-      return;
-    }
-
-    const gainedFrom = this.shownLitNeurons;
-    this.shownLitNeurons = lit;
-
-    this.sparks.setParticleTint(TRACK_LIT_COLOR);
-    for (let node = gainedFrom; node < lit; node += 1) {
-      const at = brainNodeAt(this.nodesRevealed + node, BRAIN_BOX);
-      this.sparks.emitParticleAt(at.x, at.y, SPARKS_PER_CELL);
-      this.soundBoard.play({
-        ...nodeVoice(node, Math.max(total, 1)),
-        delay: (node - gainedFrom) * 70,
-      });
-    }
-
   }
 
   private get moreToReach(): boolean {
@@ -1706,15 +1612,10 @@ export class BoardScene extends Scene {
     this.nodesRevealed += 1;
     rememberFragmentsReached(this.nodesRevealed, FRAGMENT_COUNT);
 
-    if (node.grantsHat === true) {
-      this.grantHat();
-    }
-
     this.pendingReveal = nodeIndex === memory.nodes.length - 1
       ? { title: '', body: memory.question, memoryIndex }
       : null;
 
-    this.shownLitNeurons = 0;
     this.shownPanelProgress = -1;
     this.redrawMemoryPanel(0);
 
@@ -1981,7 +1882,7 @@ export class BoardScene extends Scene {
     if (upcoming === null) {
       this.panelArt = null;
       this.panelKey = null;
-      drawBrain(this.memoryPanel, BRAIN_BOX, this.nodesRevealed, progress);
+      this.memoryPanel.clear();
       return;
     }
 
@@ -2024,9 +1925,9 @@ export class BoardScene extends Scene {
       return;
     }
 
-    const size = Math.min(BRAIN_BOX.width / art.columns, BRAIN_BOX.height / art.rows.length);
-    const left = BRAIN_BOX.left + (BRAIN_BOX.width - size * art.columns) / 2;
-    const top = BRAIN_BOX.top + (BRAIN_BOX.height - size * art.rows.length) / 2;
+    const size = Math.min(MEMORY_BOX.width / art.columns, MEMORY_BOX.height / art.rows.length);
+    const left = MEMORY_BOX.left + (MEMORY_BOX.width - size * art.columns) / 2;
+    const top = MEMORY_BOX.top + (MEMORY_BOX.height - size * art.rows.length) / 2;
     const reached = this.shownPanelCells;
 
     this.memoryPanel.clear();
@@ -2271,87 +2172,6 @@ export class BoardScene extends Scene {
     return sumX / poppedCells;
   }
 
-  private fireTheHat(): void {
-    if (!this.simulation.canFireHat) {
-      return;
-    }
-
-    const firedFrom = this.simulation.pair.row;
-    const column = this.simulation.pair.column;
-    const hit = this.simulation.fireHat();
-
-    const x = centerOfColumn(column);
-    const fromY = centerOfRow(Math.max(firedFrom, FIRST_VISIBLE_ROW));
-    const toY = centerOfRow(hit === null ? ROWS - 1 : hit.row);
-
-    this.soundBoard.play(hatVoice());
-
-    this.tweens.killTweensOf(this.hatBeam);
-    this.hatBeam
-      .setPosition(x, (fromY + toY) / 2)
-      .setSize(HAT_BEAM_WIDTH, Math.abs(toY - fromY) + CELL_SIZE)
-      .setAlpha(1)
-      .setVisible(true);
-    this.tweens.add({
-      targets: this.hatBeam,
-      alpha: 0,
-      duration: hit === null ? HAT_BEAM_DURATION : HAT_BEAM_HIT_DURATION,
-      onComplete: () => this.hatBeam.setVisible(false),
-    });
-
-    if (hit === null) {
-      return;
-    }
-
-    this.hitStopRemaining = this.tuning.hitStopDuration;
-    this.cameras.main.shake(180, this.tuning.shakeIntensity * 2);
-
-    const tile = this.popTiles[0];
-    this.tweens.killTweensOf(tile);
-    tile
-      .setPosition(x, toY)
-      .setTexture(SHADOW_BODY_TEXTURE)
-      .setScale(1)
-      .setAngle(0)
-      .setAlpha(1)
-      .setVisible(true);
-    this.tweens.add({
-      targets: tile,
-      scale: 1.7,
-      alpha: 0,
-      duration: 340,
-      ease: 'Quad.easeOut',
-      onComplete: () => tile.setVisible(false),
-    });
-
-    this.sparks.setParticleTint(TRACK_LIT_COLOR);
-    this.sparks.emitParticleAt(x, toY, SPARKS_PER_CELL * 2);
-  }
-
-  private refreshHat(): void {
-    this.hatPrompt.setVisible(this.simulation.canFireHat && !this.storyHolding);
-
-    if (this.simulation.hatCharge === this.shownHatCharge) {
-      return;
-    }
-
-    this.shownHatCharge = this.simulation.hatCharge;
-    const filled = (this.simulation.hatCharge / HAT_FULL_CHARGE) * HAT_METER_WIDTH;
-    this.hatMeter.setSize(filled, HAT_METER_HEIGHT);
-  }
-
-  private grantHat(): void {
-    rememberHat();
-    this.simulation.hatUnlocked = true;
-    this.simulation.hatCharge = HAT_FULL_CHARGE;
-    this.shownHatCharge = -1;
-
-    for (const part of this.hatParts) {
-      part.setVisible(true).setAlpha(0);
-      this.tweens.add({ targets: part, alpha: 1, duration: 420 });
-    }
-  }
-
   private bounceLanding(): void {
     for (const cell of this.simulation.lastLanded) {
       if (!isVisibleRow(cell.row)) {
@@ -2544,9 +2364,12 @@ export class BoardScene extends Scene {
         return;
       }
       this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
-      this.gameOverHint.setY(HINT_ALONE_Y);
+      this.gameOverHint.setY(HINT_BELOW_OFFER_Y);
 
-      for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint]) {
+      const ending = [
+        this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
+      ];
+      for (const text of ending) {
         text.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: text, alpha: 1, duration: 420 });
       }

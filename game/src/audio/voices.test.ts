@@ -6,7 +6,6 @@ import {
   chainVoices,
   connectionLostVoice,
   hardDropVoice,
-  hatVoice,
   landVoice,
   nodeVoice,
   popVoice,
@@ -29,7 +28,6 @@ const everyVoice = [
   answerVoice(30),
   connectionLostVoice(0),
   connectionLostVoice(30),
-  hatVoice(),
   ...chainVoices(3),
 ];
 
@@ -190,16 +188,5 @@ describe('losing the board', () => {
   it('stops falling before it drops out of hearing', () => {
     expect(connectionLostVoice(72).startFrequency).toBe(connectionLostVoice(24).startFrequency);
     expect(connectionLostVoice(72).endFrequency).toBeGreaterThan(20);
-  });
-});
-
-describe('the hat', () => {
-  it('drops in pitch, so it reads as a shot rather than a chime', () => {
-    const laser = hatVoice();
-    expect(laser.startFrequency).toBeGreaterThan(laser.endFrequency);
-  });
-
-  it('is over fast enough not to sit under the chain that follows it', () => {
-    expect(hatVoice().duration).toBeLessThan(150);
   });
 });
