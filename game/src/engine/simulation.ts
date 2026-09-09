@@ -5,7 +5,6 @@ import {
   isColour,
   isShadow,
   shadowCell,
-  shadowHolding,
 } from './grid';
 import { Board, type TileMove } from './board';
 import { FallingPair, type PairCell } from './falling-pair';
@@ -15,7 +14,6 @@ import {
   scoreLink,
   type ChainLink,
   type GroupCell,
-  type ShadowHit,
 } from './matching';
 import { DEFAULT_TUNING, type Tuning } from '../tuning';
 
@@ -238,22 +236,6 @@ export class Simulation {
     this.chainLength += 1;
     this.settlePending = true;
     this.recordBeat({ kind: 'clear', link, connections });
-  }
-
-  answerQuestion(): { driven: readonly ShadowHit[]; settled: readonly TileMove[] } {
-    const driven: ShadowHit[] = [];
-
-    for (let row = ROWS - 1; row >= 0; row -= 1) {
-      for (let column = 0; column < COLUMNS; column += 1) {
-        const cell = this.board.pieceAt(column, row);
-        if (isShadow(cell)) {
-          this.board.clear(column, row);
-          driven.push({ column, row, turnedTo: shadowHolding(cell) });
-        }
-      }
-    }
-
-    return { driven, settled: this.board.settle() };
   }
 
   get threatenedCell(): GroupCell | null {

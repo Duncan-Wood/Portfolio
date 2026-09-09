@@ -10,7 +10,6 @@ describe('the memories', () => {
     for (const memory of MEMORIES) {
       expect(memory.title).not.toBe('');
       expect(memory.nodes.length).toBeGreaterThan(1);
-      expect(memory.question).not.toBe('');
     }
   });
 

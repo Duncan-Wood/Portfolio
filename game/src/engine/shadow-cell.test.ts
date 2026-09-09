@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COLUMNS,
   PIECE_TYPE_COUNT,
   ROWS,
   SHADOW,
@@ -129,29 +128,5 @@ describe('what the shadow is reaching for', () => {
 
     expect(game.stallProgress).toBeGreaterThan(0);
     expect(game.stallProgress).toBeLessThanOrEqual(1);
-  });
-});
-
-describe('answering the question', () => {
-  it('drops the tiles that were resting on what it drove off', () => {
-    const game = new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
-    game.board.place(0, ROWS - 1, shadowCell(RED));
-    game.board.place(0, ROWS - 2, BLUE);
-
-    const { driven, settled } = game.answerQuestion();
-
-    expect(driven).toHaveLength(1);
-    expect(settled.length).toBeGreaterThan(0);
-    expect(game.board.pieceAt(0, ROWS - 1)).toBe(BLUE);
-  });
-
-  it('leaves a board with no shadow on it untouched', () => {
-    const game = new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
-    for (let column = 0; column < COLUMNS; column += 1) {
-      game.board.place(column, ROWS - 1, RED);
-    }
-
-    expect(game.answerQuestion().driven).toEqual([]);
-    expect(game.board.pieceAt(0, ROWS - 1)).toBe(RED);
   });
 });

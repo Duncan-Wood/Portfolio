@@ -58,6 +58,7 @@ import {
 } from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
+import { TouchControls } from '../input/touch-controls';
 import { SoundBoard } from '../audio/sound-board';
 import {
   chainVoices,
@@ -93,11 +94,12 @@ const HANDOVER_IN_THE_OPEN = 900;
 const HANDOVER_DIM = 240;
 const OUT_OF_PIECES_PAUSE = 2600;
 
-const ANSWER_LIMIT = 48;
 
-const SKIP_PROMPT = 'space  \u00b7  continue';
-const ANSWER_PROMPT = 'type an answer   ·   enter';
-const CARET_PERIOD = 1060;
+const TOUCH_PRIMARY = typeof matchMedia === 'function'
+  && matchMedia('(pointer: coarse)').matches;
+
+const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
+const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 
 const BLINK_DURATION = 90;
 const BLINK_INTERVAL = 2300;
@@ -124,11 +126,6 @@ const HINT_ALONE_Y = CANVAS_HEIGHT / 2 + 84;
 const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
-const MEMORY_PANEL_HEIGHT = 450;
-
-const MEMORY_PANEL_LEFT = 476;
-
-const ANSWER_ECHO_LEFT = MEMORY_PANEL_LEFT;
 
 const MEMORY_PICTURE_DARKEN = 0.88;
 const MEMORY_PICTURE_FILL_MS = 620;
@@ -288,6 +285,8 @@ export class BoardScene extends Scene {
   private timestep: FixedTimestep;
   // Not `input`: that shadows Phaser's own `Scene.input` plugin.
   private inputTranslator: InputTranslator;
+
+  readonly touch = new TouchControls();
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
   private hardDropKey: Phaser.Input.Keyboard.Key;
@@ -360,8 +359,6 @@ export class BoardScene extends Scene {
 
   private lastRevealPiece = -1;
 
-  private pendingReveal: { title: string; body: string; memoryIndex: number } | null = null;
-
   private revealScrim: Phaser.GameObjects.Rectangle;
   private revealTitle: Phaser.GameObjects.Text;
 
@@ -369,17 +366,6 @@ export class BoardScene extends Scene {
 
   private revealSkippableIn = 0;
 
-  private awaitingAnswer = false;
-
-  private answerText = '';
-
-  private answeringMemory = 0;
-
-  private memoryAnswers: string[] = [];
-
-  private answerLine: Phaser.GameObjects.Text;
-
-  private answerEcho: Phaser.GameObjects.Text;
   private revealBody: Phaser.GameObjects.Text;
 
   private cellsBeingFilled = new Set<number>();
@@ -572,8 +558,6 @@ export class BoardScene extends Scene {
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
 
-    this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.typeIntoAnswer(event));
-
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
     this.showFps = import.meta.env.DEV;
@@ -629,33 +613,10 @@ export class BoardScene extends Scene {
       color: '#6b5a80',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.answerLine = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 74, '', {
-      fontFamily: 'monospace',
-      fontSize: '19px',
-      color: '#c98cff',
-      align: 'center',
-      wordWrap: { width: BOARD_WIDTH - 80 },
-      stroke: '#150a24',
-      strokeThickness: 5,
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.answerEcho = this.add.text(
-      ANSWER_ECHO_LEFT,
-      MEMORY_PANEL_TOP + MEMORY_PANEL_HEIGHT + 20,
-      '',
-      {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#c9b3e8',
-        wordWrap: { width: CANVAS_WIDTH - ANSWER_ECHO_LEFT - 14 },
-        lineSpacing: 5,
-      },
-    ).setOrigin(0, 0).setVisible(false);
-
     this.gameOverHint = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
       HINT_ALONE_Y,
-      'restart',
+      RESTART_PROMPT,
       {
         fontFamily: 'monospace',
         fontSize: '14px',
@@ -755,7 +716,7 @@ export class BoardScene extends Scene {
 
   update(time: number, delta: number): void {
     if (this.crashed) {
-      if (Input.Keyboard.JustDown(this.restartKey)) {
+      if (Input.Keyboard.JustDown(this.restartKey) || this.touch.takeDrop()) {
         this.recoverFromCrash();
       }
       return;
@@ -774,7 +735,6 @@ export class BoardScene extends Scene {
 
     this.setPaused(false);
     this.revealHolding = false;
-    this.awaitingAnswer = false;
 
     this.gameOverText.setText(CRASHED).setVisible(true).setAlpha(1);
     this.gameOverLine.setText(CRASH_LINE).setVisible(true).setAlpha(1);
@@ -791,7 +751,7 @@ export class BoardScene extends Scene {
   }
 
   private step(time: number, delta: number): void {
-    if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.pauseKey)) {
+    if (Input.Keyboard.JustDown(this.pauseKey)) {
       this.setPaused(!this.paused);
     }
 
@@ -800,7 +760,8 @@ export class BoardScene extends Scene {
       this.setPaused(false);
     }
 
-    if (!this.awaitingAnswer && Input.Keyboard.JustDown(this.restartKey)) {
+    if (Input.Keyboard.JustDown(this.restartKey)
+      || (this.runOver !== null && this.touch.takeDrop())) {
       this.restart(this.moreToReach);
     }
 
@@ -815,21 +776,19 @@ export class BoardScene extends Scene {
       this.drawPair();
       this.drawPreview();
       this.refreshChain();
-      this.refreshAnswerLine(time);
       this.refreshGameOver();
       this.refreshFps(time);
       return;
     }
 
-    if (this.awaitingAnswer) {
-    } else if (this.revealHolding) {
+    if (this.revealHolding) {
       if (this.revealSkippableIn > 0) {
         this.revealSkippableIn -= delta;
         if (this.revealSkippableIn <= 0) {
           this.revealHint.setVisible(true).setAlpha(0);
           this.tweens.add({ targets: this.revealHint, alpha: 1, duration: 260 });
         }
-      } else if (Input.Keyboard.JustDown(this.hardDropKey)) {
+      } else if (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop()) {
         this.revealHolding = false;
         this.advanceReveal();
       }
@@ -868,7 +827,6 @@ export class BoardScene extends Scene {
     this.drawPair();
     this.drawPreview();
     this.refreshChain();
-    this.refreshAnswerLine(time);
     this.refreshStatic();
     this.refreshGameOver();
     this.refreshFps(time);
@@ -882,19 +840,6 @@ export class BoardScene extends Scene {
     this.staticOverlay.tilePositionX = Math.random() * STATIC_SIZE;
     this.staticOverlay.tilePositionY = Math.random() * STATIC_SIZE;
     this.staticOverlay.setAlpha(this.staticStrength * (0.1 + Math.random() * 0.14));
-  }
-
-  private refreshAnswerLine(time: number): void {
-    if (this.awaitingAnswer) {
-      this.revealHint.setVisible(this.answerText.length === 0);
-    }
-
-    if (!this.awaitingAnswer) {
-      return;
-    }
-
-    const caret = time % CARET_PERIOD < CARET_PERIOD / 2 ? '_' : ' ';
-    this.answerLine.setText(this.answerText + caret);
   }
 
   private setPaused(paused: boolean): void {
@@ -994,14 +939,8 @@ export class BoardScene extends Scene {
       }
     }
     if (!keepStory) {
-      this.awaitingAnswer = false;
-      this.answerText = '';
-      this.tweens.killTweensOf([this.answerLine, this.answerEcho]);
-      this.answerLine.setVisible(false);
-      this.answerEcho.setVisible(false);
-    }
+      }
     if (!keepMemory) {
-      this.memoryAnswers = [];
     }
 
     this.tweens.killTweensOf(this.cellTiles);
@@ -1030,7 +969,6 @@ export class BoardScene extends Scene {
 
     if (!keepStory) {
       this.revealHolding = false;
-      this.pendingReveal = null;
       this.revealPending = false;
     }
     this.lastRevealPiece = -1;
@@ -1080,11 +1018,11 @@ export class BoardScene extends Scene {
   }
 
   private readInput(delta: number): void {
-    if (Input.Keyboard.JustDown(this.cursors.up)) {
+    if (Input.Keyboard.JustDown(this.cursors.up) || this.touch.takeRotate()) {
       this.simulation.rotate();
     }
 
-    if (Input.Keyboard.JustDown(this.hardDropKey)) {
+    if (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop()) {
       const locksBefore = this.simulation.piecesLocked;
       const distance = this.simulation.hardDrop();
       if (this.simulation.piecesLocked !== locksBefore) {
@@ -1097,8 +1035,8 @@ export class BoardScene extends Scene {
 
     this.simulation.softDropping = this.inputTranslator.update(
       {
-        direction: this.pressedDirection(),
-        softDropHeld: this.cursors.down.isDown,
+        direction: this.pressedDirection() ?? this.touch.direction,
+        softDropHeld: this.cursors.down.isDown || this.touch.softDropHeld,
         newPiece,
         delta,
       },
@@ -1264,10 +1202,6 @@ export class BoardScene extends Scene {
 
     if (this.lockSolved) {
       if (this.simulation.resolving || this.revealPending) {
-        return;
-      }
-
-      if (this.pendingReveal !== null || this.awaitingAnswer) {
         return;
       }
 
@@ -1612,10 +1546,6 @@ export class BoardScene extends Scene {
     this.nodesRevealed += 1;
     rememberFragmentsReached(this.nodesRevealed, FRAGMENT_COUNT);
 
-    this.pendingReveal = nodeIndex === memory.nodes.length - 1
-      ? { title: '', body: memory.question, memoryIndex }
-      : null;
-
     this.shownPanelProgress = -1;
     this.redrawMemoryPanel(0);
 
@@ -1627,88 +1557,12 @@ export class BoardScene extends Scene {
   }
 
   private get storyHolding(): boolean {
-    return this.revealHolding || this.awaitingAnswer;
+    return this.revealHolding;
   }
 
   private advanceReveal(): void {
-    const pending = this.pendingReveal;
-    this.pendingReveal = null;
-
-    if (pending === null) {
-      this.hideReveal();
-      return;
-    }
-
-    this.askQuestion(pending.body, pending.memoryIndex);
-  }
-
-  private askQuestion(question: string, memoryIndex: number): void {
-    this.awaitingAnswer = true;
-    this.answerText = '';
-    this.answeringMemory = memoryIndex;
-
-    this.revealTitle.setVisible(false);
-    this.revealPhoto.setVisible(false);
-    this.revealBody.setText(question);
-    this.revealHint.setText(ANSWER_PROMPT);
-
-    this.tweens.killTweensOf([this.revealScrim, this.revealBody, this.revealHint, this.answerLine]);
-    this.revealScrim.setVisible(true).setAlpha(1);
-    this.answerLine.setText('').setVisible(true).setAlpha(1);
-    this.layOutReveal();
-
-    for (const part of [this.revealBody, this.revealHint]) {
-      part.setVisible(true).setAlpha(0);
-      this.tweens.add({ targets: part, alpha: 1, duration: 340, delay: 120 });
-    }
-  }
-
-  private typeIntoAnswer(event: KeyboardEvent): void {
-    if (!this.awaitingAnswer) {
-      return;
-    }
-
-    if (event.key === 'Enter') {
-      this.submitAnswer();
-      return;
-    }
-
-    if (event.key === 'Backspace') {
-      this.answerText = this.answerText.slice(0, -1);
-      return;
-    }
-
-    if (event.key.length === 1 && this.answerText.length < ANSWER_LIMIT) {
-      this.answerText += event.key;
-    }
-  }
-
-  private submitAnswer(): void {
-    const answer = this.answerText.trim();
-    this.awaitingAnswer = false;
     this.hideReveal();
-
-    if (answer === '') {
-      this.answerLine.setVisible(false);
-      this.endRunIfNothingLeft(700);
-      return;
-    }
-
-    this.answerLine.setText(answer);
-    this.tweens.killTweensOf(this.answerLine);
-    this.tweens.add({
-      targets: this.answerLine,
-      alpha: 0,
-      duration: 700,
-      delay: this.holdFor(answer, 900),
-      onComplete: () => this.answerLine.setVisible(false).setAlpha(1),
-    });
-
-    this.memoryAnswers[this.answeringMemory] = answer;
-    this.showAnswerEcho();
-    this.driveOffShadow();
-
-    this.endRunIfNothingLeft(this.holdFor(answer, 900) + 700);
+    this.endRunIfNothingLeft(700);
   }
 
   private endRunIfNothingLeft(after: number): void {
@@ -1722,62 +1576,6 @@ export class BoardScene extends Scene {
       }
       this.winTheRun();
     });
-  }
-
-  private showAnswerEcho(): void {
-    const answer = this.memoryAnswers[this.answeringMemory];
-
-    if (answer === undefined) {
-      this.answerEcho.setVisible(false);
-      return;
-    }
-
-    this.answerEcho.setText(`"${answer}"`).setVisible(true).setAlpha(0);
-    this.tweens.add({ targets: this.answerEcho, alpha: 1, duration: 600, delay: 400 });
-  }
-
-  private driveOffShadow(): void {
-    const { driven, settled } = this.simulation.answerQuestion();
-    if (driven.length === 0) {
-      return;
-    }
-
-    this.tweens.killTweensOf(this.popTiles);
-    this.cameras.main.shake(220 + 18 * Math.min(driven.length, 12), this.tuning.shakeIntensity * 3);
-
-    this.time.delayedCall(driven.length * 55 + 180, () => this.dropTiles(settled));
-
-    for (let index = 0; index < driven.length; index += 1) {
-      const cell = driven[index];
-      const x = centerOfColumn(cell.column);
-      const y = centerOfRow(cell.row);
-      const delay = index * 55;
-
-      const tile = this.popTiles[index];
-      tile
-        .setPosition(x, y)
-        .setTexture(SHADOW_BODY_TEXTURE)
-        .setScale(1)
-        .setAngle(0)
-        .setAlpha(1)
-        .setVisible(true);
-
-      this.tweens.add({
-        targets: tile,
-        scale: 1.7,
-        alpha: 0,
-        duration: 340,
-        delay,
-        ease: 'Quad.easeOut',
-        onComplete: () => tile.setVisible(false),
-      });
-
-      this.soundBoard.play(answerVoice(index));
-      this.time.delayedCall(delay, () => {
-        this.sparks.setParticleTint(TRACK_LIT_COLOR);
-        this.sparks.emitParticleAt(x, y, SPARKS_PER_CELL * 2);
-      });
-    }
   }
 
   private showRevealPicture(picture?: string): void {
@@ -1809,7 +1607,6 @@ export class BoardScene extends Scene {
     if (photoHeight > 0) parts.push({ target: this.revealPhoto, height: photoHeight });
     if (titleHeight > 0) parts.push({ target: this.revealTitle, height: titleHeight });
     parts.push({ target: this.revealBody, height: bodyHeight });
-    if (this.awaitingAnswer) parts.push({ target: this.answerLine, height: this.answerLine.height });
     parts.push({ target: this.revealHint, height: hintHeight });
 
     const total = parts.reduce((sum, part) => sum + part.height, 0)

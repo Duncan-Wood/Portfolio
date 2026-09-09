@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
     <title>Connected</title>
     <style>
       /* `background` must match GROUND_COLOR in `src/palette.ts`. */
@@ -12,6 +12,12 @@
         height: 100%;
         background: #221038;
         overflow: hidden;
+        /* A canvas game wants none of the browser's touch gestures. */
+        overscroll-behavior: none;
+        touch-action: manipulation;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
       }
 
       body {
@@ -79,6 +85,42 @@
         cursor: pointer;
       }
 
+      /* Shown only where touch is the primary input; a laptop trackpad is not. */
+      #touch {
+        display: none;
+        flex: none;
+        gap: 10px;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        justify-content: center;
+      }
+
+      #touch button {
+        flex: 1 1 0;
+        max-width: 92px;
+        min-height: 62px;
+        font-size: 24px;
+        color: #e9dcff;
+        background: #2b1644;
+        border: 1px solid #4a2f6b;
+        border-radius: 12px;
+        touch-action: none;
+      }
+
+      #touch button:active {
+        background: #4a2f6b;
+        border-color: #c98cff;
+      }
+
+      @media (pointer: coarse) {
+        #touch {
+          display: flex;
+        }
+
+        #controls {
+          display: none;
+        }
+      }
+
       #controls {
         flex: none;
         align-self: center;
@@ -122,6 +164,13 @@
   </head>
   <body>
     <div id="game-container"></div>
+    <div id="touch" aria-hidden="true">
+      <button type="button" data-action="left" aria-label="move left">&#9664;</button>
+      <button type="button" data-action="rotate" aria-label="rotate">&#8635;</button>
+      <button type="button" data-action="right" aria-label="move right">&#9654;</button>
+      <button type="button" data-action="softDrop" aria-label="soft drop">&#8681;</button>
+      <button type="button" data-action="drop" aria-label="drop">&#11015;</button>
+    </div>
     <div id="controls">
       <span><b>&larr;&rarr;</b> move</span>
       <span><b>&uarr;</b> rotate</span>

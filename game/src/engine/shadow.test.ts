@@ -259,38 +259,6 @@ describe('pushing the shadow back', () => {
     expect(cleared).toEqual([]);
   });
 
-  it('is driven off the whole board at once when the question is answered', () => {
-    const game = simulation();
-    game.board.place(0, ROWS - 1, SHADOW);
-    game.board.place(3, ROWS - 1, SHADOW);
-    game.board.place(5, ROWS - 4, SHADOW);
-    game.board.place(2, ROWS - 1, RED);
-
-    const { driven } = game.answerQuestion();
-
-    expect(game.shadowOnBoard).toBe(0);
-    expect(driven).toHaveLength(3);
-    expect(driven[0].row).toBeGreaterThanOrEqual(driven[driven.length - 1].row);
-  });
-
-  it('leaves the player\'s own tiles alone when the question is answered', () => {
-    const game = simulation();
-    game.board.place(0, ROWS - 1, RED);
-    game.board.place(1, ROWS - 1, BLUE);
-    game.board.place(2, ROWS - 1, SHADOW);
-
-    game.answerQuestion();
-
-    expect(game.board.pieceAt(0, ROWS - 1)).toBe(RED);
-    expect(game.board.pieceAt(1, ROWS - 1)).toBe(BLUE);
-  });
-
-  it('reports nothing when the question is answered on a clean board', () => {
-    const game = simulation();
-
-    expect(game.answerQuestion().driven).toEqual([]);
-  });
-
   it('forgets the shadow on restart', () => {
     const game = simulation();
     withTilesToTake(game);

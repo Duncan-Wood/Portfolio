@@ -7,7 +7,6 @@ interface MemoryNode {
 export interface Memory {
   title: string;
   nodes: MemoryNode[];
-  question: string;
 }
 
 export const MEMORIES: Memory[] = [
@@ -62,7 +61,6 @@ export const MEMORIES: Memory[] = [
           + 'Most of what is in it is unfinished.',
       },
     ],
-    question: 'What have you been putting off?',
   },
 ];
 
