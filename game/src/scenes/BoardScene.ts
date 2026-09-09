@@ -101,6 +101,7 @@ const TOUCH_PRIMARY = typeof matchMedia === 'function'
   && matchMedia('(pointer: coarse)').matches;
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
+const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 
 const BLINK_DURATION = 90;
@@ -557,13 +558,22 @@ export class BoardScene extends Scene {
 
     if (TOUCH_PRIMARY) {
       this.sideCommands = (['pause', 'restart'] as const).map((action, index) => this.add
-        .text(PREVIEW_CENTER_X, SIDE_COMMAND_Y + index * SIDE_COMMAND_GAP, action, {
-          fontFamily: 'monospace',
-          fontSize: '20px',
-          color: '#9d86b8',
-          backgroundColor: '#2b1644',
-          padding: { x: 26, y: 26 },
-        })
+        .text(
+          MEMORY_BOX.left + MEMORY_BOX.width / 2,
+          SIDE_COMMAND_Y + index * SIDE_COMMAND_GAP,
+          action,
+          {
+            fontFamily: 'monospace',
+            fontSize: '20px',
+            color: '#9d86b8',
+            backgroundColor: '#2b1644',
+            align: 'center',
+            // Both read as one control rather than two of different widths,
+            // and the column lines up with the picture above.
+            fixedWidth: MEMORY_BOX.width,
+            padding: { y: 26 },
+          },
+        )
         .setOrigin(0.5, 0.5)
         .setInteractive({ useHandCursor: true })
         .on('pointerup', () => {
@@ -599,7 +609,7 @@ export class BoardScene extends Scene {
           return;
         }
 
-        if (this.revealHolding || this.runOver !== null || this.crashed) {
+        if (this.paused || this.revealHolding || this.runOver !== null || this.crashed) {
           this.touch.press('drop');
           this.touch.release('drop');
         }
@@ -751,7 +761,7 @@ export class BoardScene extends Scene {
       color: '#c98cff',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, 'esc or space to resume', {
+    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, RESUME_PROMPT, {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#6b5a80',
@@ -803,7 +813,7 @@ export class BoardScene extends Scene {
     }
 
     // `JustDown` consumes the press, so the `paused` test must come first.
-    if (this.paused && Input.Keyboard.JustDown(this.hardDropKey)) {
+    if (this.paused && (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop())) {
       this.setPaused(false);
     }
 
