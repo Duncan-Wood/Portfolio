@@ -228,26 +228,4 @@ describe('anchored cells', () => {
     expect(board.pieceAt(4, BOTTOM)).toBe(2);
     expect(board.pieceAt(4, BOTTOM - 4)).toBe(neuronCell(true));
   });
-
-  it('lands a dropped tile above a neuron, never in the pocket beneath it', () => {
-    const board = new Board();
-    board.place(1, BOTTOM - 3, neuronCell(false));
-
-    expect(board.landingRow(1)).toBe(BOTTOM - 4);
-  });
-
-  it('still lands on the floor of a column with nothing anchored in it', () => {
-    const board = new Board();
-    expect(board.landingRow(0)).toBe(BOTTOM);
-    board.place(0, BOTTOM, 0);
-    expect(board.landingRow(0)).toBe(BOTTOM - 1);
-  });
-
-  it('reports a column blocked to the ceiling as having nowhere to land', () => {
-    const board = new Board();
-    for (let row = 0; row < ROWS; row += 1) {
-      board.place(5, row, 0);
-    }
-    expect(board.landingRow(5)).toBe(-1);
-  });
 });

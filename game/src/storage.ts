@@ -23,11 +23,3 @@ export function clearStored(key: string): void {
     return;
   }
 }
-
-export function storedKeys(): string[] {
-  try {
-    return Object.keys(localStorage);
-  } catch {
-    return [];
-  }
-}

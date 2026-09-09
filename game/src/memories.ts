@@ -74,3 +74,8 @@ export const FRAGMENT_COUNT = MEMORIES.reduce(
   (total, memory) => total + memory.nodes.length,
   0,
 );
+
+export const MEMORY_SIGNATURE = [
+  FRAGMENT_COUNT,
+  ...MEMORIES.flatMap((memory) => memory.nodes.map((node) => node.title)),
+].join('|');

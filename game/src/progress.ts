@@ -1,14 +1,11 @@
-import { clearStored, readStored, storedKeys, writeStored } from './storage';
+import { clearStored, readStored, writeStored } from './storage';
 
-const SAVED_PREFIX = 'connected.';
-const BUILD_KEY = 'connected.build';
+const MEMORIES_KEY = 'connected.memories';
+// PLAYED_KEY, FRAGMENTS_TOTAL_KEY and LOG_KEY are also read by src/game-progress.js,
+// a separate bundle; renaming one here silently empties the contact form's prefill.
 const PLAYED_KEY = 'connected.played';
-// Read by the portfolio's contact form, which shares this origin but not this bundle.
 const FRAGMENTS_TOTAL_KEY = 'connected.fragmentsTotal';
-// Read by the portfolio's contact form: what was surfaced and what it cost.
 const LOG_KEY = 'connected.log';
-// Where an unfinished run left off, so leaving for the contact form and
-// coming back does not start the whole thing again.
 const RESUME_KEY = 'connected.resume';
 
 export function playedBefore(): boolean {
@@ -70,16 +67,14 @@ export function rememberResume(nodesRevealed: number, total: number): void {
   writeStored(RESUME_KEY, String(nodesRevealed));
 }
 
-export function forgetProgressFromAnOlderBuild(): void {
-  if (!import.meta.env.DEV || readStored(BUILD_KEY) === __BUILD_ID__) {
+export function forgetProgressFromOlderMemories(signature: string): void {
+  if (readStored(MEMORIES_KEY) === signature) {
     return;
   }
 
-  for (const key of storedKeys()) {
-    if (key.startsWith(SAVED_PREFIX)) {
-      clearStored(key);
-    }
+  for (const key of [LOG_KEY, FRAGMENTS_TOTAL_KEY, RESUME_KEY]) {
+    clearStored(key);
   }
 
-  writeStored(BUILD_KEY, __BUILD_ID__);
+  writeStored(MEMORIES_KEY, signature);
 }

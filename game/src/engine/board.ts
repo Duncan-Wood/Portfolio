@@ -76,19 +76,6 @@ export class Board {
     return moves;
   }
 
-  landingRow(column: number): number {
-    let landing = -1;
-
-    for (let row = 0; row < ROWS; row += 1) {
-      if (!this.isEmpty(column, row)) {
-        break;
-      }
-      landing = row;
-    }
-
-    return landing;
-  }
-
   reset(): void {
     this.cells.fill(EMPTY);
   }

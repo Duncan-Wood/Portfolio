@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { clearStored, readStored, storedKeys, writeStored } from './storage';
+import { clearStored, readStored, writeStored } from './storage';
 
 function install(value: unknown): void {
   Object.defineProperty(globalThis, 'localStorage', {
@@ -51,10 +51,5 @@ describe('storage a browser may refuse', () => {
   it('drops a removal rather than throwing when the browser blocks site data', () => {
     install('refuses');
     expect(() => clearStored('connected.resume')).not.toThrow();
-  });
-
-  it('lists nothing rather than throwing when the browser blocks site data', () => {
-    install('refuses');
-    expect(storedKeys()).toEqual([]);
   });
 });

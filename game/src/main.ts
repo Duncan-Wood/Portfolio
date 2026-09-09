@@ -2,7 +2,8 @@ import { Game, Scale, WEBGL } from 'phaser';
 import { BoardScene, CANVAS_HEIGHT, CANVAS_WIDTH } from './scenes/BoardScene';
 import { GROUND_COLOR } from './palette';
 import { openGate } from './gate';
-import { forgetProgressFromAnOlderBuild } from './progress';
+import { MEMORY_SIGNATURE } from './memories';
+import { forgetProgressFromOlderMemories } from './progress';
 import { startCrashReporting } from './crash-reporter';
 import { wireTouchButtons } from './touch-buttons';
 
@@ -28,7 +29,7 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 startCrashReporting();
-forgetProgressFromAnOlderBuild();
+forgetProgressFromOlderMemories(MEMORY_SIGNATURE);
 
 void openGate(import.meta.env.VITE_GAME_CODE).then(() => {
   const game = new Game(config);

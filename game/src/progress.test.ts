@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { loggedWith, resumePoint } from './progress';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { forgetProgressFromOlderMemories, loggedWith, resumePoint } from './progress';
 
 describe('resumePoint', () => {
   it('starts a first-time visitor at the beginning', () => {
@@ -52,5 +52,80 @@ describe('the log of what a run surfaced', () => {
 
     expect(gappy).toHaveLength(3);
     expect(gappy.every((entry) => entry !== undefined)).toBe(true);
+  });
+});
+
+describe('progress left behind by an older set of memories', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  function playedThrough(): void {
+    held.set('connected.log', '[{"title":"The Laptop","tries":2}]');
+    held.set('connected.fragmentsTotal', '5');
+    held.set('connected.resume', '3');
+    held.set('connected.played', 'true');
+    held.set('connected.unlocked', 'true');
+  }
+
+  it('drops a log written against memories that have since changed', () => {
+    playedThrough();
+    held.set('connected.memories', 'old signature');
+
+    forgetProgressFromOlderMemories('new signature');
+
+    expect(held.has('connected.log')).toBe(false);
+    expect(held.has('connected.fragmentsTotal')).toBe(false);
+    expect(held.has('connected.resume')).toBe(false);
+  });
+
+  it('leaves the gate open, so a deploy does not ask friends for the code again', () => {
+    playedThrough();
+    held.set('connected.memories', 'old signature');
+
+    forgetProgressFromOlderMemories('new signature');
+
+    expect(held.get('connected.unlocked')).toBe('true');
+  });
+
+  it('still knows they played before, which no rewrite can make stale', () => {
+    playedThrough();
+    held.set('connected.memories', 'old signature');
+
+    forgetProgressFromOlderMemories('new signature');
+
+    expect(held.get('connected.played')).toBe('true');
+  });
+
+  it('keeps a run intact when the memories are the same, whatever else shipped', () => {
+    playedThrough();
+    held.set('connected.memories', 'same signature');
+
+    forgetProgressFromOlderMemories('same signature');
+
+    expect(held.get('connected.log')).toBe('[{"title":"The Laptop","tries":2}]');
+    expect(held.get('connected.resume')).toBe('3');
+  });
+
+  it('records the signature it cleared for, so the next visit is left alone', () => {
+    playedThrough();
+
+    forgetProgressFromOlderMemories('new signature');
+
+    expect(held.get('connected.memories')).toBe('new signature');
   });
 });
