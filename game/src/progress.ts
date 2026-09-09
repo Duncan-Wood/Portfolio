@@ -4,6 +4,7 @@ const PLAYED_KEY = 'connected.played';
 // Read by the portfolio's contact form, which shares this origin but not this bundle.
 const FRAGMENTS_KEY = 'connected.fragments';
 const FRAGMENTS_TOTAL_KEY = 'connected.fragmentsTotal';
+const FURTHEST_TITLE_KEY = 'connected.furthestTitle';
 // Where an unfinished run left off, so leaving for the contact form and
 // coming back does not start the whole thing again.
 const RESUME_KEY = 'connected.resume';
@@ -20,11 +21,16 @@ export function furthestFragment(remembered: number, reached: number, total: num
   return Math.max(Math.min(remembered, total), reached);
 }
 
-export function rememberFragmentsReached(reached: number, total: number): void {
+export function rememberFragmentsReached(reached: number, total: number, title: string): void {
   const remembered = Number(localStorage.getItem(FRAGMENTS_KEY)) || 0;
+  const furthest = furthestFragment(remembered, reached, total);
 
-  localStorage.setItem(FRAGMENTS_KEY, String(furthestFragment(remembered, reached, total)));
+  localStorage.setItem(FRAGMENTS_KEY, String(furthest));
   localStorage.setItem(FRAGMENTS_TOTAL_KEY, String(total));
+
+  if (furthest === reached) {
+    localStorage.setItem(FURTHEST_TITLE_KEY, title);
+  }
 }
 
 export function resumePoint(saved: number, total: number): number {

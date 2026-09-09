@@ -1599,7 +1599,7 @@ export class BoardScene extends Scene {
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
-    rememberFragmentsReached(this.nodesRevealed, FRAGMENT_COUNT);
+    rememberFragmentsReached(this.nodesRevealed, FRAGMENT_COUNT, node.title);
     rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
 
     this.shownPanelProgress = -1;

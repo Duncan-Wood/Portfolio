@@ -44,3 +44,10 @@ describe('resumePoint', () => {
     expect(resumePoint(NaN, 5)).toBe(0);
   });
 });
+
+describe('remembering how far a run got', () => {
+  it('keeps the title only when this run set a new best', () => {
+    expect(furthestFragment(3, 4, 5)).toBe(4);
+    expect(furthestFragment(4, 2, 5)).toBe(4);
+  });
+});
