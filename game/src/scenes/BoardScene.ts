@@ -44,6 +44,8 @@ import {
   playedBefore,
   rememberFragmentsReached,
   rememberPlayed,
+  rememberResume,
+  resumeAt,
 } from '../progress';
 import {
   CONNECTION_LOST,
@@ -903,7 +905,7 @@ export class BoardScene extends Scene {
     this.threatenedIndex = null;
 
     if (!keepMemory) {
-      this.nodesRevealed = 0;
+      this.nodesRevealed = resumeAt(FRAGMENT_COUNT);
     }
 
     this.startLock();
@@ -1562,6 +1564,7 @@ export class BoardScene extends Scene {
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
     rememberFragmentsReached(this.nodesRevealed, FRAGMENT_COUNT);
+    rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
 
     this.shownPanelProgress = -1;
     this.redrawMemoryPanel(0);
