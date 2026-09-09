@@ -560,6 +560,24 @@ export class BoardScene extends Scene {
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
+    // The card says "tap"; route that through the drop action so a tap, the
+    // drop button and space all take the same path. Play is left to the buttons.
+    this.input.on(
+      Input.Events.POINTER_UP,
+      (_pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
+        this.soundBoard.unlock();
+
+        if (over.includes(this.contactOffer)) {
+          return;
+        }
+
+        if (this.revealHolding || this.runOver !== null || this.crashed) {
+          this.touch.press('drop');
+          this.touch.release('drop');
+        }
+      },
+    );
+
     this.showFps = import.meta.env.DEV;
     this.fpsText = this.add.text(8, 8, '', {
       fontFamily: 'monospace',
