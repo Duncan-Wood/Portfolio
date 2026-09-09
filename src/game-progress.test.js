@@ -1,50 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { openingLine, draftFor } from "./game-progress";
+import { draftFrom } from "./game-progress";
 
-describe("openingLine", () => {
-  it("says nothing for someone who never opened the game", () => {
-    expect(openingLine(0, 0, null, false)).toBe(null);
-  });
+const build = { title: "The Build", tries: 1 };
+const johns = { title: "No Johns", tries: 4 };
+const laptop = { title: "The Laptop", tries: 7 };
 
-  it("speaks for someone who played and surfaced nothing, since they can still write", () => {
-    expect(openingLine(0, 5, null, true)).toBe("I played Connected.");
-  });
-
-  it("names where they stopped, which is the part worth replying to", () => {
-    expect(openingLine(3, 5, "The Laptop", true)).toBe(
-      "I played Connected and got as far as The Laptop — 3 of 5."
-    );
-  });
-
-  it("says so plainly when they saw everything", () => {
-    expect(openingLine(5, 5, "The Notebook", true)).toBe(
-      "I played Connected and saw all 5."
-    );
-  });
-
-  it("falls back to the count when no title was stored", () => {
-    expect(openingLine(2, 5, null, true)).toBe("I played Connected and got 2 of 5.");
-  });
-
-  it("never claims more fragments than the game has", () => {
-    expect(openingLine(9, 5, "The Notebook", true)).toBe(
-      "I played Connected and saw all 5."
-    );
-  });
-
-  it("ignores stored values that are not numbers", () => {
-    expect(openingLine(NaN, NaN, "The Hat", true)).toBe("I played Connected.");
-  });
-});
-
-describe("draftFor", () => {
+describe("draftFrom", () => {
   it("is empty for someone who never played, so the form is untouched", () => {
-    expect(draftFor(null)).toBe("");
+    expect(draftFrom([], 5, false)).toBe("");
   });
 
-  it("leaves the message itself entirely to the sender", () => {
-    expect(draftFor("I played Connected and got as far as The Laptop — 3 of 5.")).toBe(
-      "I played Connected and got as far as The Laptop — 3 of 5.\n\n"
+  it("speaks for someone who played and surfaced nothing", () => {
+    expect(draftFrom([], 5, true)).toBe("I played Connected.\n\n");
+  });
+
+  it("says how far, then what each one cost", () => {
+    expect(draftFrom([build, johns, laptop], 5, true)).toBe(
+      "I played Connected — 3 of 5.\n\n" +
+        "The Build — 1 try\n" +
+        "No Johns — 4 tries\n" +
+        "The Laptop — 7 tries\n\n"
     );
+  });
+
+  it("says all rather than a score when they finished", () => {
+    expect(draftFrom([build, johns], 2, true)).toBe(
+      "I played Connected — all 2.\n\n" + "The Build — 1 try\n" + "No Johns — 4 tries\n\n"
+    );
+  });
+
+  it("says try rather than tries for a first-time clear", () => {
+    expect(draftFrom([build], 5, true)).toContain("The Build — 1 try\n");
+  });
+
+  it("skips an entry with no title, rather than printing a blank row", () => {
+    expect(draftFrom([{ title: "", tries: 0 }, johns], 5, true)).toBe(
+      "I played Connected — 2 of 5.\n\n" + "No Johns — 4 tries\n\n"
+    );
+  });
+
+  it("copes with a log that is not an array", () => {
+    expect(draftFrom(null, 5, true)).toBe("I played Connected.\n\n");
   });
 });

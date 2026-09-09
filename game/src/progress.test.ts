@@ -1,27 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { furthestFragment, resumePoint } from './progress';
-
-describe('furthestFragment', () => {
-  it('keeps the best run when this one fell short', () => {
-    expect(furthestFragment(3, 1, 4)).toBe(3);
-  });
-
-  it('advances when this run went further', () => {
-    expect(furthestFragment(1, 3, 4)).toBe(3);
-  });
-
-  it('starts from nothing remembered', () => {
-    expect(furthestFragment(0, 2, 4)).toBe(2);
-  });
-
-  it('caps a mark set when the game had more fragments than it has now', () => {
-    expect(furthestFragment(6, 1, 4)).toBe(4);
-  });
-
-  it('lets this run beat a capped mark', () => {
-    expect(furthestFragment(6, 4, 4)).toBe(4);
-  });
-});
+import { loggedWith, resumePoint } from './progress';
 
 describe('resumePoint', () => {
   it('starts a first-time visitor at the beginning', () => {
@@ -45,9 +23,34 @@ describe('resumePoint', () => {
   });
 });
 
-describe('remembering how far a run got', () => {
-  it('keeps the title only when this run set a new best', () => {
-    expect(furthestFragment(3, 4, 5)).toBe(4);
-    expect(furthestFragment(4, 2, 5)).toBe(4);
+describe('the log of what a run surfaced', () => {
+  it('records the first fragment with what it cost', () => {
+    expect(loggedWith([], 0, { title: 'The Build', tries: 3 }))
+      .toEqual([{ title: 'The Build', tries: 3 }]);
+  });
+
+  it('appends the next one without disturbing the last', () => {
+    const first = loggedWith([], 0, { title: 'The Build', tries: 1 });
+
+    expect(loggedWith(first, 1, { title: 'No Johns', tries: 4 })).toEqual([
+      { title: 'The Build', tries: 1 },
+      { title: 'No Johns', tries: 4 },
+    ]);
+  });
+
+  it('overwrites in place when a fragment is surfaced again on a later run', () => {
+    const before = [{ title: 'The Build', tries: 9 }, { title: 'No Johns', tries: 2 }];
+
+    expect(loggedWith(before, 0, { title: 'The Build', tries: 1 })).toEqual([
+      { title: 'The Build', tries: 1 },
+      { title: 'No Johns', tries: 2 },
+    ]);
+  });
+
+  it('never leaves a hole, so the contact form can read it straight through', () => {
+    const gappy = loggedWith([], 2, { title: 'The Laptop', tries: 5 });
+
+    expect(gappy).toHaveLength(3);
+    expect(gappy.every((entry) => entry !== undefined)).toBe(true);
   });
 });

@@ -1,43 +1,39 @@
 // Written by the game at /game/, which shares this origin but not this bundle.
-const FRAGMENTS_KEY = "connected.fragments";
+const LOG_KEY = "connected.log";
 const FRAGMENTS_TOTAL_KEY = "connected.fragmentsTotal";
-const FURTHEST_TITLE_KEY = "connected.furthestTitle";
 const PLAYED_KEY = "connected.played";
 
-export function openingLine(reached, total, title, played) {
+// What they came to say is theirs; this only says what happened in the game.
+export function draftFrom(log, total, played) {
   if (!played) {
-    return null;
+    return "";
   }
 
-  if (!(reached > 0) || !(total > 0)) {
-    return "I played Connected.";
+  const surfaced = Array.isArray(log) ? log.filter((entry) => entry?.title) : [];
+
+  if (surfaced.length === 0 || !(total > 0)) {
+    return "I played Connected.\n\n";
   }
 
-  const surfaced = Math.min(reached, total);
+  const reached = Array.isArray(log) ? log.length : 0;
+  const head =
+    reached >= total
+      ? `I played Connected — all ${total}.`
+      : `I played Connected — ${reached} of ${total}.`;
 
-  if (surfaced >= total) {
-    return `I played Connected and saw all ${total}.`;
-  }
+  const lines = surfaced.map(
+    ({ title, tries }) => `${title} — ${tries} ${tries === 1 ? "try" : "tries"}`
+  );
 
-  return title
-    ? `I played Connected and got as far as ${title} — ${surfaced} of ${total}.`
-    : `I played Connected and got ${surfaced} of ${total}.`;
-}
-
-// What they came to say is theirs; the draft only says where they got to.
-export function draftFor(opening) {
-  return opening === null ? "" : `${opening}\n\n`;
+  return `${head}\n\n${lines.join("\n")}\n\n`;
 }
 
 export function gameProgressPrefill() {
   try {
-    return draftFor(
-      openingLine(
-        Number(localStorage.getItem(FRAGMENTS_KEY)),
-        Number(localStorage.getItem(FRAGMENTS_TOTAL_KEY)),
-        localStorage.getItem(FURTHEST_TITLE_KEY),
-        localStorage.getItem(PLAYED_KEY) === "true"
-      )
+    return draftFrom(
+      JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]"),
+      Number(localStorage.getItem(FRAGMENTS_TOTAL_KEY)),
+      localStorage.getItem(PLAYED_KEY) === "true"
     );
   } catch {
     // A browser set to block site data throws here rather than returning null.

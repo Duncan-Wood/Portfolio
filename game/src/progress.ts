@@ -2,9 +2,9 @@ const SAVED_PREFIX = 'connected.';
 const BUILD_KEY = 'connected.build';
 const PLAYED_KEY = 'connected.played';
 // Read by the portfolio's contact form, which shares this origin but not this bundle.
-const FRAGMENTS_KEY = 'connected.fragments';
 const FRAGMENTS_TOTAL_KEY = 'connected.fragmentsTotal';
-const FURTHEST_TITLE_KEY = 'connected.furthestTitle';
+// Read by the portfolio's contact form: what was surfaced and what it cost.
+const LOG_KEY = 'connected.log';
 // Where an unfinished run left off, so leaving for the contact form and
 // coming back does not start the whole thing again.
 const RESUME_KEY = 'connected.resume';
@@ -17,20 +17,38 @@ export function rememberPlayed(): void {
   localStorage.setItem(PLAYED_KEY, 'true');
 }
 
-export function furthestFragment(remembered: number, reached: number, total: number): number {
-  return Math.max(Math.min(remembered, total), reached);
+export interface SurfacedFragment {
+  title: string;
+  tries: number;
 }
 
-export function rememberFragmentsReached(reached: number, total: number, title: string): void {
-  const remembered = Number(localStorage.getItem(FRAGMENTS_KEY)) || 0;
-  const furthest = furthestFragment(remembered, reached, total);
+export function loggedWith(
+  log: readonly SurfacedFragment[],
+  index: number,
+  entry: SurfacedFragment,
+): SurfacedFragment[] {
+  const next = [...log];
+  next[index] = entry;
+  return [...next].map((held) => held ?? { title: '', tries: 0 });
+}
 
-  localStorage.setItem(FRAGMENTS_KEY, String(furthest));
-  localStorage.setItem(FRAGMENTS_TOTAL_KEY, String(total));
-
-  if (furthest === reached) {
-    localStorage.setItem(FURTHEST_TITLE_KEY, title);
+export function rememberFragment(
+  index: number,
+  entry: SurfacedFragment,
+  total: number,
+): void {
+  let log: SurfacedFragment[] = [];
+  try {
+    const held: unknown = JSON.parse(localStorage.getItem(LOG_KEY) ?? '[]');
+    if (Array.isArray(held)) {
+      log = held as SurfacedFragment[];
+    }
+  } catch {
+    log = [];
   }
+
+  localStorage.setItem(LOG_KEY, JSON.stringify(loggedWith(log, index, entry)));
+  localStorage.setItem(FRAGMENTS_TOTAL_KEY, String(total));
 }
 
 export function resumePoint(saved: number, total: number): number {

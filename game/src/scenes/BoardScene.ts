@@ -42,7 +42,7 @@ import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
   playedBefore,
-  rememberFragmentsReached,
+  rememberFragment,
   rememberPlayed,
   rememberResume,
   resumeAt,
@@ -355,6 +355,8 @@ export class BoardScene extends Scene {
   private shownPanelProgress = -1;
 
   private crashed = false;
+
+  private triesAtLock = 1;
 
   private sideCommands: Phaser.GameObjects.Text[] = [];
 
@@ -1279,6 +1281,7 @@ export class BoardScene extends Scene {
 
   // The shadow keeps what it took; only `startLock` reseeds the board itself.
   private reseedAfterRunningOut(): void {
+    this.triesAtLock += 1;
     this.lockEndingIn = OUT_OF_PIECES_PAUSE;
     this.shadowGroundHeld = this.simulation.shadowTaken;
     this.objectiveText.setText('out of pieces').setAlpha(1);
@@ -1599,7 +1602,12 @@ export class BoardScene extends Scene {
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
-    rememberFragmentsReached(this.nodesRevealed, FRAGMENT_COUNT, node.title);
+    rememberFragment(
+      this.nodesRevealed - 1,
+      { title: node.title, tries: this.triesAtLock },
+      FRAGMENT_COUNT,
+    );
+    this.triesAtLock = 1;
     rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
 
     this.shownPanelProgress = -1;
@@ -1837,6 +1845,7 @@ export class BoardScene extends Scene {
       this.shownToppedOut = toppedOut;
       if (toppedOut) {
         this.runOver = 'topped-out';
+        this.triesAtLock += 1;
         this.soundBoard.play(topOutVoice());
         this.loseTheBoard();
       }
