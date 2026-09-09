@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { upstreamFor } from "./tunnel.mjs";
+import { upstreamFor } from "./functions/tunnel.mjs";
 
 const DSN = "https://b822c40c02f0075b1cc91d67d2f48ea4@o4511803623211008.ingest.us.sentry.io/4512052958527488";
 const header = (extra) => JSON.stringify({ event_id: "abc", ...extra });
