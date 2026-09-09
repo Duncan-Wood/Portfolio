@@ -48,13 +48,14 @@ export const MEMORIES: Memory[] = [
           + 'This is the one I could start over on.',
       },
       {
-        title: 'The Red Kickball',
+        title: 'The Kickball',
         photo: 'the-kickball',
         body:
           'I moved to DC three years ago and knew nobody. Someone invited me to '
           + 'Sunday kickball. Stonewall.\n\n'
           + 'I was not good at it. Nobody was. That turned out to be the point.\n\n'
-          + 'Three of those teams have since asked me to captain.',
+          + 'My original team asked me to captain two seasons in a row. '
+          + 'Then another FRAY League team asked too. I haven’t said yes yet.',
       },
       {
         title: 'The Notebook',
