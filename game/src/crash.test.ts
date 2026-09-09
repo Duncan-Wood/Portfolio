@@ -57,10 +57,10 @@ describe('the crash log', () => {
 });
 
 describe('recognising a Sentry DSN', () => {
-  const REAL = 'https://b822c40c02f0075b1cc91d67d2f48ea4@o4511803623211008.ingest.us.sentry.io/4512052958527488';
+  const SHAPE = 'https://0123456789abcdef0123456789abcdef@o1234567890123456.ingest.us.sentry.io/1234567890123456';
 
   it('accepts the shape Sentry actually hands out', () => {
-    expect(looksLikeDsn(REAL)).toBe(true);
+    expect(looksLikeDsn(SHAPE)).toBe(true);
   });
 
   it('rejects the security token, which is the easiest thing to copy by mistake', () => {
@@ -68,11 +68,11 @@ describe('recognising a Sentry DSN', () => {
   });
 
   it('rejects a URL with no public key in front of the host', () => {
-    expect(looksLikeDsn('https://o4511803623211008.ingest.us.sentry.io/4512052958527488')).toBe(false);
+    expect(looksLikeDsn('https://o1234567890123456.ingest.us.sentry.io/1234567890123456')).toBe(false);
   });
 
   it('rejects a URL with no project id after the host', () => {
-    expect(looksLikeDsn('https://b822c40c@o4511803623211008.ingest.us.sentry.io/')).toBe(false);
+    expect(looksLikeDsn('https://0123456789abcdef@o1234567890123456.ingest.us.sentry.io/')).toBe(false);
   });
 
   it('rejects something that is not a URL at all', () => {

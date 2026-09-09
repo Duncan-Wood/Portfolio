@@ -31,6 +31,20 @@ const PANEL_COLUMNS = 22;
 
 const PICTURES = {
   'the-build': { file: 'puter.jpg', columns: 110, rows: 147 },
+  'no-johns': { file: 'gamecube_controller.jpg', columns: 110, rows: 147 },
+  'the-kickball': {
+    file: 'kickball.jpeg',
+    columns: 110,
+    rows: 121,
+    crop: ['-crop', '316x347+0+32', '+repage'],
+  },
+  'the-laptop': {
+    file: 'old_macbook.jpg',
+    columns: 110,
+    rows: 82,
+    crop: ['-crop', '2775x2056+105+1104', '+repage'],
+  },
+  'the-notebook': { file: 'journal_&_pen.jpg', columns: 110, rows: 147 },
 };
 
 function quantize({ file, columns, rows, crop = [] }) {
