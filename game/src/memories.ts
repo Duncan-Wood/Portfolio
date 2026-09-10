@@ -17,24 +17,22 @@ export const MEMORIES: Memory[] = [
         title: 'The Build',
         photo: 'the-build',
         body:
-          'I was lucky. My grandparents bought the parts one Christmas when I was '
-          + 'fourteen. I put it together myself and it still runs.\n\n'
-          + 'Freshman year had scattered everyone I knew into new groups, and I spent '
-          + 'most of that year alone in front of this thing.\n\n'
-          + 'It is also where I found Dota. I am still in that community today.'
+          'My grandparents bought the parts one Christmas when I was fourteen. I put '
+          + 'it together myself.\n\n'
+          + 'Freshman year of high school scattered everyone I knew. I spent most of '
+          + 'that year alone in front of it. Alone is the wrong word. Dota was on it, '
+          + 'and so were people I have known for thirteen years.\n\n'
+          + 'It still runs.'
       },
       {
         title: 'No Johns',
         photo: 'no-johns',
         body:
           'I had Melee as a kid and nobody to play it with. I did not touch it again '
-          + 'until I was eighteen, at Charlie’s house, five hours in one sitting.\n\n'
-          + 'I had judged him on the way in — the cigarettes, the beer, the routine of '
-          + 'it. I was wrong. Over the next three years he quit.\n\n'
+          + 'until I was eighteen, at a friend’s house.\n\n'
           + 'Melee has a word for the excuse you make after you lose. A john. You do '
-          + 'not get to john. I learned that properly from someone who stopped making '
-          + 'them.\n\n'
-          + 'I do not see Charlie much now. I am still in that community.'
+          + 'not get to john.\n\n'
+          + 'The community they handed me is still mine.'
       },
       {
         title: 'The Laptop',
@@ -42,10 +40,10 @@ export const MEMORIES: Memory[] = [
         body:
           'My mom’s old MacBook. Slow enough to be annoying, good enough to get me '
           + 'through a bootcamp. It is where I learned to actually build software.\n\n'
-          + 'Tools have always been able to carry me further than I can go alone, and '
-          + 'for a while I let them. Claude writes code faster than I ever will.\n\n'
-          + 'So now I write the test first and read every line before it ships. This is '
-          + 'still the machine I could start over on.'
+          + 'Tools have always carried me further than I can go alone. Claude writes '
+          + 'code faster than I ever will.\n\n'
+          + 'Some of what is committed here I could not explain yet. There is more I '
+          + 'want to build than I have time for, so I keep using it.'
       },
       {
         title: 'The Kickball',
@@ -64,8 +62,8 @@ export const MEMORIES: Memory[] = [
           'A notebook, and a pen nice enough that I slow down for it.\n\n'
           + 'Everything else I own hands me more material than I can use. This gives me '
           + 'nothing. Only what I can get out of my own head.\n\n'
-          + 'Most of what is in it is unfinished, and I have stopped minding. The point '
-          + 'was never the pages. It is that I keep opening it.'
+          + 'Most of what is in it is unfinished, and I have stopped minding. I keep '
+          + 'opening it.'
       },
     ],
   },
