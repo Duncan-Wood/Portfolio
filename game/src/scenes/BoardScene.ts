@@ -571,29 +571,32 @@ export class BoardScene extends Scene {
     }).setOrigin(0.5, 0.5);
 
     if (TOUCH_PRIMARY) {
-      this.sideCommands = (['pause', 'restart'] as const).map((action, index) => this.add
-        .text(
-          MEMORY_BOX.left + MEMORY_BOX.width / 2,
-          SIDE_COMMAND_Y + index * SIDE_COMMAND_GAP,
-          action,
-          {
-            fontFamily: 'monospace',
-            fontSize: '20px',
-            color: '#9d86b8',
-            backgroundColor: '#2b1644',
-            align: 'center',
-            // Both read as one control rather than two of different widths,
-            // and the column lines up with the picture above.
-            fixedWidth: MEMORY_BOX.width,
-            padding: { y: 26 },
-          },
-        )
-        .setOrigin(0.5, 0.5)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerup', () => {
+      this.sideCommands = (['pause', 'restart'] as const).map((action, index) => {
+        const command = this.add
+          .text(
+            MEMORY_BOX.left + MEMORY_BOX.width / 2,
+            SIDE_COMMAND_Y + index * SIDE_COMMAND_GAP,
+            action,
+            {
+              fontFamily: 'monospace',
+              fontSize: '20px',
+              color: '#9d86b8',
+              backgroundColor: '#2b1644',
+              align: 'center',
+              // Both read as one control rather than two of different widths,
+              // and the column lines up with the picture above.
+              fixedWidth: MEMORY_BOX.width,
+              padding: { y: 26 },
+            },
+          )
+          .setOrigin(0.5, 0.5)
+          .setInteractive({ useHandCursor: true });
+
+        return this.onPress(command, () => {
           this.touch.press(action);
           this.touch.release(action);
-        }));
+        });
+      });
     }
 
     this.previewTiles = [
@@ -630,12 +633,15 @@ export class BoardScene extends Scene {
       },
     );
 
-    this.input.on(Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
-      if (this.betweenPlay) {
-        return;
-      }
-      this.swipe.begin(pointer.x, pointer.y, this.time.now);
-    });
+    this.input.on(
+      Input.Events.POINTER_DOWN,
+      (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
+        if (this.betweenPlay || over.length > 0) {
+          return;
+        }
+        this.swipe.begin(pointer.x, pointer.y, this.time.now);
+      },
+    );
 
     this.input.on(Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
       if (pointer.isDown) {
@@ -740,10 +746,11 @@ export class BoardScene extends Scene {
     )
       .setOrigin(0.5, 0.5)
       .setVisible(false)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerup', () => {
-        window.location.href = '/#contact';
-      });
+      .setInteractive({ useHandCursor: true });
+
+    this.onPress(this.contactOffer, () => {
+      window.location.href = '/#contact';
+    });
 
     this.staticOverlay = this.add.tileSprite(
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -1184,6 +1191,28 @@ export class BoardScene extends Scene {
       return 1;
     }
     return null;
+  }
+
+  // Phaser fires pointerup on whatever the finger is over, not on what it
+  // pressed, so a drag that ends on a control would trigger it.
+  private onPress<T extends Phaser.GameObjects.Text>(target: T, run: () => void): T {
+    let armed = false;
+
+    target.on('pointerdown', () => {
+      armed = true;
+    });
+    target.on('pointerout', () => {
+      armed = false;
+    });
+    target.on('pointerup', () => {
+      if (!armed) {
+        return;
+      }
+      armed = false;
+      run();
+    });
+
+    return target;
   }
 
   private get betweenPlay(): boolean {
