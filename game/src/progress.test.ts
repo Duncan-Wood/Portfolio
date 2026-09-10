@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { forgetProgressFromOlderMemories, loggedWith, resumePoint } from './progress';
+import {
+  controlScheme,
+  forgetProgressFromOlderMemories,
+  loggedWith,
+  rememberBestChain,
+  rememberControlScheme,
+  resumePoint,
+} from './progress';
 
 describe('resumePoint', () => {
   it('starts a first-time visitor at the beginning', () => {
@@ -52,6 +59,88 @@ describe('the log of what a run surfaced', () => {
 
     expect(gappy).toHaveLength(3);
     expect(gappy.every((entry) => entry !== undefined)).toBe(true);
+  });
+});
+
+describe('which controls a player chose', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('starts on swipe, which is what testers reached for', () => {
+    expect(controlScheme()).toBe('swipe');
+  });
+
+  it('remembers a switch to the buttons', () => {
+    rememberControlScheme('buttons');
+    expect(controlScheme()).toBe('buttons');
+  });
+
+  it('remembers a switch back', () => {
+    rememberControlScheme('buttons');
+    rememberControlScheme('swipe');
+    expect(controlScheme()).toBe('swipe');
+  });
+
+  it('falls back to the default rather than trusting a value it does not know', () => {
+    held.set('connected.controls', 'trackball');
+    expect(controlScheme()).toBe('swipe');
+  });
+});
+
+describe('the best chain a player has managed', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('records a first result', () => {
+    rememberBestChain(4);
+    expect(held.get('connected.bestChain')).toBe('4');
+  });
+
+  it('keeps the deeper of the two, so a worse run cannot undo a good one', () => {
+    rememberBestChain(6);
+    rememberBestChain(3);
+    expect(held.get('connected.bestChain')).toBe('6');
+  });
+
+  it('raises it when a later run goes deeper', () => {
+    rememberBestChain(3);
+    rememberBestChain(7);
+    expect(held.get('connected.bestChain')).toBe('7');
+  });
+
+  it('ignores a run with no chain in it, which is not an achievement', () => {
+    rememberBestChain(1);
+    expect(held.has('connected.bestChain')).toBe(false);
   });
 });
 

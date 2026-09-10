@@ -142,13 +142,48 @@
         transition: color 120ms ease, background-color 120ms ease;
       }
 
+      #scheme {
+        display: none;
+      }
+
       @media (pointer: coarse) {
         #touch {
           display: flex;
         }
 
+        body[data-controls="swipe"] #touch {
+          display: none;
+        }
+
+        #scheme {
+          display: block;
+          position: fixed;
+          top: calc(8px + env(safe-area-inset-top));
+          right: 10px;
+          z-index: 2;
+          font-family: monospace;
+          font-size: 11px;
+          line-height: 1;
+          color: #9d86b8;
+          background: #2b1644;
+          border: 1px solid #4a2f6b;
+          border-radius: 6px;
+          padding: 10px 12px;
+        }
+
+        #scheme:active {
+          background: #4a2f6b;
+          border-color: #c98cff;
+        }
+
         #controls {
           display: none;
+        }
+
+        #to-standard {
+          order: -1;
+          padding: 12px;
+          font-size: 11px;
         }
       }
 
@@ -162,6 +197,7 @@
   </head>
   <body>
     <div id="game-container"></div>
+    <button id="scheme" type="button">controls: swipe</button>
     <div id="touch" aria-hidden="true">
       <button type="button" data-action="left" aria-label="move left">&#9664;</button>
       <button type="button" data-action="rotate" aria-label="rotate">&#8635;</button>
