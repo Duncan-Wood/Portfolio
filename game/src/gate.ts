@@ -29,6 +29,10 @@ export function openGate(expected: string | undefined): Promise<void> {
     const field = document.createElement('input');
     field.id = 'gate-code';
     field.autocomplete = 'off';
+    field.autocapitalize = 'none';
+    field.spellcheck = false;
+    // Non-standard, and the one that stops iOS substituting a word outright.
+    field.setAttribute('autocorrect', 'off');
 
     const button = document.createElement('button');
     button.textContent = 'enter';
