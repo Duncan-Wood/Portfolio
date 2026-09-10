@@ -1,3 +1,5 @@
+import { type SwipeTuning } from './input/swipe-controls';
+
 export interface Tuning {
   shadowInterval: number;
 
@@ -46,6 +48,16 @@ export const DEFAULT_TUNING: Tuning = {
   landingBounceDuration: 140,
   shakeIntensity: 0.004,
   shakeRollDegrees: 0.22,
+};
+
+// Canvas units, not screen pixels: Phaser reports pointers in the 620x900 space
+// however the display scales it, so one column here stays one column everywhere.
+export const SWIPE_TUNING: SwipeTuning = {
+  columnDistance: 68,
+  tapMaxDistance: 14,
+  tapMaxDuration: 250,
+  dropMinDistance: 120,
+  dropMaxDuration: 300,
 };
 
 // A thumb on glass cannot press as briefly as a finger on a key. At the

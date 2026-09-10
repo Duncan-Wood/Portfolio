@@ -969,6 +969,84 @@ describe('the piece budget', () => {
   });
 });
 
+describe('the deepest chain of a run', () => {
+  it('is nothing before anything has cleared', () => {
+    const simulation = new Simulation(() => [0, 1]);
+    simulation.restart();
+
+    expect(simulation.deepestChain).toBe(0);
+  });
+
+  it('keeps the deepest cascade after the chain counter has reset for the next one', () => {
+    const simulation = new Simulation(() => [0, 0]);
+    simulation.restart();
+
+    simulation.chainLength = 4;
+    simulation.rememberChain();
+    simulation.chainLength = 0;
+
+    expect(simulation.deepestChain).toBe(4);
+  });
+
+  it('does not lower it when a later cascade is shallower', () => {
+    const simulation = new Simulation(() => [0, 0]);
+    simulation.restart();
+
+    simulation.chainLength = 5;
+    simulation.rememberChain();
+    simulation.chainLength = 2;
+    simulation.rememberChain();
+
+    expect(simulation.deepestChain).toBe(5);
+  });
+
+  it('starts over with the run, so a new run reports its own best', () => {
+    const simulation = new Simulation(() => [0, 0]);
+    simulation.restart();
+
+    simulation.chainLength = 6;
+    simulation.rememberChain();
+    simulation.restart();
+
+    expect(simulation.deepestChain).toBe(0);
+  });
+});
+
+describe('the piece after this one', () => {
+  const budgeted = (pieces: number) => {
+    const simulation = new Simulation(() => [0, 1]);
+    simulation.pieceBudget = pieces;
+    simulation.restart();
+    return simulation;
+  };
+
+  it('is promised while the run still has pieces to hand out', () => {
+    expect(budgeted(3).hasNextPiece).toBe(true);
+  });
+
+  it('is not promised on the last piece, so the preview cannot show one that never arrives', () => {
+    const simulation = budgeted(2);
+    simulation.hardDrop();
+
+    expect(simulation.piecesRemaining).toBe(1);
+    expect(simulation.hasNextPiece).toBe(false);
+  });
+
+  it('stays unpromised once the budget is spent', () => {
+    const simulation = budgeted(1);
+    simulation.hardDrop();
+
+    expect(simulation.hasNextPiece).toBe(false);
+  });
+
+  it('is always promised when nothing limits the run', () => {
+    const simulation = new Simulation(() => [0, 1]);
+    simulation.restart();
+
+    expect(simulation.hasNextPiece).toBe(true);
+  });
+});
+
 describe('a board that has run out of pieces', () => {
   it('still lets the last piece\'s cascade play out', () => {
     const simulation = new Simulation(() => [0, 0]);

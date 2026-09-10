@@ -7,47 +7,62 @@ const laptop = { title: "The Laptop", tries: 7 };
 
 describe("draftFrom", () => {
   it("is empty for someone who never played, so the form is untouched", () => {
-    expect(draftFrom([], 5, false)).toBe("");
+    expect(draftFrom([], 5, false, 0)).toBe("");
   });
 
   it("speaks for someone who played and surfaced nothing", () => {
-    expect(draftFrom([], 5, true)).toBe("I played Connected.\n\n");
+    expect(draftFrom([], 5, true, 0)).toBe("I played Connected.\n\n");
   });
 
   it("answers the losing screen when they surfaced every fragment", () => {
-    expect(draftFrom([build, johns], 2, true)).toBe(
-      "Still connected. No Johns took me 4 tries.\n\n"
+    expect(draftFrom([build, johns], 2, true, 4)).toBe(
+      "Still connected. Best chain: 4.\n\n"
     );
   });
 
   it("says how far they got when they stopped short", () => {
-    expect(draftFrom([build, johns, laptop], 5, true)).toBe(
-      "I got as far as The Laptop. The Laptop took me 7 tries.\n\n"
+    expect(draftFrom([build, johns, laptop], 5, true, 3)).toBe(
+      "I got as far as The Laptop. Best chain: 3.\n\n"
     );
   });
 
-  it("stays a single sentence when nothing cost more than one try", () => {
-    expect(draftFrom([build], 1, true)).toBe("Still connected.\n\n");
+  it("stays a single sentence when they never built a chain", () => {
+    expect(draftFrom([build], 1, true, 0)).toBe("Still connected.\n\n");
   });
 
-  it("names only the hardest fragment, not a table of every one", () => {
-    const draft = draftFrom([build, johns, laptop], 3, true);
-    expect(draft).toContain("The Laptop took me 7 tries");
-    expect(draft).not.toContain("The Build");
-    expect(draft).not.toContain("No Johns");
+  it("leaves out a chain of one, which is just a match", () => {
+    expect(draftFrom([build], 1, true, 1)).toBe("Still connected.\n\n");
   });
 
   it("leaves the message box mostly empty for what they came to say", () => {
-    expect(draftFrom([build, johns, laptop], 3, true).split("\n")).toHaveLength(3);
+    expect(draftFrom([build, johns], 2, true, 4).split("\n")).toHaveLength(3);
   });
 
   it("ignores an entry with no title, rather than counting a blank as progress", () => {
-    expect(draftFrom([{ title: "", tries: 9 }, johns], 5, true)).toBe(
-      "I got as far as No Johns. No Johns took me 4 tries.\n\n"
+    expect(draftFrom([{ title: "", tries: 9 }, johns], 5, true, 2)).toBe(
+      "I got as far as No Johns. Best chain: 2.\n\n"
     );
   });
 
   it("copes with a log that is not an array", () => {
-    expect(draftFrom(null, 5, true)).toBe("I played Connected.\n\n");
+    expect(draftFrom(null, 5, true, 5)).toBe("I played Connected.\n\n");
+  });
+
+  it("says nothing about controls when they played the way it shipped", () => {
+    expect(draftFrom([build, johns], 2, true, 4, "swipe")).toBe(
+      "Still connected. Best chain: 4.\n\n"
+    );
+  });
+
+  it("mentions the controls when they went and changed them", () => {
+    expect(draftFrom([build, johns], 2, true, 4, "buttons")).toBe(
+      "Still connected. Best chain: 4. (on the buttons)\n\n"
+    );
+  });
+
+  it("mentions changed controls even on a run with no chain to report", () => {
+    expect(draftFrom([build], 1, true, 0, "buttons")).toBe(
+      "Still connected. (on the buttons)\n\n"
+    );
   });
 });

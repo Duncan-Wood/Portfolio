@@ -14,7 +14,7 @@ import {
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
-import { DEFAULT_TUNING, TOUCH_TUNING, type Tuning } from '../tuning';
+import { SWIPE_TUNING, DEFAULT_TUNING, TOUCH_TUNING, type Tuning } from '../tuning';
 import {
   GROUND_COLOR,
   TRACE_COLORS,
@@ -41,7 +41,10 @@ import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
+  type ControlScheme,
+  controlScheme,
   playedBefore,
+  rememberBestChain,
   rememberFragment,
   rememberPlayed,
   rememberResume,
@@ -60,6 +63,7 @@ import {
 } from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
+import { SwipeControls } from '../input/swipe-controls';
 import { TouchControls } from '../input/touch-controls';
 import { SoundBoard } from '../audio/sound-board';
 import {
@@ -125,6 +129,7 @@ const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE + (VISIBLE_ROWS - 1) * GAP;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 
 const CONTACT_OFFER_Y = CANVAS_HEIGHT / 2 + 84;
+const CHAIN_NOTE_Y = CANVAS_HEIGHT / 2 + 172;
 const HINT_ALONE_Y = CANVAS_HEIGHT / 2 + 84;
 const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
@@ -285,6 +290,10 @@ export class BoardScene extends Scene {
   private piecesText: Phaser.GameObjects.Text;
 
   private shownPivotType = -1;
+
+  private shownPreviewShowing = true;
+
+  private chainNote!: Phaser.GameObjects.Text;
   private shownSatelliteType = -1;
   private shownChain = -1;
   private nextFpsRefresh = 0;
@@ -293,6 +302,10 @@ export class BoardScene extends Scene {
   private inputTranslator: InputTranslator;
 
   readonly touch = new TouchControls();
+
+  readonly swipe = new SwipeControls(SWIPE_TUNING);
+
+  private scheme: ControlScheme = controlScheme();
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
   private hardDropKey: Phaser.Input.Keyboard.Key;
@@ -610,12 +623,29 @@ export class BoardScene extends Scene {
           return;
         }
 
-        if (this.paused || this.revealHolding || this.runOver !== null || this.crashed) {
+        if (this.betweenPlay) {
           this.touch.press('drop');
           this.touch.release('drop');
         }
       },
     );
+
+    this.input.on(Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
+      if (this.betweenPlay) {
+        return;
+      }
+      this.swipe.begin(pointer.x, pointer.y, this.time.now);
+    });
+
+    this.input.on(Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
+      if (pointer.isDown) {
+        this.swipe.move(pointer.x, pointer.y, this.time.now);
+      }
+    });
+
+    this.input.on(Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
+      this.swipe.end(pointer.x, pointer.y, this.time.now);
+    });
 
     this.showFps = import.meta.env.DEV;
     this.fpsText = this.add.text(8, 8, '', {
@@ -678,6 +708,19 @@ export class BoardScene extends Scene {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#8ea3b0',
+        backgroundColor: '#221038',
+        padding: { x: 10, y: 5 },
+      },
+    ).setOrigin(0.5, 0.5).setVisible(false);
+
+    this.chainNote = this.add.text(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      CHAIN_NOTE_Y,
+      '',
+      {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#ffc914',
         backgroundColor: '#221038',
         padding: { x: 10, y: 5 },
       },
@@ -907,6 +950,7 @@ export class BoardScene extends Scene {
     }
 
     this.paused = paused;
+    this.swipe.cancel();
     this.pauseScrim.setVisible(paused);
     this.pauseText.setVisible(paused);
     this.pauseHint.setVisible(paused);
@@ -956,7 +1000,7 @@ export class BoardScene extends Scene {
 
     this.runOver = null;
     this.tweens.killTweensOf([
-      this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
+      this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer, this.chainNote,
       this.memoryPanel,
     ]);
     this.contactOffer.setVisible(false);
@@ -1073,17 +1117,45 @@ export class BoardScene extends Scene {
     });
   }
 
+  useControlScheme(scheme: ControlScheme): void {
+    this.scheme = scheme;
+    this.swipe.cancel();
+  }
+
+  private readSwipe(): void {
+    if (this.scheme !== 'swipe') {
+      this.swipe.cancel();
+      return;
+    }
+
+    for (let action = this.swipe.take(); action !== null; action = this.swipe.take()) {
+      if (action === 'rotate') {
+        this.simulation.rotate();
+      } else if (action === 'drop') {
+        this.dropTheHardWay();
+      } else {
+        this.shift(action === 'left' ? -1 : 1);
+      }
+    }
+  }
+
+  private dropTheHardWay(): void {
+    const locksBefore = this.simulation.piecesLocked;
+    const distance = this.simulation.hardDrop();
+    if (this.simulation.piecesLocked !== locksBefore) {
+      this.slamDistance = distance;
+    }
+  }
+
   private readInput(delta: number): void {
+    this.readSwipe();
+
     if (Input.Keyboard.JustDown(this.cursors.up) || this.touch.takeRotate()) {
       this.simulation.rotate();
     }
 
     if (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop()) {
-      const locksBefore = this.simulation.piecesLocked;
-      const distance = this.simulation.hardDrop();
-      if (this.simulation.piecesLocked !== locksBefore) {
-        this.slamDistance = distance;
-      }
+      this.dropTheHardWay();
     }
 
     const newPiece = this.simulation.piecesSpawned !== this.lastPiecesSpawned;
@@ -1112,6 +1184,10 @@ export class BoardScene extends Scene {
       return 1;
     }
     return null;
+  }
+
+  private get betweenPlay(): boolean {
+    return this.paused || this.revealHolding || this.runOver !== null || this.crashed;
   }
 
   private shift(direction: HorizontalDirection): boolean {
@@ -2149,6 +2225,18 @@ export class BoardScene extends Scene {
   }
 
   private drawPreview(): void {
+    const showing = this.simulation.hasNextPiece;
+    if (showing !== this.shownPreviewShowing) {
+      this.shownPreviewShowing = showing;
+      for (const tile of this.previewTiles) {
+        tile.setVisible(showing);
+      }
+    }
+
+    if (!showing) {
+      return;
+    }
+
     const [pivotType, satelliteType] = this.simulation.upcoming;
     if (pivotType === this.shownPivotType && satelliteType === this.shownSatelliteType) {
       return;
@@ -2158,6 +2246,16 @@ export class BoardScene extends Scene {
     this.shownSatelliteType = satelliteType;
     this.previewTiles[0].setTexture(tileTexture(pivotType));
     this.previewTiles[1].setTexture(tileTexture(satelliteType));
+  }
+
+  private chainNoteIfEarned(): Phaser.GameObjects.Text[] {
+    const deepest = this.simulation.deepestChain;
+    if (deepest < 2) {
+      return [];
+    }
+
+    this.chainNote.setText(`BEST CHAIN  ${deepest}`);
+    return [this.chainNote];
   }
 
   private refreshChain(): void {
@@ -2182,6 +2280,8 @@ export class BoardScene extends Scene {
   }
 
   private loseTheBoard(): void {
+    rememberBestChain(this.simulation.deepestChain);
+
     const lit = this.connections.filter((slot) => slot.trace.visible);
 
     this.staticOverlay.setVisible(true).setAlpha(0);
@@ -2231,6 +2331,7 @@ export class BoardScene extends Scene {
 
       const ending = [
         this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
+        ...this.chainNoteIfEarned(),
       ];
       for (const text of ending) {
         text.setVisible(true).setAlpha(0);
@@ -2241,6 +2342,7 @@ export class BoardScene extends Scene {
 
   private winTheRun(): void {
     this.runOver = 'won';
+    rememberBestChain(this.simulation.deepestChain);
 
     this.tweens.add({
       targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],
@@ -2285,7 +2387,10 @@ export class BoardScene extends Scene {
       this.gameOverText.setText(STILL_CONNECTED);
       this.gameOverLine.setText(RECOVERED_LINE);
 
-      for (const text of [this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer]) {
+      for (const text of [
+        this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
+        ...this.chainNoteIfEarned(),
+      ]) {
         text.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: text, alpha: 1, duration: 420 });
       }

@@ -46,6 +46,8 @@ export class Simulation {
 
   chainLength = 0;
 
+  deepestChain = 0;
+
   shadowTaken = 0;
 
   lastShadowCell: GroupCell | null = null;
@@ -146,6 +148,7 @@ export class Simulation {
     this.score = 0;
     this.connectionsMade = 0;
     this.chainLength = 0;
+    this.deepestChain = 0;
     this.stallTimer = 0;
     this.resolving = false;
     this.settlePending = false;
@@ -191,6 +194,10 @@ export class Simulation {
     return distance;
   }
 
+  rememberChain(): void {
+    this.deepestChain = Math.max(this.deepestChain, this.chainLength);
+  }
+
   get piecesRemaining(): number {
     return this.pieceBudget === 0
       ? Infinity
@@ -199,6 +206,10 @@ export class Simulation {
 
   get outOfPieces(): boolean {
     return this.pieceBudget !== 0 && this.piecesLocked >= this.pieceBudget;
+  }
+
+  get hasNextPiece(): boolean {
+    return this.piecesRemaining > 1;
   }
 
   private get acceptsInput(): boolean {
@@ -234,6 +245,7 @@ export class Simulation {
     this.score += scoreLink(link, this.chainLength);
     this.connectionsMade += connections;
     this.chainLength += 1;
+    this.rememberChain();
     this.settlePending = true;
     this.recordBeat({ kind: 'clear', link, connections });
   }
