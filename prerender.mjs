@@ -10,7 +10,7 @@ const inject = (template, placeholder, markup) => {
       `index.html is missing the ${placeholder} placeholder, so the build would ship a page crawlers see as blank.`
     );
   }
-  return template.replace(placeholder, markup);
+  return template.replace(placeholder, () => markup);
 };
 
 const appHtml = render("/");

@@ -1,7 +1,12 @@
-import { SITE_URL, PERSON, PAGES } from "./site";
-import { experienceData } from "./components/Experience";
-import { professionalProjects, personalProjects } from "./components/Projects";
-import { skillGroups } from "./components/Skills";
+import {
+  SITE_URL,
+  PERSON,
+  PAGES,
+  experienceData,
+  professionalProjects,
+  personalProjects,
+  skillGroups,
+} from "./site";
 
 const PERSON_ID = `${SITE_URL}/#duncan-wood`;
 const WEBSITE_ID = `${SITE_URL}/#website`;
@@ -25,14 +30,12 @@ const buildPerson = () => ({
     addressCountry: "US",
   },
   sameAs: PERSON.profiles,
-  worksFor: experienceData.map((job) => ({
-    "@type": "Organization",
-    name: job.company,
-  })),
   hasOccupation: experienceData.map((job) => ({
     "@type": "Occupation",
     name: job.role,
     occupationLocation: { "@type": "Organization", name: job.company },
+    startDate: job.start,
+    endDate: job.end,
     description: job.bullets.join(" "),
   })),
   alumniOf: PERSON.education.map((entry) => ({
@@ -83,21 +86,6 @@ const buildPersonalWork = (project) => ({
   ...(project.live ? { url: project.live } : {}),
 });
 
-const buildGame = () => ({
-  "@type": "VideoGame",
-  "@id": `${SITE_URL}/game/#connected`,
-  name: "Connected",
-  url: `${SITE_URL}/game/`,
-  image: `${SITE_URL}/og-game.png`,
-  description:
-    "A browser game about the part a resume leaves out — the story behind the CV, told the other way round.",
-  author: authorReference,
-  applicationCategory: "Game",
-  gamePlatform: "Web browser",
-  operatingSystem: "Any modern web browser",
-  inLanguage: "en-US",
-});
-
 export function buildStructuredData() {
   return {
     "@context": "https://schema.org",
@@ -105,7 +93,6 @@ export function buildStructuredData() {
       buildPerson(),
       buildWebSite(),
       buildProfilePage(),
-      buildGame(),
       ...professionalProjects.map(buildProfessionalWork),
       ...personalProjects.map(buildPersonalWork),
     ],
@@ -164,9 +151,5 @@ ${skillGroups.map((group) => `- **${group.label}:** ${group.skills.map((skill) =
 ## Education
 
 ${PERSON.education.map((entry) => `- ${entry.credential} — ${entry.school} (${entry.year})`).join("\n")}
-
-## Connected
-
-A browser game at ${SITE_URL}/game/ about the part a resume leaves out.
 `;
 }
