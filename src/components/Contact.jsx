@@ -102,6 +102,7 @@ const Contact = () => {
               type="text"
               id="name"
               name="from_name"
+              autoComplete="name"
             />
           </div>
           <div>
@@ -116,12 +117,13 @@ const Contact = () => {
               type="email"
               id="email"
               name="user_email"
+              autoComplete="email"
             />
           </div>
           <div>
             <label
               className="block text-gray-700 font-bold mb-2 flex justify-center"
-              htmlFor="message"
+              htmlFor="contact__formMessage"
             >
               Message
             </label>
