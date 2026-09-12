@@ -184,4 +184,28 @@ describe('a gesture that is interrupted', () => {
     expect(controls.take()).toBe('right');
     expect(controls.take()).toBeNull();
   });
+
+  it('reports a finger still down, so a lift that ends a gesture is not also a tap', () => {
+    const controls = new SwipeControls(TUNING);
+
+    expect(controls.gesturing).toBe(false);
+
+    controls.begin(100, 500, 0);
+    expect(controls.gesturing).toBe(true);
+
+    controls.move(100, 640, 40);
+    expect(controls.gesturing).toBe(true);
+
+    controls.end(100, 640, 60);
+    expect(controls.gesturing).toBe(false);
+  });
+
+  it('stops reporting a gesture once cancelled', () => {
+    const controls = new SwipeControls(TUNING);
+
+    controls.begin(100, 500, 0);
+    controls.cancel();
+
+    expect(controls.gesturing).toBe(false);
+  });
 });

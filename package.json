@@ -15,7 +15,7 @@
   "scripts": {
     "start": "concurrently -n web,game -c blue,magenta \"vite\" \"npm --prefix game run dev\"",
     "start:web": "vite",
-    "build": "vite build && npm --prefix game run build && cp -r game/dist build/game",
+    "build": "vite build && vite build --ssr src/entry-server.jsx --outDir .ssr && node prerender.mjs && npm --prefix game run build && cp -r game/dist build/game",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

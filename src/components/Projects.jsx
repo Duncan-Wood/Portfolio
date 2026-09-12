@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { professionalProjects, personalProjects } from "../site";
+
 import github from "../assets/github.png";
 import link from "../assets/link.png";
 
@@ -14,76 +16,15 @@ import dog_city_motion from "../assets/Projects/dog-city-motion.gif";
 import sunrise_weather from "../assets/Projects/sunrise-weather-screenshot.png";
 import sunrise_weather_motion from "../assets/Projects/sunrise-weather-motion.gif";
 
-const professionalProjects = [
-  {
-    name: "Update Detector",
-    tech: "Next.js | TypeScript | Supabase",
-    description:
-      "A tool EcoMap's data team uses to review proposed changes to asset data — editing, accepting, or rejecting each suggested update before it goes live, with reviewed updates archived and the original values preserved. Built from an empty repo as lead developer. (Internal tool.)",
-  },
-  {
-    name: "AI Report Summaries",
-    tech: "Ruby on Rails | LLM | Structured Output",
-    description:
-      "A shared system that turns report data into plain-language narrative summaries using a structured LLM schema, reusable across multiple report modules. A team effort I helped design and did much of the refining on.",
-  },
-  {
-    name: "HIPAA Document-Conversion Service",
-    tech: "Python | Flask | Google Cloud Run",
-    description:
-      "A HIPAA-compliant microservice that converts documents on demand, replacing an expensive commercial tool, with a full automated unit, integration, and performance test suite.",
-  },
-];
 
-const personalProjects = [
-  {
-    name: "Hemingway Search Engine",
-    tech: "React | Flask | Word2Vec | NumPy",
-    description:
-      "A search engine that uses a Word2Vec model and NumPy to calculate the similarity between a user's query and the text in the corpus. If no exact results are found, it returns at least three of the closest matches.",
-    image: hemingway,
-    motion: hemingway_motion,
-    github: "https://github.com/Duncan-Wood/Hemingway-Search-Engine",
-  },
-  {
-    name: "Coping Corner",
-    tech: "React | PostgreSQL | Material Theme Builder",
-    description:
-      "A full-stack web application for people struggling with mental health, providing user authentication, resource creation and sharing, and community building.",
-    image: coping_corner,
-    motion: coping_corner_motion,
-    github: "https://github.com/Duncan-Wood/Coping-Corner-Frontend",
-  },
-  {
-    name: "ThriveTracker",
-    tech: "React | Django | Tailwind",
-    description:
-      "A full-stack application with time-tracking and progress-monitoring features to support individuals in their addiction-recovery journey.",
-    image: thrivetracker,
-    motion: thrivetracker_motion,
-    github: "https://github.com/Duncan-Wood/ThriveTracker-Frontend",
-  },
-  {
-    name: "Dog City",
-    tech: "React | Axios | ChartJS",
-    description:
-      "A React web app for dog lovers that lets users browse 172 dog breeds and view their characteristics and images.",
-    image: dog_city,
-    motion: dog_city_motion,
-    live: "https://dog-city.netlify.app/",
-    github: "https://github.com/Duncan-Wood/Dog-City",
-  },
-  {
-    name: "Sunrise Weather",
-    tech: "HTML | Axios | JavaScript",
-    description:
-      "A single-page website that displays current weather information from a weather API alongside a random quote to brighten your day.",
-    image: sunrise_weather,
-    motion: sunrise_weather_motion,
-    live: "https://sunrise-weather.surge.sh",
-    github: "https://github.com/Duncan-Wood/Sunrise-Weather",
-  },
-];
+
+export const projectArt = {
+  "Hemingway Search Engine": { still: hemingway, motion: hemingway_motion },
+  "Coping Corner": { still: coping_corner, motion: coping_corner_motion },
+  ThriveTracker: { still: thrivetracker, motion: thrivetracker_motion },
+  "Dog City": { still: dog_city, motion: dog_city_motion },
+  "Sunrise Weather": { still: sunrise_weather, motion: sunrise_weather_motion },
+};
 
 const PERSONAL_PREVIEW_COUNT = 3;
 
@@ -127,6 +68,7 @@ const ProfessionalCard = ({ project }) => (
 
 const PersonalCard = ({ project }) => {
   const [isHovering, setIsHovering] = useState(false);
+  const art = projectArt[project.name];
   return (
     <div
       className={cardClasses}
@@ -134,7 +76,7 @@ const PersonalCard = ({ project }) => {
       onMouseLeave={() => setIsHovering(false)}
     >
       <img
-        src={isHovering ? project.motion : project.image}
+        src={isHovering ? art.motion : art.still}
         alt={project.name}
         className="w-full h-48 object-cover"
       />

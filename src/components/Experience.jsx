@@ -1,26 +1,11 @@
-const experienceData = [
-  {
-    role: "Software Engineer",
-    company: "EcoMap Technologies",
-    dates: "Nov 2023 – Jul 2026",
-    bullets: [
-      "Became the sole engineer maintaining a 70+ customer white-labeled platform, owning the full cycle from triage to weekly deploys while keeping customer escalations low.",
-      "Built and shipped several State Scorecard intelligence-report modules (including Population and Business Formation & Survival) on a Ruby on Rails platform, backed by BigQuery data models and automated monthly refreshes.",
-      "Helped design and did much of the refining on a shared AI-summary system that turns report data into plain-language narratives with a structured LLM schema, reused across multiple report modules.",
-      "Root-caused and fixed a production SQL-injection vulnerability, and helped lead a zero-downtime credential rotation across four services.",
-      "Built self-directed search-log analysis tooling that revealed how much traffic came from bots, then shipped an upstream fix to cut wasted requests and infrastructure spend.",
-    ],
-  },
-  {
-    role: "Contract Developer",
-    company: "Mighty Crow",
-    dates: "Jan 2025 – Nov 2025",
-    bullets: [
-      "Designed a rule-based compliance engine using database triggers and functions to automate real-time housing-certification state cascades across regulatory registries.",
-      "Independently designed and shipped a HIPAA-compliant Python/Flask document-conversion service on Google Cloud Run — replacing an expensive commercial alternative — with a full unit, integration, and performance test suite.",
-    ],
-  },
-];
+import { experienceData } from "../site";
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const monthAndYear = (isoMonth) => {
+  const [year, month] = isoMonth.split("-");
+  return `${MONTH_NAMES[Number(month) - 1]} ${year}`;
+};
 
 const Experience = () => {
   return (
@@ -41,7 +26,7 @@ const Experience = () => {
                 <span className="text-purple-800">· {job.company}</span>
               </h3>
               <span className="text-sm font-medium text-gray-500 mt-1 sm:mt-0">
-                {job.dates}
+                {`${monthAndYear(job.start)} – ${monthAndYear(job.end)}`}
               </span>
             </div>
             <ul className="list-disc list-outside pl-5 space-y-2 text-gray-700 text-base">

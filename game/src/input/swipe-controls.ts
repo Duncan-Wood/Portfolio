@@ -24,6 +24,10 @@ export class SwipeControls {
 
   constructor(private tuning: SwipeTuning) {}
 
+  get gesturing(): boolean {
+    return this.touch !== null;
+  }
+
   begin(x: number, y: number, at: number): void {
     this.touch = {
       startX: x,

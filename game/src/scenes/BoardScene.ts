@@ -305,7 +305,7 @@ export class BoardScene extends Scene {
 
   readonly swipe = new SwipeControls(SWIPE_TUNING);
 
-  private scheme: ControlScheme = controlScheme();
+  private scheme: ControlScheme = TOUCH_PRIMARY ? controlScheme() : 'buttons';
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
   private hardDropKey: Phaser.Input.Keyboard.Key;
@@ -346,6 +346,8 @@ export class BoardScene extends Scene {
 
   private runOver: 'topped-out' | 'won' | null = null;
 
+  private chainCarriedFromEarlierBoards = 0;
+
   private shadowGroundHeld = 0;
 
   private runReadouts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
@@ -367,8 +369,6 @@ export class BoardScene extends Scene {
   private shownPanelProgress = -1;
 
   private crashed = false;
-
-  private triesAtLock = 1;
 
   private sideCommands: Phaser.GameObjects.Text[] = [];
 
@@ -621,6 +621,10 @@ export class BoardScene extends Scene {
       (_pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
         this.soundBoard.unlock();
 
+        if (this.swipe.gesturing) {
+          return;
+        }
+
         if (over.includes(this.contactOffer)
           || this.sideCommands.some((command) => over.includes(command))) {
           return;
@@ -633,25 +637,27 @@ export class BoardScene extends Scene {
       },
     );
 
-    this.input.on(
-      Input.Events.POINTER_DOWN,
-      (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
-        if (this.betweenPlay || over.length > 0) {
-          return;
+    if (TOUCH_PRIMARY) {
+      this.input.on(
+        Input.Events.POINTER_DOWN,
+        (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
+          if (this.betweenPlay || over.length > 0) {
+            return;
+          }
+          this.swipe.begin(pointer.x, pointer.y, this.time.now);
+        },
+      );
+
+      this.input.on(Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
+        if (pointer.isDown) {
+          this.swipe.move(pointer.x, pointer.y, this.time.now);
         }
-        this.swipe.begin(pointer.x, pointer.y, this.time.now);
-      },
-    );
+      });
 
-    this.input.on(Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
-      if (pointer.isDown) {
-        this.swipe.move(pointer.x, pointer.y, this.time.now);
-      }
-    });
-
-    this.input.on(Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
-      this.swipe.end(pointer.x, pointer.y, this.time.now);
-    });
+      this.input.on(Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
+        this.swipe.end(pointer.x, pointer.y, this.time.now);
+      });
+    }
 
     this.showFps = import.meta.env.DEV;
     this.fpsText = this.add.text(8, 8, '', {
@@ -969,8 +975,13 @@ export class BoardScene extends Scene {
     }
   }
 
+  private get deepestChainThisRun(): number {
+    return Math.max(this.chainCarriedFromEarlierBoards, this.simulation.deepestChain);
+  }
+
   private restart(keepMemory = false, keepStory = false): void {
     this.setPaused(false);
+    this.chainCarriedFromEarlierBoards = keepMemory ? this.deepestChainThisRun : 0;
     this.simulation.restart();
 
     this.lastPiecesSpawned = -1;
@@ -1014,6 +1025,7 @@ export class BoardScene extends Scene {
     this.gameOverText.setVisible(false);
     this.gameOverLine.setVisible(false);
     this.gameOverHint.setVisible(false);
+    this.chainNote.setVisible(false);
     this.memoryPanel.setAlpha(1);
     this.panelKey = null;
     this.shownPanelCells = 0;
@@ -1125,7 +1137,7 @@ export class BoardScene extends Scene {
   }
 
   useControlScheme(scheme: ControlScheme): void {
-    this.scheme = scheme;
+    this.scheme = TOUCH_PRIMARY ? scheme : 'buttons';
     this.swipe.cancel();
   }
 
@@ -1385,7 +1397,6 @@ export class BoardScene extends Scene {
 
   // The shadow keeps what it took; only `startLock` reseeds the board itself.
   private reseedAfterRunningOut(): void {
-    this.triesAtLock += 1;
     this.lockEndingIn = OUT_OF_PIECES_PAUSE;
     this.shadowGroundHeld = this.simulation.shadowTaken;
     this.objectiveText.setText('out of pieces').setAlpha(1);
@@ -1710,10 +1721,9 @@ export class BoardScene extends Scene {
     this.nodesRevealed += 1;
     rememberFragment(
       this.nodesRevealed - 1,
-      { title: node.title, tries: this.triesAtLock },
+      { title: node.title },
       FRAGMENT_COUNT,
     );
-    this.triesAtLock = 1;
     rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
 
     this.shownPanelProgress = -1;
@@ -1951,7 +1961,6 @@ export class BoardScene extends Scene {
       this.shownToppedOut = toppedOut;
       if (toppedOut) {
         this.runOver = 'topped-out';
-        this.triesAtLock += 1;
         this.soundBoard.play(topOutVoice());
         this.loseTheBoard();
       }
@@ -2278,7 +2287,7 @@ export class BoardScene extends Scene {
   }
 
   private chainNoteIfEarned(): Phaser.GameObjects.Text[] {
-    const deepest = this.simulation.deepestChain;
+    const deepest = this.deepestChainThisRun;
     if (deepest < 2) {
       return [];
     }
@@ -2305,11 +2314,12 @@ export class BoardScene extends Scene {
       this.gameOverLine.setVisible(false);
       this.gameOverHint.setVisible(false);
       this.contactOffer.setVisible(false);
+      this.chainNote.setVisible(false);
     }
   }
 
   private loseTheBoard(): void {
-    rememberBestChain(this.simulation.deepestChain);
+    rememberBestChain(this.deepestChainThisRun);
 
     const lit = this.connections.filter((slot) => slot.trace.visible);
 
@@ -2371,7 +2381,7 @@ export class BoardScene extends Scene {
 
   private winTheRun(): void {
     this.runOver = 'won';
-    rememberBestChain(this.simulation.deepestChain);
+    rememberBestChain(this.deepestChainThisRun);
 
     this.tweens.add({
       targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],

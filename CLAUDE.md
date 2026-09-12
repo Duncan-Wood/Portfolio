@@ -21,7 +21,7 @@ This mono-repo contains two independent Vite applications joined only by root sc
 - **Performance Budget:** Build for 60fps and low input latency on low-end hardware. Favor computationally cheaper rendering techniques.
 
 ## Git & Deployment Protocol
-- **Commits:** NEVER commit or stage code without explicit user approval for that exact diff. Author commits as the user with zero AI attribution. Split large tasks into reviewable chunks.
+- **Commits:** NEVER commit or stage code without explicit user approval for that exact diff. Author commits as the user. Split large tasks into reviewable chunks.
 - **Root Commands:** 
   - `npm start` (Runs both dev environments at `:3000` and `:3000/game/`).
   - `npm run build` (Builds both into `build/`).

@@ -26,20 +26,24 @@ export function wireTouchButtons(controls: TouchControls): void {
   window.addEventListener('blur', () => controls.releaseAll());
 }
 
-export function wireControlScheme(onChange: (scheme: ControlScheme) => void): void {
-  const toggle = document.getElementById('scheme');
+export function showControlScheme(scheme: ControlScheme = controlScheme()): void {
+  document.body.dataset.controls = scheme;
 
+  const toggle = document.getElementById('scheme');
+  if (toggle !== null) {
+    toggle.textContent = `controls: ${scheme}`;
+  }
+}
+
+export function wireControlScheme(onChange: (scheme: ControlScheme) => void): void {
   const show = (scheme: ControlScheme): void => {
-    document.body.dataset.controls = scheme;
-    if (toggle !== null) {
-      toggle.textContent = `controls: ${scheme}`;
-    }
+    showControlScheme(scheme);
     onChange(scheme);
   };
 
   show(controlScheme());
 
-  toggle?.addEventListener('click', () => {
+  document.getElementById('scheme')?.addEventListener('click', () => {
     const next: ControlScheme = controlScheme() === 'swipe' ? 'buttons' : 'swipe';
     rememberControlScheme(next);
     show(next);

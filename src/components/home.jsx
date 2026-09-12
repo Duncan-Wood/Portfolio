@@ -1,4 +1,3 @@
-import headshot from "../assets/headshot.png";
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
 import resume from "../assets/resume.png";
@@ -15,7 +14,7 @@ const Home = () => {
       >
         <div className=" mr-8 flex justify-center pl-8 sm: mb-8">
           <img
-            src={headshot}
+            src="/headshot.png"
             alt="Duncan's Headshot"
             id="headshot"
             className="rounded-full max-h-56 md:max-h-96 mx-auto"
