@@ -1,18 +1,10 @@
-import React from 'react';
-import { createRoot, hydrateRoot } from 'react-dom/client';
-import './index.css';
-import App from './App';
-import { BrowserRouter } from 'react-router-dom'
+import { createRoot, hydrateRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import "./index.css";
+import { AppTree } from "./app-tree";
 
-
-const container = document.getElementById('root');
-const tree = (
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
-);
+const container = document.getElementById("root");
+const tree = <AppTree router={BrowserRouter} />;
 
 const wasPrerendered = container.firstElementChild !== null;
 
