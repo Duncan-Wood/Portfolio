@@ -7,7 +7,7 @@
     <link rel="canonical" href="https://duncanwoodpro.netlify.app/game/" />
     <meta name="author" content="Duncan Wood" />
     <meta name="description" content="Connected, a browser game by Duncan Wood about the part a resume leaves out — the story behind the CV, told the other way round." />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="robots" content="noindex, nofollow" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://duncanwoodpro.netlify.app/game/" />
     <meta property="og:site_name" content="Duncan Wood" />
@@ -197,8 +197,13 @@
 
         #to-standard {
           order: -1;
+          align-self: flex-start;
+          margin-top: env(safe-area-inset-top);
+          margin-right: 108px;
           padding: 12px;
           font-size: 11px;
+          white-space: normal;
+          text-align: left;
         }
       }
 

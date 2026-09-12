@@ -32,30 +32,30 @@ describe('resumePoint', () => {
 
 describe('the log of what a run surfaced', () => {
   it('records the first fragment with what it cost', () => {
-    expect(loggedWith([], 0, { title: 'The Build', tries: 3 }))
-      .toEqual([{ title: 'The Build', tries: 3 }]);
+    expect(loggedWith([], 0, { title: 'The Build' }))
+      .toEqual([{ title: 'The Build' }]);
   });
 
   it('appends the next one without disturbing the last', () => {
-    const first = loggedWith([], 0, { title: 'The Build', tries: 1 });
+    const first = loggedWith([], 0, { title: 'The Build' });
 
-    expect(loggedWith(first, 1, { title: 'No Johns', tries: 4 })).toEqual([
-      { title: 'The Build', tries: 1 },
-      { title: 'No Johns', tries: 4 },
+    expect(loggedWith(first, 1, { title: 'No Johns' })).toEqual([
+      { title: 'The Build' },
+      { title: 'No Johns' },
     ]);
   });
 
   it('overwrites in place when a fragment is surfaced again on a later run', () => {
-    const before = [{ title: 'The Build', tries: 9 }, { title: 'No Johns', tries: 2 }];
+    const before = [{ title: 'The Build' }, { title: 'No Johns' }];
 
-    expect(loggedWith(before, 0, { title: 'The Build', tries: 1 })).toEqual([
-      { title: 'The Build', tries: 1 },
-      { title: 'No Johns', tries: 2 },
+    expect(loggedWith(before, 0, { title: 'The Build' })).toEqual([
+      { title: 'The Build' },
+      { title: 'No Johns' },
     ]);
   });
 
   it('never leaves a hole, so the contact form can read it straight through', () => {
-    const gappy = loggedWith([], 2, { title: 'The Laptop', tries: 5 });
+    const gappy = loggedWith([], 2, { title: 'The Laptop' });
 
     expect(gappy).toHaveLength(3);
     expect(gappy.every((entry) => entry !== undefined)).toBe(true);
@@ -164,7 +164,7 @@ describe('progress left behind by an older set of memories', () => {
   });
 
   function playedThrough(): void {
-    held.set('connected.log', '[{"title":"The Laptop","tries":2}]');
+    held.set('connected.log', '[{"title":"The Laptop",}]');
     held.set('connected.fragmentsTotal', '5');
     held.set('connected.resume', '3');
     held.set('connected.played', 'true');
@@ -206,7 +206,7 @@ describe('progress left behind by an older set of memories', () => {
 
     forgetProgressFromOlderMemories('same signature');
 
-    expect(held.get('connected.log')).toBe('[{"title":"The Laptop","tries":2}]');
+    expect(held.get('connected.log')).toBe('[{"title":"The Laptop",}]');
     expect(held.get('connected.resume')).toBe('3');
   });
 

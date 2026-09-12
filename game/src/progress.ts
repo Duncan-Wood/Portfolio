@@ -3,7 +3,8 @@ import { clearStored, readStored, writeStored } from './storage';
 const MEMORIES_KEY = 'connected.memories';
 const BEST_CHAIN_KEY = 'connected.bestChain';
 const CONTROLS_KEY = 'connected.controls';
-// PLAYED_KEY, FRAGMENTS_TOTAL_KEY, LOG_KEY and BEST_CHAIN_KEY are also read by
+// PLAYED_KEY, FRAGMENTS_TOTAL_KEY, LOG_KEY, BEST_CHAIN_KEY and CONTROLS_KEY are
+// also read by
 // src/game-progress.js, a separate bundle; renaming one here silently empties the
 // contact form's prefill.
 const PLAYED_KEY = 'connected.played';
@@ -21,7 +22,6 @@ export function rememberPlayed(): void {
 
 export interface SurfacedFragment {
   title: string;
-  tries: number;
 }
 
 export function loggedWith(
@@ -31,7 +31,7 @@ export function loggedWith(
 ): SurfacedFragment[] {
   const next = [...log];
   next[index] = entry;
-  return [...next].map((held) => held ?? { title: '', tries: 0 });
+  return [...next].map((held) => held ?? { title: '' });
 }
 
 export function rememberFragment(
