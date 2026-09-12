@@ -6,7 +6,7 @@ import globals from "globals";
 export default [
   // game/ is its own project with its own tooling, and its dist/ is minified
   // output that would otherwise dominate every report.
-  { ignores: ["build/**", "node_modules/**", "game/**"] },
+  { ignores: ["build/**", ".ssr/**", "node_modules/**", "game/**"] },
 
   js.configs.recommended,
 

@@ -37,3 +37,5 @@ Concept.md
 storyboard
 portfolio_memories
 cowboy_hat
+# prerender SSR bundle
+/.ssr

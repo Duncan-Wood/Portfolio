@@ -1,4 +1,4 @@
-const experienceData = [
+export const experienceData = [
   {
     role: "Software Engineer",
     company: "EcoMap Technologies",

@@ -14,7 +14,7 @@ import dog_city_motion from "../assets/Projects/dog-city-motion.gif";
 import sunrise_weather from "../assets/Projects/sunrise-weather-screenshot.png";
 import sunrise_weather_motion from "../assets/Projects/sunrise-weather-motion.gif";
 
-const professionalProjects = [
+export const professionalProjects = [
   {
     name: "Update Detector",
     tech: "Next.js | TypeScript | Supabase",
@@ -35,7 +35,7 @@ const professionalProjects = [
   },
 ];
 
-const personalProjects = [
+export const personalProjects = [
   {
     name: "Hemingway Search Engine",
     tech: "React | Flask | Word2Vec | NumPy",

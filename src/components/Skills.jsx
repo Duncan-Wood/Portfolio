@@ -1,4 +1,4 @@
-const skillGroups = [
+export const skillGroups = [
   {
     label: "Languages",
     skills: [
