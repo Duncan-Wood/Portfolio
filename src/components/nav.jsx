@@ -12,7 +12,7 @@ export const scrollLinks = [
   { to: "contact", label: "Contact", offset: 0 },
 ];
 
-const linkBase = "cursor-pointer text-white hover:bg-purple-700 hover:text-white";
+const linkBase = "cursor-pointer text-white hover:bg-brand-hover hover:text-white";
 const variantClass = {
   desktop: "px-3 py-2 rounded-md text-sm font-medium",
   mobile: "block px-3 py-2 rounded-md text-base font-medium",
@@ -63,14 +63,14 @@ const Nav = () => {
   const closeMenu = () => setIsOpen(false);
 
   return (
-    <nav id="nav" className="bg-purple-800">
+    <nav id="nav" className="bg-brand">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
         <div className="relative flex items-center justify-between h-16">
           <div className="absolute inset-y-0 left-0 flex items-center md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
               type="button"
-              className="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white hover:bg-purple-700 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-white"
+              className="inline-flex items-center justify-center p-2 rounded-md text-white hover:text-white hover:bg-brand-hover focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-white"
               aria-controls="mobile-menu"
               aria-expanded={isOpen}
             >

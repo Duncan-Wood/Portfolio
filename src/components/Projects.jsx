@@ -1,6 +1,8 @@
 import { useState } from "react";
 
 import { professionalProjects, personalProjects } from "../site";
+import Button from "./Button";
+import { interactiveChipClasses } from "./chip-classes";
 
 import github from "../assets/github.png";
 import link from "../assets/link.png";
@@ -31,10 +33,10 @@ const PERSONAL_PREVIEW_COUNT = 3;
 const cardClasses =
   "bg-white rounded-lg shadow-md overflow-hidden transform hover:-translate-y-1 hover:shadow-lg transition duration-300 flex flex-col";
 
-const LinkButton = ({ href, icon, alt, color }) => (
+const LinkButton = ({ href, icon, alt }) => (
   <a
     href={href}
-    className={`${color} text-white font-bold py-1 px-3 rounded-md border mx-2`}
+    className={`${interactiveChipClasses} py-1 px-3 mx-2`}
     target="_blank"
     rel="noreferrer"
   >
@@ -58,7 +60,6 @@ const ProfessionalCard = ({ project }) => (
             href={project.live}
             icon={link}
             alt="Live Site"
-            color="bg-blue-300 hover:bg-blue-500 border-blue-500"
           />
         </div>
       )}
@@ -92,7 +93,6 @@ const PersonalCard = ({ project }) => {
               href={project.live}
               icon={link}
               alt="Deployed App"
-              color="bg-blue-300 hover:bg-blue-500 border-blue-500"
             />
           )}
           {project.github && (
@@ -100,7 +100,6 @@ const PersonalCard = ({ project }) => {
               href={project.github}
               icon={github}
               alt="Github"
-              color="bg-gray-300 hover:bg-gray-500 border-gray-500"
             />
           )}
         </div>
@@ -154,12 +153,9 @@ const Projects = () => {
         </div>
         {personalProjects.length > PERSONAL_PREVIEW_COUNT && (
           <div className="text-center mt-8">
-            <button
-              className="bg-gray-400 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg"
-              onClick={() => setShowAllPersonal(!showAllPersonal)}
-            >
+            <Button onClick={() => setShowAllPersonal(!showAllPersonal)}>
               {showAllPersonal ? "Show Less" : "Show All"}
-            </button>
+            </Button>
           </div>
         )}
       </section>

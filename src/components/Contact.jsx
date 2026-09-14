@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import emailjs from "emailjs-com";
 
 import { gameProgressPrefill } from "../game-progress";
+import Button from "./Button";
+import { framedChipClasses } from "./chip-classes";
 
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
@@ -47,7 +49,7 @@ const Contact = () => {
       >
         <h1 className="text-3xl font-bold mb-4">Contact Me</h1>
         <h3 className="text-gray-600 mb-8">(duncanwoodpro@gmail.com)</h3>
-        <div id="contact-icons" className="flex flex-row mb-10">
+        <div className={`${framedChipClasses} p-2 flex flex-row mb-10`}>
           <a
             href="https://www.linkedin.com/in/duncanwoodpro/"
             target="_blank"
@@ -136,13 +138,9 @@ const Contact = () => {
             />
           </div>
           <div className="flex justify-center">
-            <button
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-sm"
-              type="submit"
-              value="Send"
-            >
+            <Button type="submit" value="Send">
               Send
-            </button>
+            </Button>
           </div>
           {status === "success" && (
             <p role="status" className="text-center text-green-600 font-medium">

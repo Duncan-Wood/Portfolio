@@ -1,6 +1,7 @@
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
 import resume from "../assets/resume.png";
+import { framedChipClasses } from "./chip-classes";
 
 const Home = () => {
   return (
@@ -27,7 +28,7 @@ const Home = () => {
           <h2 className="text-4xl font-bold leading-tight text-center p-2 md:p-4">
             Hello! My name is Duncan Wood
           </h2>
-          <div id="contact-icons" className="flex flex-row mt-4 ">
+          <div className={`${framedChipClasses} p-2 flex flex-row mt-4`}>
             <a
               href="https://www.linkedin.com/in/duncanwoodpro/"
               target="_blank"
@@ -67,7 +68,7 @@ const Home = () => {
           </h3>
           <a
             href="/game/"
-            className="mt-2 inline-flex flex-col items-center rounded-lg border border-purple-400 px-6 py-3 text-center transition-colors hover:bg-purple-700 focus:outline-hidden focus:ring-2 focus:ring-purple-400"
+            className="mt-2 inline-flex flex-col items-center rounded-lg border border-purple-400 px-6 py-3 text-center transition-colors hover:bg-brand-hover focus:outline-hidden focus:ring-2 focus:ring-purple-400"
           >
             <span className="text-lg font-semibold">
               Or play Connected

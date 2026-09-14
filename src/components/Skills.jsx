@@ -1,9 +1,9 @@
 import { skillGroups } from "../site";
+import { chipClasses, interactiveChipClasses } from "./chip-classes";
 
-const baseTag =
-  "bg-white text-purple-900 text-sm font-medium px-4 py-2 rounded-lg shadow-xs border";
-const linkClasses = `${baseTag} border-purple-200 hover:border-purple-800 hover:-translate-y-0.5 transition duration-200`;
-const staticClasses = `${baseTag} border-purple-100`;
+const tagText = "text-purple-900 text-sm font-medium px-4 py-2";
+const linkClasses = `${interactiveChipClasses} ${tagText}`;
+const staticClasses = `${chipClasses} border border-purple-100 ${tagText}`;
 
 const SkillTag = ({ skill }) =>
   skill.url ? (
@@ -29,7 +29,7 @@ const Skills = () => {
       <div className="max-w-4xl mx-auto space-y-6">
         {skillGroups.map((group) => (
           <div key={group.label}>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-purple-800 mb-3 text-center sm:text-left">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-brand mb-3 text-center sm:text-left">
               {group.label}
             </h3>
             <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
