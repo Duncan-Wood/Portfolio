@@ -1,6 +1,7 @@
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
 import resume from "../assets/resume.png";
+import { outlinedChipClasses } from "./chip-classes";
 
 const Home = () => {
   return (
@@ -27,7 +28,7 @@ const Home = () => {
           <h2 className="text-4xl font-bold leading-tight text-center p-2 md:p-4">
             Hello! My name is Duncan Wood
           </h2>
-          <div id="contact-icons" className="flex flex-row mt-4 ">
+          <div className={`${outlinedChipClasses} p-2 flex flex-row mt-4`}>
             <a
               href="https://www.linkedin.com/in/duncanwoodpro/"
               target="_blank"

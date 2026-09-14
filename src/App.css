@@ -42,13 +42,6 @@
 #contact__form {
   width: 70%;
 }
-#contact-icons {
-  border: 0.25vh solid black;
-  background-color: #aa4cff;
-  padding: 1vh;
-  border-radius: 0.5ch;
-}
-
 #contact__formMessage {
   height: 150px;
 }
