@@ -3,7 +3,7 @@ import { chipClasses, interactiveChipClasses } from "./chip-classes";
 
 const tagText = "text-purple-900 text-sm font-medium px-4 py-2";
 const linkClasses = `${interactiveChipClasses} ${tagText}`;
-const staticClasses = `${chipClasses} border-purple-100 ${tagText}`;
+const staticClasses = `${chipClasses} border border-purple-100 ${tagText}`;
 
 const SkillTag = ({ skill }) =>
   skill.url ? (
