@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  /* index.html's theme-color and public/manifest.json repeat this hex, since neither can read a CSS variable. */
+  --color-brand: #6b21a8;
+  --color-brand-hover: #7e22ce;
+}
+
 @layer base {
   button:not(:disabled),
   [role="button"]:not(:disabled) {

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import emailjs from "emailjs-com";
 
 import { gameProgressPrefill } from "../game-progress";
+import Button from "./Button";
 
 import linkedin from "../assets/linkedin.png";
 import github from "../assets/github.png";
@@ -136,13 +137,9 @@ const Contact = () => {
             />
           </div>
           <div className="flex justify-center">
-            <button
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-sm"
-              type="submit"
-              value="Send"
-            >
+            <Button type="submit" value="Send">
               Send
-            </button>
+            </Button>
           </div>
           {status === "success" && (
             <p role="status" className="text-center text-green-600 font-medium">

@@ -18,12 +18,12 @@ const Experience = () => {
         {experienceData.map((job) => (
           <div
             key={job.company}
-            className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-800"
+            className="bg-white rounded-lg shadow-md p-6 border-l-4 border-brand"
           >
             <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between mb-3">
               <h3 className="text-xl font-semibold">
                 {job.role}{" "}
-                <span className="text-purple-800">· {job.company}</span>
+                <span className="text-brand">· {job.company}</span>
               </h3>
               <span className="text-sm font-medium text-gray-500 mt-1 sm:mt-0">
                 {`${monthAndYear(job.start)} – ${monthAndYear(job.end)}`}
