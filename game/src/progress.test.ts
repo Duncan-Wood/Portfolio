@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  controlScheme,
   forgetProgressFromOlderMemories,
   introSeen,
   loggedWith,
   rememberBestChain,
-  rememberControlScheme,
   rememberIntroSeen,
   resumePoint,
 } from './progress';
@@ -61,46 +59,6 @@ describe('the log of what a run surfaced', () => {
 
     expect(gappy).toHaveLength(3);
     expect(gappy.every((entry) => entry !== undefined)).toBe(true);
-  });
-});
-
-describe('which controls a player chose', () => {
-  const held = new Map<string, string>();
-
-  beforeEach(() => {
-    held.clear();
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem: (key: string) => held.get(key) ?? null,
-        setItem: (key: string, value: string) => held.set(key, value),
-        removeItem: (key: string) => held.delete(key),
-      },
-    });
-  });
-
-  afterEach(() => {
-    Reflect.deleteProperty(globalThis, 'localStorage');
-  });
-
-  it('starts on swipe, which is what testers reached for', () => {
-    expect(controlScheme()).toBe('swipe');
-  });
-
-  it('remembers a switch to the buttons', () => {
-    rememberControlScheme('buttons');
-    expect(controlScheme()).toBe('buttons');
-  });
-
-  it('remembers a switch back', () => {
-    rememberControlScheme('buttons');
-    rememberControlScheme('swipe');
-    expect(controlScheme()).toBe('swipe');
-  });
-
-  it('falls back to the default rather than trusting a value it does not know', () => {
-    held.set('connected.controls', 'trackball');
-    expect(controlScheme()).toBe('swipe');
   });
 });
 

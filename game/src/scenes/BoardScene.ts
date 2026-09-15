@@ -14,7 +14,7 @@ import {
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
-import { SWIPE_TUNING, DEFAULT_TUNING, TOUCH_TUNING, type Tuning } from '../tuning';
+import { SWIPE_TUNING, DEFAULT_TUNING, type Tuning } from '../tuning';
 import {
   GROUND_COLOR,
   TRACE_COLORS,
@@ -43,8 +43,6 @@ import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
-  type ControlScheme,
-  controlScheme,
   introSeen,
   playedBefore,
   rememberBestChain,
@@ -112,6 +110,7 @@ const TOUCH_PRIMARY = typeof matchMedia === 'function'
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
 const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
+const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
 const BLINK_INTERVAL = 2300;
@@ -310,11 +309,10 @@ export class BoardScene extends Scene {
   // Not `input`: that shadows Phaser's own `Scene.input` plugin.
   private inputTranslator: InputTranslator;
 
-  readonly touch = new TouchControls();
+  private readonly touch = new TouchControls();
 
   readonly swipe = new SwipeControls(SWIPE_TUNING);
 
-  private scheme: ControlScheme = TOUCH_PRIMARY ? controlScheme() : 'buttons';
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
   private hardDropKey: Phaser.Input.Keyboard.Key;
@@ -434,9 +432,7 @@ export class BoardScene extends Scene {
   }
 
   create(): void {
-    this.tuning = TOUCH_PRIMARY
-      ? { ...DEFAULT_TUNING, ...TOUCH_TUNING }
-      : { ...DEFAULT_TUNING };
+    this.tuning = { ...DEFAULT_TUNING };
     this.simulation = new Simulation(randomPieceTypes, this.tuning);
     this.timestep = new FixedTimestep();
     this.inputTranslator = new InputTranslator(this.tuning);
@@ -611,10 +607,7 @@ export class BoardScene extends Scene {
           .setOrigin(0.5, 0.5)
           .setInteractive({ useHandCursor: true });
 
-        return this.onPress(command, () => {
-          this.touch.press(action);
-          this.touch.release(action);
-        });
+        return this.onPress(command, () => this.touch.press(action));
       });
     }
 
@@ -636,8 +629,6 @@ export class BoardScene extends Scene {
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
-    // The card says "tap"; route that through the drop action so a tap, the
-    // drop button and space all take the same path. Play is left to the buttons.
     this.input.on(
       Input.Events.POINTER_UP,
       (_pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
@@ -654,7 +645,6 @@ export class BoardScene extends Scene {
 
         if (this.betweenPlay) {
           this.touch.press('drop');
-          this.touch.release('drop');
         }
       },
     );
@@ -1164,22 +1154,7 @@ export class BoardScene extends Scene {
     });
   }
 
-  useControlScheme(scheme: ControlScheme): void {
-    this.scheme = TOUCH_PRIMARY ? scheme : 'buttons';
-    this.swipe.cancel();
-
-    if (this.introCardShowing !== null) {
-      this.revealBody.setText(introCards(this.introControls)[this.introCardShowing].body);
-      this.layOutReveal();
-    }
-  }
-
   private readSwipe(): void {
-    if (this.scheme !== 'swipe') {
-      this.swipe.cancel();
-      return;
-    }
-
     for (let action = this.swipe.take(); action !== null; action = this.swipe.take()) {
       if (action === 'rotate') {
         this.simulation.rotate();
@@ -1202,7 +1177,7 @@ export class BoardScene extends Scene {
   private readInput(delta: number): void {
     this.readSwipe();
 
-    if (Input.Keyboard.JustDown(this.cursors.up) || this.touch.takeRotate()) {
+    if (Input.Keyboard.JustDown(this.cursors.up)) {
       this.simulation.rotate();
     }
 
@@ -1215,7 +1190,7 @@ export class BoardScene extends Scene {
 
     this.simulation.softDropping = this.inputTranslator.update(
       {
-        direction: this.pressedDirection() ?? this.touch.direction,
+        direction: this.pressedDirection(),
         softDropHeld: this.cursors.down.isDown,
         newPiece,
         delta,
@@ -1787,7 +1762,7 @@ export class BoardScene extends Scene {
   private advanceReveal(): void {
     if (this.introCardShowing !== null) {
       const next = this.introCardShowing + 1;
-      if (next < introCards(this.introControls).length) {
+      if (next < introCards(INTRO_CONTROLS).length) {
         this.showIntroCard(next);
         return;
       }
@@ -1799,12 +1774,8 @@ export class BoardScene extends Scene {
     this.endRunIfNothingLeft(700);
   }
 
-  private get introControls(): IntroControls {
-    return TOUCH_PRIMARY ? this.scheme : 'keyboard';
-  }
-
   private showIntroCard(index: number): void {
-    const card = introCards(this.introControls)[index];
+    const card = introCards(INTRO_CONTROLS)[index];
     this.introCardShowing = index;
     this.showReveal(card.title, card.body);
   }

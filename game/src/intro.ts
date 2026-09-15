@@ -1,6 +1,4 @@
-import { type ControlScheme } from './progress';
-
-export type IntroControls = ControlScheme | 'keyboard';
+export type IntroControls = 'keyboard' | 'swipe';
 
 export interface IntroCard {
   title: string;
@@ -10,7 +8,6 @@ export interface IntroCard {
 const CONTROLS: Record<IntroControls, string> = {
   keyboard: '←  →  move\n↑  rotate\n↓  faster\nspace  drop',
   swipe: 'drag sideways to move\ntap to rotate\nflick down to drop',
-  buttons: '◀  ▶  move\n↻  rotate\n⬇  drop',
 };
 
 export function introCards(controls: IntroControls): readonly IntroCard[] {

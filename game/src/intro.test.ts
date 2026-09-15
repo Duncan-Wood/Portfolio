@@ -37,17 +37,8 @@ describe('the controls a player is told about', () => {
     expect(body).not.toContain('space');
   });
 
-  it('shows a buttons player the buttons on their screen', () => {
-    const body = introCards('buttons')[1].body;
-
-    expect(body).toContain('◀');
-    expect(body).not.toContain('flick');
-  });
-
   it('changes only the controls between devices, never what the game is or its rules', () => {
     expect(introCards('swipe')[0]).toEqual(introCards('keyboard')[0]);
-    expect(introCards('buttons')[0]).toEqual(introCards('keyboard')[0]);
     expect(rules('swipe')).toBe(rules('keyboard'));
-    expect(rules('buttons')).toBe(rules('keyboard'));
   });
 });
