@@ -43,13 +43,16 @@ import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
   type ControlScheme,
   controlScheme,
+  introSeen,
   playedBefore,
   rememberBestChain,
   rememberFragment,
+  rememberIntroSeen,
   rememberPlayed,
   rememberResume,
   resumeAt,
 } from '../progress';
+import { type IntroControls, introCards } from '../intro';
 import {
   CONNECTION_LOST,
   REACH_OUT_LINE,
@@ -388,6 +391,8 @@ export class BoardScene extends Scene {
   private revealHint: Phaser.GameObjects.Text;
 
   private revealSkippableIn = 0;
+
+  private introCardShowing: number | null = null;
 
   private revealBody: Phaser.GameObjects.Text;
 
@@ -1089,6 +1094,7 @@ export class BoardScene extends Scene {
     if (!keepStory) {
       this.revealHolding = false;
       this.revealPending = false;
+      this.introCardShowing = null;
     }
     this.lastRevealPiece = -1;
     this.redrawMemoryPanel(0);
@@ -1099,7 +1105,9 @@ export class BoardScene extends Scene {
   }
 
   private openTheRun(): void {
-    if (playedBefore()) {
+    if (!introSeen()) {
+      this.showIntroCard(0);
+    } else if (playedBefore()) {
       this.showReveal('', SHADOW_OPENING_LINE);
       this.revealBody.setColor('#b07dff');
     }
@@ -1139,6 +1147,11 @@ export class BoardScene extends Scene {
   useControlScheme(scheme: ControlScheme): void {
     this.scheme = TOUCH_PRIMARY ? scheme : 'buttons';
     this.swipe.cancel();
+
+    if (this.introCardShowing !== null) {
+      this.revealBody.setText(introCards(this.introControls)[this.introCardShowing].body);
+      this.layOutReveal();
+    }
   }
 
   private readSwipe(): void {
@@ -1741,8 +1754,28 @@ export class BoardScene extends Scene {
   }
 
   private advanceReveal(): void {
+    if (this.introCardShowing !== null) {
+      const next = this.introCardShowing + 1;
+      if (next < introCards(this.introControls).length) {
+        this.showIntroCard(next);
+        return;
+      }
+      this.introCardShowing = null;
+      rememberIntroSeen();
+    }
+
     this.hideReveal();
     this.endRunIfNothingLeft(700);
+  }
+
+  private get introControls(): IntroControls {
+    return TOUCH_PRIMARY ? this.scheme : 'keyboard';
+  }
+
+  private showIntroCard(index: number): void {
+    const card = introCards(this.introControls)[index];
+    this.introCardShowing = index;
+    this.showReveal(card.title, card.body);
   }
 
   private endRunIfNothingLeft(after: number): void {
@@ -1813,7 +1846,8 @@ export class BoardScene extends Scene {
 
     this.layOutReveal();
 
-    this.revealScrim.setVisible(true).setAlpha(0);
+    const scrimAlpha = this.revealScrim.visible ? this.revealScrim.alpha : 0;
+    this.revealScrim.setVisible(true).setAlpha(scrimAlpha);
     this.tweens.add({ targets: this.revealScrim, alpha: 1, duration: 240 });
 
     for (const part of [this.revealTitle, this.revealBody, this.revealPhoto]) {
