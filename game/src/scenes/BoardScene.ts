@@ -14,7 +14,7 @@ import {
 import { Simulation } from '../engine/simulation';
 import { type TileMove } from '../engine/board';
 import { type ChainLink } from '../engine/matching';
-import { SWIPE_TUNING, DEFAULT_TUNING, TOUCH_TUNING, type Tuning } from '../tuning';
+import { SWIPE_TUNING, DEFAULT_TUNING, type Tuning } from '../tuning';
 import {
   GROUND_COLOR,
   TRACE_COLORS,
@@ -36,20 +36,23 @@ import {
 import { CRASHED, CRASH_LINE } from '../crash';
 import { reportCrash } from '../crash-reporter';
 import { MEMORY_ART, type MemoryGrid } from '../memory-art';
+import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
+import { bakeCharacterStandIn, characterTexture } from './character-textures';
 import { revealOrder } from '../memory-reveal';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
-  type ControlScheme,
-  controlScheme,
+  introSeen,
   playedBefore,
   rememberBestChain,
   rememberFragment,
+  rememberIntroSeen,
   rememberPlayed,
   rememberResume,
   resumeAt,
 } from '../progress';
+import { type IntroControls, introCards } from '../intro';
 import {
   CONNECTION_LOST,
   REACH_OUT_LINE,
@@ -107,6 +110,7 @@ const TOUCH_PRIMARY = typeof matchMedia === 'function'
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
 const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
+const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
 const BLINK_INTERVAL = 2300;
@@ -135,8 +139,7 @@ const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
 
-const SIDE_COMMAND_Y = 640;
-const SIDE_COMMAND_GAP = 96;
+const SIDE_COMMAND_GAP = 8;
 
 const MEMORY_PICTURE_DARKEN = 0.88;
 const MEMORY_PICTURE_FILL_MS = 620;
@@ -147,6 +150,11 @@ const MEMORY_BOX = {
   width: CANVAS_WIDTH - (ORIGIN_X + BOARD_WIDTH) - 26,
   height: 300,
 };
+
+const SIDE_COMMAND_WIDTH = (MEMORY_BOX.width - SIDE_COMMAND_GAP) / 2;
+const SIDE_COMMAND_Y = ORIGIN_Y + BOARD_HEIGHT - 34;
+const CHARACTER_X = MEMORY_BOX.left + MEMORY_BOX.width / 2;
+const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -301,11 +309,10 @@ export class BoardScene extends Scene {
   // Not `input`: that shadows Phaser's own `Scene.input` plugin.
   private inputTranslator: InputTranslator;
 
-  readonly touch = new TouchControls();
+  private readonly touch = new TouchControls();
 
   readonly swipe = new SwipeControls(SWIPE_TUNING);
 
-  private scheme: ControlScheme = TOUCH_PRIMARY ? controlScheme() : 'buttons';
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
   private hardDropKey: Phaser.Input.Keyboard.Key;
@@ -345,6 +352,12 @@ export class BoardScene extends Scene {
   private connections: ConnectionSlot[];
 
   private runOver: 'topped-out' | 'won' | null = null;
+
+  private character: Phaser.GameObjects.Image;
+
+  private characterState = RESTING;
+
+  private shownCharacterTexture = characterTexture('idle', 0);
 
   private chainCarriedFromEarlierBoards = 0;
 
@@ -389,6 +402,8 @@ export class BoardScene extends Scene {
 
   private revealSkippableIn = 0;
 
+  private introCardShowing: number | null = null;
+
   private revealBody: Phaser.GameObjects.Text;
 
   private cellsBeingFilled = new Set<number>();
@@ -417,9 +432,7 @@ export class BoardScene extends Scene {
   }
 
   create(): void {
-    this.tuning = TOUCH_PRIMARY
-      ? { ...DEFAULT_TUNING, ...TOUCH_TUNING }
-      : { ...DEFAULT_TUNING };
+    this.tuning = { ...DEFAULT_TUNING };
     this.simulation = new Simulation(randomPieceTypes, this.tuning);
     this.timestep = new FixedTimestep();
     this.inputTranslator = new InputTranslator(this.tuning);
@@ -448,6 +461,8 @@ export class BoardScene extends Scene {
     this.memoryPanel = this.add.graphics();
 
     bakeTileTextures(this, CELL_SIZE, GAP);
+
+    bakeCharacterStandIn(this);
 
     this.cellTiles = [];
     for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
@@ -574,30 +589,28 @@ export class BoardScene extends Scene {
       this.sideCommands = (['pause', 'restart'] as const).map((action, index) => {
         const command = this.add
           .text(
-            MEMORY_BOX.left + MEMORY_BOX.width / 2,
-            SIDE_COMMAND_Y + index * SIDE_COMMAND_GAP,
+            MEMORY_BOX.left + SIDE_COMMAND_WIDTH / 2 + index * (SIDE_COMMAND_WIDTH + SIDE_COMMAND_GAP),
+            SIDE_COMMAND_Y,
             action,
             {
               fontFamily: 'monospace',
-              fontSize: '20px',
+              fontSize: '16px',
               color: '#9d86b8',
               backgroundColor: '#2b1644',
               align: 'center',
-              // Both read as one control rather than two of different widths,
-              // and the column lines up with the picture above.
-              fixedWidth: MEMORY_BOX.width,
-              padding: { y: 26 },
+              fixedWidth: SIDE_COMMAND_WIDTH,
+              padding: { y: 24 },
             },
           )
           .setOrigin(0.5, 0.5)
           .setInteractive({ useHandCursor: true });
 
-        return this.onPress(command, () => {
-          this.touch.press(action);
-          this.touch.release(action);
-        });
+        return this.onPress(command, () => this.touch.press(action));
       });
     }
+
+    this.character = this.add.image(CHARACTER_X, CHARACTER_BOTTOM, characterTexture('idle', 0))
+      .setOrigin(0.5, 1);
 
     this.previewTiles = [
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
@@ -614,8 +627,6 @@ export class BoardScene extends Scene {
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
-    // The card says "tap"; route that through the drop action so a tap, the
-    // drop button and space all take the same path. Play is left to the buttons.
     this.input.on(
       Input.Events.POINTER_UP,
       (_pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
@@ -632,7 +643,6 @@ export class BoardScene extends Scene {
 
         if (this.betweenPlay) {
           this.touch.press('drop');
-          this.touch.release('drop');
         }
       },
     );
@@ -896,6 +906,8 @@ export class BoardScene extends Scene {
       return;
     }
 
+    this.advanceCharacter(delta);
+
     if (this.revealHolding) {
       if (this.revealSkippableIn > 0) {
         this.revealSkippableIn -= delta;
@@ -1017,6 +1029,7 @@ export class BoardScene extends Scene {
     }
 
     this.runOver = null;
+    this.characterState = characterOn(this.characterState, 'restart');
     this.tweens.killTweensOf([
       this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer, this.chainNote,
       this.memoryPanel,
@@ -1089,6 +1102,7 @@ export class BoardScene extends Scene {
     if (!keepStory) {
       this.revealHolding = false;
       this.revealPending = false;
+      this.introCardShowing = null;
     }
     this.lastRevealPiece = -1;
     this.redrawMemoryPanel(0);
@@ -1099,7 +1113,9 @@ export class BoardScene extends Scene {
   }
 
   private openTheRun(): void {
-    if (playedBefore()) {
+    if (!introSeen()) {
+      this.showIntroCard(0);
+    } else if (playedBefore()) {
       this.showReveal('', SHADOW_OPENING_LINE);
       this.revealBody.setColor('#b07dff');
     }
@@ -1136,17 +1152,7 @@ export class BoardScene extends Scene {
     });
   }
 
-  useControlScheme(scheme: ControlScheme): void {
-    this.scheme = TOUCH_PRIMARY ? scheme : 'buttons';
-    this.swipe.cancel();
-  }
-
   private readSwipe(): void {
-    if (this.scheme !== 'swipe') {
-      this.swipe.cancel();
-      return;
-    }
-
     for (let action = this.swipe.take(); action !== null; action = this.swipe.take()) {
       if (action === 'rotate') {
         this.simulation.rotate();
@@ -1169,7 +1175,7 @@ export class BoardScene extends Scene {
   private readInput(delta: number): void {
     this.readSwipe();
 
-    if (Input.Keyboard.JustDown(this.cursors.up) || this.touch.takeRotate()) {
+    if (Input.Keyboard.JustDown(this.cursors.up)) {
       this.simulation.rotate();
     }
 
@@ -1182,7 +1188,7 @@ export class BoardScene extends Scene {
 
     this.simulation.softDropping = this.inputTranslator.update(
       {
-        direction: this.pressedDirection() ?? this.touch.direction,
+        direction: this.pressedDirection(),
         softDropHeld: this.cursors.down.isDown,
         newPiece,
         delta,
@@ -1554,6 +1560,7 @@ export class BoardScene extends Scene {
 
     this.shownShadowTaken = shadowTaken;
     this.soundBoard.play(shadowArrivalVoice());
+    this.characterState = characterOn(this.characterState, 'shadow');
     this.speakForShadow();
 
     this.shadowArrival = {
@@ -1736,13 +1743,39 @@ export class BoardScene extends Scene {
     return floor + text.length * this.tuning.readingPerCharacter;
   }
 
+  private advanceCharacter(delta: number): void {
+    this.characterState = characterAfter(this.characterState, delta);
+
+    const texture = characterTexture(this.characterState.animation, characterFrame(this.characterState));
+    if (texture !== this.shownCharacterTexture) {
+      this.shownCharacterTexture = texture;
+      this.character.setTexture(texture);
+    }
+  }
+
   private get storyHolding(): boolean {
     return this.revealHolding;
   }
 
   private advanceReveal(): void {
+    if (this.introCardShowing !== null) {
+      const next = this.introCardShowing + 1;
+      if (next < introCards(INTRO_CONTROLS).length) {
+        this.showIntroCard(next);
+        return;
+      }
+      this.introCardShowing = null;
+      rememberIntroSeen();
+    }
+
     this.hideReveal();
     this.endRunIfNothingLeft(700);
+  }
+
+  private showIntroCard(index: number): void {
+    const card = introCards(INTRO_CONTROLS)[index];
+    this.introCardShowing = index;
+    this.showReveal(card.title, card.body);
   }
 
   private endRunIfNothingLeft(after: number): void {
@@ -1813,7 +1846,8 @@ export class BoardScene extends Scene {
 
     this.layOutReveal();
 
-    this.revealScrim.setVisible(true).setAlpha(0);
+    const scrimAlpha = this.revealScrim.visible ? this.revealScrim.alpha : 0;
+    this.revealScrim.setVisible(true).setAlpha(scrimAlpha);
     this.tweens.add({ targets: this.revealScrim, alpha: 1, duration: 240 });
 
     for (const part of [this.revealTitle, this.revealBody, this.revealPhoto]) {
@@ -1969,7 +2003,11 @@ export class BoardScene extends Scene {
     if (resolving) {
       this.chainAwaitingFlourish = chainLength;
     } else if (this.chainAwaitingFlourish > 0) {
-      this.soundBoard.playAll(chainVoices(this.chainAwaitingFlourish));
+      const flourish = chainVoices(this.chainAwaitingFlourish);
+      this.soundBoard.playAll(flourish);
+      if (flourish.length > 0) {
+        this.characterState = characterOn(this.characterState, 'good');
+      }
       this.chainAwaitingFlourish = 0;
     }
   }
@@ -1999,6 +2037,10 @@ export class BoardScene extends Scene {
 
   private reachNeurons(lit: readonly NeuronSite[]): void {
     const total = neuronsOn(this.simulation.board).length;
+
+    if (lit.length > 0) {
+      this.characterState = characterOn(this.characterState, 'good');
+    }
 
     for (const site of lit) {
       this.litNeurons.push(site);
@@ -2320,6 +2362,7 @@ export class BoardScene extends Scene {
 
   private loseTheBoard(): void {
     rememberBestChain(this.deepestChainThisRun);
+    this.characterState = characterOn(this.characterState, 'lost');
 
     const lit = this.connections.filter((slot) => slot.trace.visible);
 
@@ -2382,6 +2425,7 @@ export class BoardScene extends Scene {
   private winTheRun(): void {
     this.runOver = 'won';
     rememberBestChain(this.deepestChainThisRun);
+    this.characterState = characterOn(this.characterState, 'won');
 
     this.tweens.add({
       targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],

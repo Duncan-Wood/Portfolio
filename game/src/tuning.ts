@@ -59,10 +59,3 @@ export const SWIPE_TUNING: SwipeTuning = {
   dropMinDistance: 120,
   dropMaxDuration: 300,
 };
-
-// A thumb on glass cannot press as briefly as a finger on a key. At the
-// keyboard's 130/40 a deliberate 300ms tap crosses five of the six columns.
-export const TOUCH_TUNING: Pick<Tuning, 'autoShiftDelay' | 'autoRepeatInterval'> = {
-  autoShiftDelay: 320,
-  autoRepeatInterval: 110,
-};

@@ -5,7 +5,6 @@ import { openGate } from './gate';
 import { MEMORY_SIGNATURE } from './memories';
 import { forgetProgressFromOlderMemories } from './progress';
 import { startCrashReporting } from './crash-reporter';
-import { showControlScheme, wireControlScheme, wireTouchButtons } from './touch-buttons';
 
 const config: Phaser.Types.Core.GameConfig = {
   // Not `AUTO`, which falls back to Canvas 2D silently and slowly.
@@ -28,15 +27,9 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BoardScene],
 };
 
-showControlScheme();
 startCrashReporting();
 forgetProgressFromOlderMemories(MEMORY_SIGNATURE);
 
 void openGate(import.meta.env.VITE_GAME_CODE).then(() => {
-  const game = new Game(config);
-  game.events.once('ready', () => {
-    const board = game.scene.getScene('Board') as BoardScene;
-    wireTouchButtons(board.touch);
-    wireControlScheme((scheme) => board.useControlScheme(scheme));
-  });
+  new Game(config);
 });

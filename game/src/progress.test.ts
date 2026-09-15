@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  controlScheme,
   forgetProgressFromOlderMemories,
+  introSeen,
   loggedWith,
   rememberBestChain,
-  rememberControlScheme,
+  rememberIntroSeen,
   resumePoint,
 } from './progress';
 
@@ -62,7 +62,7 @@ describe('the log of what a run surfaced', () => {
   });
 });
 
-describe('which controls a player chose', () => {
+describe('whether a player has read the intro', () => {
   const held = new Map<string, string>();
 
   beforeEach(() => {
@@ -81,24 +81,18 @@ describe('which controls a player chose', () => {
     Reflect.deleteProperty(globalThis, 'localStorage');
   });
 
-  it('starts on swipe, which is what testers reached for', () => {
-    expect(controlScheme()).toBe('swipe');
+  it('shows it to someone who has never dismissed it', () => {
+    expect(introSeen()).toBe(false);
   });
 
-  it('remembers a switch to the buttons', () => {
-    rememberControlScheme('buttons');
-    expect(controlScheme()).toBe('buttons');
+  it('stops showing it once it has been dismissed', () => {
+    rememberIntroSeen();
+    expect(introSeen()).toBe(true);
   });
 
-  it('remembers a switch back', () => {
-    rememberControlScheme('buttons');
-    rememberControlScheme('swipe');
-    expect(controlScheme()).toBe('swipe');
-  });
-
-  it('falls back to the default rather than trusting a value it does not know', () => {
-    held.set('connected.controls', 'trackball');
-    expect(controlScheme()).toBe('swipe');
+  it('still shows it to someone who played before the intro existed', () => {
+    held.set('connected.played', 'true');
+    expect(introSeen()).toBe(false);
   });
 });
 
@@ -164,7 +158,7 @@ describe('progress left behind by an older set of memories', () => {
   });
 
   function playedThrough(): void {
-    held.set('connected.log', '[{"title":"The Laptop",}]');
+    held.set('connected.log', '[{"title":"The Laptop"}]');
     held.set('connected.fragmentsTotal', '5');
     held.set('connected.resume', '3');
     held.set('connected.played', 'true');
@@ -191,6 +185,16 @@ describe('progress left behind by an older set of memories', () => {
     expect(held.get('connected.unlocked')).toBe('true');
   });
 
+  it('keeps the intro dismissed, since new memories do not change how to play', () => {
+    playedThrough();
+    held.set('connected.introSeen', 'true');
+    held.set('connected.memories', 'old signature');
+
+    forgetProgressFromOlderMemories('new signature');
+
+    expect(held.get('connected.introSeen')).toBe('true');
+  });
+
   it('still knows they played before, which no rewrite can make stale', () => {
     playedThrough();
     held.set('connected.memories', 'old signature');
@@ -206,7 +210,7 @@ describe('progress left behind by an older set of memories', () => {
 
     forgetProgressFromOlderMemories('same signature');
 
-    expect(held.get('connected.log')).toBe('[{"title":"The Laptop",}]');
+    expect(held.get('connected.log')).toBe('[{"title":"The Laptop"}]');
     expect(held.get('connected.resume')).toBe('3');
   });
 
