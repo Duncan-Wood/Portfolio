@@ -598,8 +598,6 @@ export class BoardScene extends Scene {
               color: '#9d86b8',
               backgroundColor: '#2b1644',
               align: 'center',
-              // Both read as one control rather than two of different widths,
-              // and the column lines up with the picture above.
               fixedWidth: SIDE_COMMAND_WIDTH,
               padding: { y: 24 },
             },
