@@ -36,6 +36,8 @@ import {
 import { CRASHED, CRASH_LINE } from '../crash';
 import { reportCrash } from '../crash-reporter';
 import { MEMORY_ART, type MemoryGrid } from '../memory-art';
+import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
+import { bakeCharacterStandIn, characterTexture } from './character-textures';
 import { revealOrder } from '../memory-reveal';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
@@ -138,8 +140,7 @@ const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
 
-const SIDE_COMMAND_Y = 640;
-const SIDE_COMMAND_GAP = 96;
+const SIDE_COMMAND_GAP = 8;
 
 const MEMORY_PICTURE_DARKEN = 0.88;
 const MEMORY_PICTURE_FILL_MS = 620;
@@ -150,6 +151,11 @@ const MEMORY_BOX = {
   width: CANVAS_WIDTH - (ORIGIN_X + BOARD_WIDTH) - 26,
   height: 300,
 };
+
+const SIDE_COMMAND_WIDTH = (MEMORY_BOX.width - SIDE_COMMAND_GAP) / 2;
+const SIDE_COMMAND_Y = ORIGIN_Y + BOARD_HEIGHT - 34;
+const CHARACTER_X = MEMORY_BOX.left + MEMORY_BOX.width / 2;
+const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -349,6 +355,12 @@ export class BoardScene extends Scene {
 
   private runOver: 'topped-out' | 'won' | null = null;
 
+  private character: Phaser.GameObjects.Image;
+
+  private characterState = RESTING;
+
+  private shownCharacterTexture = characterTexture('idle', 0);
+
   private chainCarriedFromEarlierBoards = 0;
 
   private shadowGroundHeld = 0;
@@ -453,6 +465,8 @@ export class BoardScene extends Scene {
     this.memoryPanel = this.add.graphics();
 
     bakeTileTextures(this, CELL_SIZE, GAP);
+
+    bakeCharacterStandIn(this);
 
     this.cellTiles = [];
     for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
@@ -579,19 +593,19 @@ export class BoardScene extends Scene {
       this.sideCommands = (['pause', 'restart'] as const).map((action, index) => {
         const command = this.add
           .text(
-            MEMORY_BOX.left + MEMORY_BOX.width / 2,
-            SIDE_COMMAND_Y + index * SIDE_COMMAND_GAP,
+            MEMORY_BOX.left + SIDE_COMMAND_WIDTH / 2 + index * (SIDE_COMMAND_WIDTH + SIDE_COMMAND_GAP),
+            SIDE_COMMAND_Y,
             action,
             {
               fontFamily: 'monospace',
-              fontSize: '20px',
+              fontSize: '16px',
               color: '#9d86b8',
               backgroundColor: '#2b1644',
               align: 'center',
               // Both read as one control rather than two of different widths,
               // and the column lines up with the picture above.
-              fixedWidth: MEMORY_BOX.width,
-              padding: { y: 26 },
+              fixedWidth: SIDE_COMMAND_WIDTH,
+              padding: { y: 24 },
             },
           )
           .setOrigin(0.5, 0.5)
@@ -603,6 +617,9 @@ export class BoardScene extends Scene {
         });
       });
     }
+
+    this.character = this.add.image(CHARACTER_X, CHARACTER_BOTTOM, characterTexture('idle', 0))
+      .setOrigin(0.5, 1);
 
     this.previewTiles = [
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
@@ -901,6 +918,8 @@ export class BoardScene extends Scene {
       return;
     }
 
+    this.advanceCharacter(delta);
+
     if (this.revealHolding) {
       if (this.revealSkippableIn > 0) {
         this.revealSkippableIn -= delta;
@@ -1022,6 +1041,7 @@ export class BoardScene extends Scene {
     }
 
     this.runOver = null;
+    this.characterState = characterOn(this.characterState, 'restart');
     this.tweens.killTweensOf([
       this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer, this.chainNote,
       this.memoryPanel,
@@ -1567,6 +1587,7 @@ export class BoardScene extends Scene {
 
     this.shownShadowTaken = shadowTaken;
     this.soundBoard.play(shadowArrivalVoice());
+    this.characterState = characterOn(this.characterState, 'shadow');
     this.speakForShadow();
 
     this.shadowArrival = {
@@ -1747,6 +1768,16 @@ export class BoardScene extends Scene {
 
   private holdFor(text: string, floor: number): number {
     return floor + text.length * this.tuning.readingPerCharacter;
+  }
+
+  private advanceCharacter(delta: number): void {
+    this.characterState = characterAfter(this.characterState, delta);
+
+    const texture = characterTexture(this.characterState.animation, characterFrame(this.characterState));
+    if (texture !== this.shownCharacterTexture) {
+      this.shownCharacterTexture = texture;
+      this.character.setTexture(texture);
+    }
   }
 
   private get storyHolding(): boolean {
@@ -2003,7 +2034,11 @@ export class BoardScene extends Scene {
     if (resolving) {
       this.chainAwaitingFlourish = chainLength;
     } else if (this.chainAwaitingFlourish > 0) {
-      this.soundBoard.playAll(chainVoices(this.chainAwaitingFlourish));
+      const flourish = chainVoices(this.chainAwaitingFlourish);
+      this.soundBoard.playAll(flourish);
+      if (flourish.length > 0) {
+        this.characterState = characterOn(this.characterState, 'good');
+      }
       this.chainAwaitingFlourish = 0;
     }
   }
@@ -2033,6 +2068,10 @@ export class BoardScene extends Scene {
 
   private reachNeurons(lit: readonly NeuronSite[]): void {
     const total = neuronsOn(this.simulation.board).length;
+
+    if (lit.length > 0) {
+      this.characterState = characterOn(this.characterState, 'good');
+    }
 
     for (const site of lit) {
       this.litNeurons.push(site);
@@ -2354,6 +2393,7 @@ export class BoardScene extends Scene {
 
   private loseTheBoard(): void {
     rememberBestChain(this.deepestChainThisRun);
+    this.characterState = characterOn(this.characterState, 'lost');
 
     const lit = this.connections.filter((slot) => slot.trace.visible);
 
@@ -2416,6 +2456,7 @@ export class BoardScene extends Scene {
   private winTheRun(): void {
     this.runOver = 'won';
     rememberBestChain(this.deepestChainThisRun);
+    this.characterState = characterOn(this.characterState, 'won');
 
     this.tweens.add({
       targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],
