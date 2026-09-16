@@ -118,7 +118,8 @@
         color: #9d86b8;
       }
 
-      #to-standard {
+      #to-standard,
+      #to-contact {
         flex: none;
         align-self: center;
         font-family: monospace;
@@ -132,6 +133,10 @@
         transition: color 120ms ease, background-color 120ms ease;
       }
 
+      #to-contact {
+        color: #9d86b8;
+      }
+
       @media (pointer: coarse) {
         #controls {
           display: none;
@@ -141,15 +146,35 @@
           order: -1;
           align-self: flex-start;
           margin-top: env(safe-area-inset-top);
+          margin-right: 145px;
           padding: 12px;
           font-size: 11px;
           white-space: normal;
           text-align: left;
         }
+
+        #to-contact {
+          position: fixed;
+          top: calc(8px + env(safe-area-inset-top));
+          right: 10px;
+          z-index: 2;
+          padding: 10px 12px;
+          font-size: 11px;
+          background: #2b1644;
+          border: 1px solid #4a2f6b;
+          border-radius: 6px;
+        }
+
+        #to-contact:active {
+          background: #4a2f6b;
+          border-color: #c98cff;
+        }
       }
 
       #to-standard:hover,
-      #to-standard:focus-visible {
+      #to-standard:focus-visible,
+      #to-contact:hover,
+      #to-contact:focus-visible {
         color: #c98cff;
         background: #2b1644;
         outline: none;
@@ -166,6 +191,7 @@
       <span><b>esc</b> pause</span>
       <span><b>r</b> restart</span>
     </div>
+    <a id="to-contact" href="/#contact">reach out to me</a>
     <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
     <script type="module" src="/src/main.ts"></script>
   </body>

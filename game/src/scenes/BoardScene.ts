@@ -2409,10 +2409,10 @@ export class BoardScene extends Scene {
         return;
       }
       this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
-      this.gameOverHint.setY(HINT_BELOW_OFFER_Y);
+      this.gameOverHint.setY(HINT_ALONE_Y);
 
       const ending = [
-        this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
+        this.gameOverText, this.gameOverLine, this.gameOverHint,
         ...this.chainNoteIfEarned(),
       ];
       for (const text of ending) {
