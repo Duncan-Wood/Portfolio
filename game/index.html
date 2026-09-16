@@ -99,31 +99,6 @@
         cursor: pointer;
       }
 
-      #touch {
-        display: none;
-        flex: none;
-        gap: 10px;
-        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-        justify-content: center;
-      }
-
-      #touch button {
-        flex: 1 1 0;
-        max-width: 108px;
-        min-height: 68px;
-        font-size: 24px;
-        color: #e9dcff;
-        background: #2b1644;
-        border: 1px solid #4a2f6b;
-        border-radius: 12px;
-        touch-action: none;
-      }
-
-      #touch button:active {
-        background: #4a2f6b;
-        border-color: #c98cff;
-      }
-
       #controls {
         flex: none;
         align-self: center;
@@ -143,7 +118,8 @@
         color: #9d86b8;
       }
 
-      #to-standard {
+      #to-standard,
+      #to-contact {
         flex: none;
         align-self: center;
         font-family: monospace;
@@ -157,40 +133,11 @@
         transition: color 120ms ease, background-color 120ms ease;
       }
 
-      #scheme {
-        display: none;
+      #to-contact {
+        color: #9d86b8;
       }
 
       @media (pointer: coarse) {
-        #touch {
-          display: flex;
-        }
-
-        body[data-controls="swipe"] #touch {
-          display: none;
-        }
-
-        #scheme {
-          display: block;
-          position: fixed;
-          top: calc(8px + env(safe-area-inset-top));
-          right: 10px;
-          z-index: 2;
-          font-family: monospace;
-          font-size: 11px;
-          line-height: 1;
-          color: #9d86b8;
-          background: #2b1644;
-          border: 1px solid #4a2f6b;
-          border-radius: 6px;
-          padding: 10px 12px;
-        }
-
-        #scheme:active {
-          background: #4a2f6b;
-          border-color: #c98cff;
-        }
-
         #controls {
           display: none;
         }
@@ -199,16 +146,35 @@
           order: -1;
           align-self: flex-start;
           margin-top: env(safe-area-inset-top);
-          margin-right: 108px;
+          margin-right: 145px;
           padding: 12px;
           font-size: 11px;
           white-space: normal;
           text-align: left;
         }
+
+        #to-contact {
+          position: fixed;
+          top: calc(8px + env(safe-area-inset-top));
+          right: 10px;
+          z-index: 2;
+          padding: 10px 12px;
+          font-size: 11px;
+          background: #2b1644;
+          border: 1px solid #4a2f6b;
+          border-radius: 6px;
+        }
+
+        #to-contact:active {
+          background: #4a2f6b;
+          border-color: #c98cff;
+        }
       }
 
       #to-standard:hover,
-      #to-standard:focus-visible {
+      #to-standard:focus-visible,
+      #to-contact:hover,
+      #to-contact:focus-visible {
         color: #c98cff;
         background: #2b1644;
         outline: none;
@@ -217,13 +183,6 @@
   </head>
   <body>
     <div id="game-container"></div>
-    <button id="scheme" type="button">controls: swipe</button>
-    <div id="touch" aria-hidden="true">
-      <button type="button" data-action="left" aria-label="move left">&#9664;</button>
-      <button type="button" data-action="rotate" aria-label="rotate">&#8635;</button>
-      <button type="button" data-action="drop" aria-label="drop">&#11015;</button>
-      <button type="button" data-action="right" aria-label="move right">&#9654;</button>
-    </div>
     <div id="controls">
       <span><b>&larr;&rarr;</b> move</span>
       <span><b>&uarr;</b> rotate</span>
@@ -232,6 +191,7 @@
       <span><b>esc</b> pause</span>
       <span><b>r</b> restart</span>
     </div>
+    <a id="to-contact" href="/#contact">reach out to me</a>
     <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
     <script type="module" src="/src/main.ts"></script>
   </body>

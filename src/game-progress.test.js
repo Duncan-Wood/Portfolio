@@ -47,22 +47,4 @@ describe("draftFrom", () => {
   it("copes with a log that is not an array", () => {
     expect(draftFrom(null, 5, true, 5)).toBe("I played Connected.\n\n");
   });
-
-  it("says nothing about controls when they played the way it shipped", () => {
-    expect(draftFrom([build, johns], 2, true, 4, "swipe")).toBe(
-      "Still connected. Best chain: 4.\n\n"
-    );
-  });
-
-  it("mentions the controls when they went and changed them", () => {
-    expect(draftFrom([build, johns], 2, true, 4, "buttons")).toBe(
-      "Still connected. Best chain: 4. (on the buttons)\n\n"
-    );
-  });
-
-  it("mentions changed controls even on a run with no chain to report", () => {
-    expect(draftFrom([build], 1, true, 0, "buttons")).toBe(
-      "Still connected. (on the buttons)\n\n"
-    );
-  });
 });
