@@ -95,6 +95,7 @@ const SHADOW_ARRIVAL_DURATION = 340;
 const PHOTO_MAX_WIDTH = 368;
 const PHOTO_MAX_HEIGHT = 300;
 const REVEAL_GAP = 26;
+const REVEAL_MARGIN = 12;
 
 const REVEAL_SKIP_GRACE = 420;
 
@@ -400,6 +401,10 @@ export class BoardScene extends Scene {
 
   private revealHint: Phaser.GameObjects.Text;
 
+  private revealContact: Phaser.GameObjects.Text;
+
+  private revealOffersContact = false;
+
   private revealSkippableIn = 0;
 
   private introCardShowing: number | null = null;
@@ -636,7 +641,7 @@ export class BoardScene extends Scene {
           return;
         }
 
-        if (over.includes(this.contactOffer)
+        if (over.includes(this.contactOffer) || over.includes(this.revealContact)
           || this.sideCommands.some((command) => over.includes(command))) {
           return;
         }
@@ -748,25 +753,8 @@ export class BoardScene extends Scene {
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.contactOffer = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CONTACT_OFFER_Y,
-      REACH_OUT_LINE,
-      {
-        fontFamily: 'monospace',
-        fontSize: '19px',
-        color: '#221038',
-        backgroundColor: '#c98cff',
-        padding: { x: 18, y: 10 },
-      },
-    )
-      .setOrigin(0.5, 0.5)
-      .setVisible(false)
-      .setInteractive({ useHandCursor: true });
-
-    this.onPress(this.contactOffer, () => {
-      window.location.href = '/#contact';
-    });
+    this.contactOffer = this.addContactOffer(CONTACT_OFFER_Y);
+    this.revealContact = this.addContactOffer(0);
 
     this.staticOverlay = this.add.tileSprite(
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -912,8 +900,13 @@ export class BoardScene extends Scene {
       if (this.revealSkippableIn > 0) {
         this.revealSkippableIn -= delta;
         if (this.revealSkippableIn <= 0) {
-          this.revealHint.setVisible(true).setAlpha(0);
-          this.tweens.add({ targets: this.revealHint, alpha: 1, duration: 260 });
+          const appearing = this.revealOffersContact
+            ? [this.revealHint, this.revealContact]
+            : [this.revealHint];
+          for (const part of appearing) {
+            part.setVisible(true).setAlpha(0);
+          }
+          this.tweens.add({ targets: appearing, alpha: 1, duration: 260 });
         }
       } else if (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop()) {
         this.revealHolding = false;
@@ -1057,9 +1050,11 @@ export class BoardScene extends Scene {
 
     if (!keepStory) {
       this.tweens.killTweensOf([
-        this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
+        this.revealScrim, this.revealTitle, this.revealBody, this.revealHint, this.revealContact,
       ]);
-      for (const part of [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]) {
+      for (const part of [
+        this.revealScrim, this.revealTitle, this.revealBody, this.revealHint, this.revealContact,
+      ]) {
         part.setVisible(false).setAlpha(1);
       }
       this.revealSkippableIn = 0;
@@ -1209,6 +1204,28 @@ export class BoardScene extends Scene {
       return 1;
     }
     return null;
+  }
+
+  private addContactOffer(y: number): Phaser.GameObjects.Text {
+    const offer = this.add.text(
+      ORIGIN_X + BOARD_WIDTH / 2,
+      y,
+      REACH_OUT_LINE,
+      {
+        fontFamily: 'monospace',
+        fontSize: '19px',
+        color: '#221038',
+        backgroundColor: '#c98cff',
+        padding: { x: 18, y: 10 },
+      },
+    )
+      .setOrigin(0.5, 0.5)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+
+    return this.onPress(offer, () => {
+      window.location.href = '/#contact';
+    });
   }
 
   // Phaser fires pointerup on whatever the finger is over, not on what it
@@ -1736,7 +1753,7 @@ export class BoardScene extends Scene {
     this.shownPanelProgress = -1;
     this.redrawMemoryPanel(0);
 
-    this.showReveal(node.title, node.body, node.photo);
+    this.showReveal(node.title, node.body, { photo: node.photo, offersContact: true });
   }
 
   private holdFor(text: string, floor: number): number {
@@ -1814,29 +1831,39 @@ export class BoardScene extends Scene {
     const photoHeight = this.revealPhoto.visible ? this.revealPhoto.displayHeight : 0;
     const titleHeight = this.revealTitle.visible ? this.revealTitle.height : 0;
     const bodyHeight = this.revealBody.height;
+    const contactHeight = this.revealOffersContact ? this.revealContact.height : 0;
     const hintHeight = this.revealHint.height;
 
     const parts: { target: Phaser.GameObjects.Components.Transform; height: number }[] = [];
     if (photoHeight > 0) parts.push({ target: this.revealPhoto, height: photoHeight });
     if (titleHeight > 0) parts.push({ target: this.revealTitle, height: titleHeight });
     parts.push({ target: this.revealBody, height: bodyHeight });
+    if (contactHeight > 0) parts.push({ target: this.revealContact, height: contactHeight });
     parts.push({ target: this.revealHint, height: hintHeight });
 
-    const total = parts.reduce((sum, part) => sum + part.height, 0)
-      + REVEAL_GAP * (parts.length - 1);
+    const stacked = parts.reduce((sum, part) => sum + part.height, 0);
+    const room = this.revealScrim.height - REVEAL_MARGIN * 2;
+    const gap = Math.max(0, Math.min(REVEAL_GAP, (room - stacked) / (parts.length - 1)));
+    const total = stacked + gap * (parts.length - 1);
 
     let y = CANVAS_HEIGHT / 2 - total / 2;
     for (const part of parts) {
       part.target.setPosition(centerX, y + part.height / 2);
-      y += part.height + REVEAL_GAP;
+      y += part.height + gap;
     }
   }
 
-  private showReveal(title: string, body: string, photo?: string): void {
+  private showReveal(
+    title: string,
+    body: string,
+    { photo, offersContact = false }: { photo?: string; offersContact?: boolean } = {},
+  ): void {
     this.revealBody.setColor(REVEAL_BODY_COLOR);
     this.revealHolding = true;
     this.revealSkippableIn = REVEAL_SKIP_GRACE;
+    this.revealOffersContact = offersContact;
     this.revealHint.setText(SKIP_PROMPT).setVisible(false);
+    this.revealContact.setVisible(false);
 
     this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody, this.revealPhoto]);
 
@@ -1860,6 +1887,7 @@ export class BoardScene extends Scene {
   }
 
   private hideReveal(): void {
+    this.revealContact.setVisible(false);
     const parts = [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
       this.revealPhoto];
     this.tweens.killTweensOf(parts);
