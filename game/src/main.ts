@@ -1,5 +1,5 @@
 import { Game, Scale, WEBGL } from 'phaser';
-import { BoardScene, CANVAS_HEIGHT, CANVAS_WIDTH } from './scenes/BoardScene';
+import { BoardScene, CANVAS_HEIGHT, CANVAS_WIDTH, TOUCH_PRIMARY } from './scenes/BoardScene';
 import { GROUND_COLOR } from './palette';
 import { openGate } from './gate';
 import { MEMORY_SIGNATURE } from './memories';
@@ -21,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
 
   scale: {
     mode: Scale.FIT,
-    autoCenter: Scale.CENTER_BOTH,
+    autoCenter: TOUCH_PRIMARY ? Scale.CENTER_HORIZONTALLY : Scale.CENTER_BOTH,
   },
 
   scene: [BoardScene],

@@ -104,7 +104,7 @@ const HANDOVER_DIM = 240;
 const OUT_OF_PIECES_PAUSE = 2600;
 
 
-const TOUCH_PRIMARY = typeof matchMedia === 'function'
+export const TOUCH_PRIMARY = typeof matchMedia === 'function'
   && matchMedia('(pointer: coarse)').matches;
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
