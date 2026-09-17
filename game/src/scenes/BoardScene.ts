@@ -1020,6 +1020,7 @@ export class BoardScene extends Scene {
     }
 
     this.startLock();
+    this.simulation.shadowHeld = this.nodesRevealed === 0;
 
     for (const slot of this.connections) {
       slot.lit = 0;
@@ -1726,6 +1727,7 @@ export class BoardScene extends Scene {
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
+    this.simulation.shadowHeld = this.nodesRevealed === 0;
     rememberFragment(
       this.nodesRevealed - 1,
       { title: node.title },

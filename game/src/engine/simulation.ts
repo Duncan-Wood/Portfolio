@@ -52,6 +52,8 @@ export class Simulation {
 
   lastShadowCell: GroupCell | null = null;
 
+  shadowHeld = false;
+
   get shadowOnBoard(): number {
     let held = 0;
 
@@ -110,10 +112,14 @@ export class Simulation {
       return;
     }
 
-    this.stallTimer += delta;
-    if (this.stallTimer >= this.tuning.shadowInterval) {
+    if (this.shadowHeld) {
       this.stallTimer = 0;
-      this.encroach();
+    } else {
+      this.stallTimer += delta;
+      if (this.stallTimer >= this.tuning.shadowInterval) {
+        this.stallTimer = 0;
+        this.encroach();
+      }
     }
 
     if (!this.pair.canFall(this.board)) {
