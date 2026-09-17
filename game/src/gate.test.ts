@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gateOpens, gateRequired } from './gate';
+import { codeFromQuery, gateOpens, gateRequired } from './gate';
 
 describe('gateRequired', () => {
   it('is off when the build has no code', () => {
@@ -33,5 +33,36 @@ describe('gateOpens', () => {
   it('never opens on a blank expected code', () => {
     expect(gateOpens('', '')).toBe(false);
     expect(gateOpens('   ', '  ')).toBe(false);
+  });
+});
+
+describe('a code carried in the link', () => {
+  it('reads the code a shared link brings', () => {
+    expect(codeFromQuery('?code=a-code')).toBe('a-code');
+  });
+
+  it('ignores whatever else rides along', () => {
+    expect(codeFromQuery('?utm_source=mail&code=a-code')).toBe('a-code');
+  });
+
+  it('decodes what the browser encoded', () => {
+    expect(codeFromQuery('?code=two%20words')).toBe('two words');
+  });
+
+  it('finds nothing in a plain link', () => {
+    expect(codeFromQuery('')).toBeNull();
+    expect(codeFromQuery('?something=else')).toBeNull();
+  });
+
+  it('treats an empty code as nothing, so the form still shows', () => {
+    expect(codeFromQuery('?code=')).toBeNull();
+    expect(codeFromQuery('?code=%20%20')).toBeNull();
+  });
+
+  it('opens the gate only when the carried code is the right one', () => {
+    const carried = codeFromQuery('?code=a-code');
+
+    expect(carried !== null && gateOpens(carried, 'a-code')).toBe(true);
+    expect(carried !== null && gateOpens(carried, 'another-code')).toBe(false);
   });
 });

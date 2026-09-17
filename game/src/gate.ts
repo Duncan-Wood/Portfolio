@@ -11,8 +11,19 @@ export function gateOpens(entered: string, expected: string): boolean {
   return wanted !== '' && entered.trim().toLowerCase() === wanted;
 }
 
+export function codeFromQuery(search: string): string | null {
+  const carried = new URLSearchParams(search).get('code');
+  return carried !== null && carried.trim() !== '' ? carried : null;
+}
+
 export function openGate(expected: string | undefined): Promise<void> {
   if (!gateRequired(expected) || readStored(UNLOCKED_KEY) === 'true') {
+    return Promise.resolve();
+  }
+
+  const carried = codeFromQuery(window.location.search);
+  if (carried !== null && gateOpens(carried, expected)) {
+    writeStored(UNLOCKED_KEY, 'true');
     return Promise.resolve();
   }
 
