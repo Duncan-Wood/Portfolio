@@ -151,7 +151,7 @@ export class RevealCard {
   }
 
   reset(): void {
-    const parts = [this.scrim, this.title, this.body, this.hint];
+    const parts = [this.scrim, this.title, this.body, this.hint, this.photo];
     this.scene.tweens.killTweensOf(parts);
     for (const part of parts) {
       part.setVisible(false).setAlpha(1);
@@ -177,7 +177,6 @@ export class RevealCard {
     image.setScale(fit).setVisible(true);
   }
 
-  // Fixed offsets cannot hold a body whose length varies; the card is a stack.
   private layOut(): void {
     const photoHeight = this.photo.visible ? this.photo.displayHeight : 0;
     const titleHeight = this.title.visible ? this.title.height : 0;
