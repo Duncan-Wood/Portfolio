@@ -582,7 +582,7 @@ export class BoardScene extends Scene {
     this.add.text(PREVIEW_CENTER_X, MEMORY_PANEL_TOP - 40, 'MEMORY', {
       fontFamily: 'monospace',
       fontSize: '18px',
-      color: '#6b5a80',
+      color: '#9481aa',
     }).setOrigin(0.5, 0.5);
 
     if (TOUCH_PRIMARY) {
@@ -719,7 +719,7 @@ export class BoardScene extends Scene {
     this.revealHint = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 96, SKIP_PROMPT, {
       fontFamily: 'monospace',
       fontSize: '13px',
-      color: '#6b5a80',
+      color: '#9481aa',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
     this.gameOverHint = this.add.text(
@@ -831,7 +831,7 @@ export class BoardScene extends Scene {
     this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, RESUME_PROMPT, {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#6b5a80',
+      color: '#9481aa',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
     this.resetShownState();
@@ -1020,6 +1020,7 @@ export class BoardScene extends Scene {
     }
 
     this.startLock();
+    this.simulation.shadowHeld = this.nodesRevealed === 0;
 
     for (const slot of this.connections) {
       slot.lit = 0;
@@ -1726,6 +1727,7 @@ export class BoardScene extends Scene {
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
     this.nodesRevealed += 1;
+    this.simulation.shadowHeld = this.nodesRevealed === 0;
     rememberFragment(
       this.nodesRevealed - 1,
       { title: node.title },

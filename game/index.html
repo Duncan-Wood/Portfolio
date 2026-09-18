@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Connected — a game by Duncan Wood</title>
     <link rel="canonical" href="https://duncanwoodpro.netlify.app/game/" />
     <meta name="author" content="Duncan Wood" />
@@ -80,7 +80,8 @@
       }
 
       #gate input:focus-visible {
-        outline: none;
+        outline: 2px solid #c98cff;
+        outline-offset: 2px;
         border-color: #c98cff;
       }
 
@@ -110,7 +111,7 @@
         font-family: monospace;
         font-size: 12px;
         line-height: 1;
-        color: #6b5a80;
+        color: #9481aa;
       }
 
       #controls b {
@@ -126,7 +127,7 @@
         font-size: 12px;
         line-height: 1;
         white-space: nowrap;
-        color: #6b5a80;
+        color: #9481aa;
         text-decoration: none;
         padding: 9px 12px 11px;
         border-radius: 6px;
@@ -177,7 +178,12 @@
       #to-contact:focus-visible {
         color: #c98cff;
         background: #2b1644;
-        outline: none;
+      }
+
+      #to-standard:focus-visible,
+      #to-contact:focus-visible {
+        outline: 2px solid #c98cff;
+        outline-offset: 2px;
       }
     </style>
   </head>

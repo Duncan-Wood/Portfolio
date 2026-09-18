@@ -1107,3 +1107,45 @@ describe('the shadow waits for the player to start', () => {
     expect(simulation.shadowTaken).toBeGreaterThan(0);
   });
 });
+
+describe('holding the shadow back while a first memory is still unearned', () => {
+  const stalledWithHold = (held: boolean): Simulation => {
+    const simulation = new Simulation(() => [0, 1], THINKING);
+    simulation.restart();
+    simulation.shadowHeld = held;
+    simulation.hardDrop();
+
+    for (let step = 0; step < 400; step += 1) {
+      simulation.update(50);
+    }
+
+    return simulation;
+  };
+
+  it('leaves every board free by default, so only the scene decides to hold', () => {
+    expect(new Simulation(() => [0, 1], THINKING).shadowHeld).toBe(false);
+  });
+
+  it('takes nothing while the hold is on, however long the player stalls', () => {
+    expect(stalledWithHold(true).shadowTaken).toBe(0);
+  });
+
+  it('builds no threat while the hold is on, so nothing looms on the board', () => {
+    expect(stalledWithHold(true).stallProgress).toBe(0);
+  });
+
+  it('still takes ground once the hold is off', () => {
+    expect(stalledWithHold(false).shadowTaken).toBeGreaterThan(0);
+  });
+
+  it('lets the shadow back in the moment the hold is lifted', () => {
+    const simulation = stalledWithHold(true);
+    simulation.shadowHeld = false;
+
+    for (let step = 0; step < 400; step += 1) {
+      simulation.update(50);
+    }
+
+    expect(simulation.shadowTaken).toBeGreaterThan(0);
+  });
+});

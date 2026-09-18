@@ -31,5 +31,15 @@ startCrashReporting();
 forgetProgressFromOlderMemories(MEMORY_SIGNATURE);
 
 void openGate(import.meta.env.VITE_GAME_CODE).then(() => {
-  new Game(config);
+  const game = new Game(config);
+
+  game.events.once('ready', () => {
+    game.canvas.setAttribute('role', 'img');
+    game.canvas.setAttribute(
+      'aria-label',
+      'Connected: a falling-block game played on a grid. A screen reader cannot read the '
+      + 'board or the memories it unlocks. The link to the standard version of the site is '
+      + 'plain text.',
+    );
+  });
 });
