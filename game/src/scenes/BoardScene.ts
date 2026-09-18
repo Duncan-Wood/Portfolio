@@ -34,11 +34,10 @@ import {
 } from './tile-textures';
 import { CRASHED, CRASH_LINE } from '../crash';
 import { reportCrash } from '../crash-reporter';
-import { MEMORY_ART, type MemoryGrid } from '../memory-art';
 import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
 import { bakeCharacterStandIn, characterTexture } from './character-textures';
 import { RevealCard } from './reveal-card';
-import { revealOrder } from '../memory-reveal';
+import { MemoryPanel } from './memory-panel';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
@@ -134,9 +133,6 @@ const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 const MEMORY_PANEL_TOP = 300;
 
 const SIDE_COMMAND_GAP = 8;
-
-const MEMORY_PICTURE_DARKEN = 0.88;
-const MEMORY_PICTURE_FILL_MS = 620;
 
 const MEMORY_BOX = {
   left: ORIGIN_X + BOARD_WIDTH + 14,
@@ -360,23 +356,11 @@ export class BoardScene extends Scene {
 
   private boardFrame: Phaser.GameObjects.Graphics;
 
-  private memoryPanel: Phaser.GameObjects.Graphics;
-
-  private panelRank: number[] = [];
-
-  private panelArt: MemoryGrid | null = null;
-
-  private panelKey: string | null = null;
-
-  private shownPanelCells = 0;
-
-  private shownPanelProgress = -1;
+  private memoryPanel: MemoryPanel;
 
   private crashed = false;
 
   private sideCommands: Phaser.GameObjects.Text[] = [];
-
-  private panelFill: Phaser.Tweens.Tween | null = null;
 
   private nodesRevealed = 0;
 
@@ -440,7 +424,7 @@ export class BoardScene extends Scene {
     this.boardFrame.closePath();
     this.boardFrame.strokePath();
 
-    this.memoryPanel = this.add.graphics();
+    this.memoryPanel = new MemoryPanel(this, MEMORY_BOX);
 
     bakeTileTextures(this, CELL_SIZE, GAP);
 
@@ -984,17 +968,13 @@ export class BoardScene extends Scene {
     this.characterState = characterOn(this.characterState, 'restart');
     this.tweens.killTweensOf([
       this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer, this.chainNote,
-      this.memoryPanel,
     ]);
     this.contactOffer.setVisible(false);
     this.gameOverText.setVisible(false);
     this.gameOverLine.setVisible(false);
     this.gameOverHint.setVisible(false);
     this.chainNote.setVisible(false);
-    this.memoryPanel.setAlpha(1);
-    this.panelKey = null;
-    this.shownPanelCells = 0;
-    this.shownPanelProgress = -1;
+    this.memoryPanel.reset();
     if (!keepStory) {
       this.tweens.killAll();
     }
@@ -1050,7 +1030,7 @@ export class BoardScene extends Scene {
       this.introCardShowing = null;
     }
     this.lastRevealPiece = -1;
-    this.redrawMemoryPanel(0);
+    this.memoryPanel.startOver(this.upcomingPhoto());
 
     if (!keepMemory) {
       this.openTheRun();
@@ -1621,11 +1601,7 @@ export class BoardScene extends Scene {
     const fillScore = lockFor(this.nodesRevealed).fillScore;
     const progress = Math.max(fromNeurons, Math.min(this.simulation.score / fillScore, 1));
 
-    if (progress !== this.shownPanelProgress) {
-      this.shownPanelProgress = progress;
-      this.redrawMemoryPanel(progress);
-    }
-
+    this.memoryPanel.showProgress(this.upcomingPhoto(), progress);
   }
 
   private get moreToReach(): boolean {
@@ -1679,8 +1655,7 @@ export class BoardScene extends Scene {
     );
     rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
 
-    this.shownPanelProgress = -1;
-    this.redrawMemoryPanel(0);
+    this.memoryPanel.startOver(this.upcomingPhoto());
 
     this.revealCard.show(node.title, node.body, node.photo);
   }
@@ -1737,101 +1712,9 @@ export class BoardScene extends Scene {
     });
   }
 
-  private upcomingArt(): { key: string; art: MemoryGrid } | null {
+  private upcomingPhoto(): string | undefined {
     const at = this.locate(this.nodesRevealed);
-    if (at === null) {
-      return null;
-    }
-
-    const photo = MEMORIES[at.memoryIndex].nodes[at.nodeIndex].photo;
-    const art = photo === undefined ? undefined : MEMORY_ART[photo];
-
-    return art === undefined ? null : { key: photo as string, art: art.panel };
-  }
-
-  private redrawMemoryPanel(progress: number): void {
-    const upcoming = this.upcomingArt();
-
-    if (upcoming === null) {
-      this.panelArt = null;
-      this.panelKey = null;
-      this.memoryPanel.clear();
-      return;
-    }
-
-    const { key, art } = upcoming;
-    const cells = art.columns * art.rows.length;
-
-    if (key !== this.panelKey) {
-      this.panelKey = key;
-      this.panelArt = art;
-      this.panelRank = [];
-      revealOrder(art.columns, art.rows.length)
-        .forEach((cell, rank) => { this.panelRank[cell] = rank; });
-      this.shownPanelCells = 0;
-    }
-
-    const target = Math.round(Math.max(0, Math.min(progress, 1)) * cells);
-
-    this.panelFill?.remove();
-    this.panelFill = this.tweens.addCounter({
-      from: this.shownPanelCells,
-      to: target,
-      duration: MEMORY_PICTURE_FILL_MS,
-      ease: 'Cubic.easeOut',
-      onUpdate: (tween) => {
-        this.shownPanelCells = tween.getValue() ?? target;
-        this.drawMemoryPicture();
-      },
-      onComplete: () => {
-        this.shownPanelCells = target;
-        this.drawMemoryPicture();
-      },
-    });
-
-    this.drawMemoryPicture();
-  }
-
-  private drawMemoryPicture(): void {
-    const art = this.panelArt;
-    if (art === null) {
-      return;
-    }
-
-    const size = Math.min(MEMORY_BOX.width / art.columns, MEMORY_BOX.height / art.rows.length);
-    const left = MEMORY_BOX.left + (MEMORY_BOX.width - size * art.columns) / 2;
-    const top = MEMORY_BOX.top + (MEMORY_BOX.height - size * art.rows.length) / 2;
-    const reached = this.shownPanelCells;
-
-    this.memoryPanel.clear();
-
-    for (let row = 0; row < art.rows.length; row += 1) {
-      const line = art.rows[row];
-      for (let column = 0; column < art.columns; column += 1) {
-        const mark = line[column];
-        if (mark === undefined || mark === '.') {
-          continue;
-        }
-
-        const code = Number(mark);
-        if (!Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
-          continue;
-        }
-
-        const shaded = code >= PIECE_TYPE_COUNT;
-        const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
-        const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
-        const lit = this.panelRank[row * art.columns + column] < reached;
-
-        this.memoryPanel.fillStyle(lit ? face : mix(face, 0x000000, MEMORY_PICTURE_DARKEN), 1);
-        this.memoryPanel.fillRect(
-          left + column * size,
-          top + row * size,
-          Math.max(1, size - 1),
-          Math.max(1, size - 1),
-        );
-      }
-    }
+    return at === null ? undefined : MEMORIES[at.memoryIndex].nodes[at.nodeIndex].photo;
   }
 
   private settledPieceAt(column: number, row: number): number | null {
@@ -2259,12 +2142,7 @@ export class BoardScene extends Scene {
 
     const settled = lit.length * 45 + 320;
 
-    this.tweens.add({
-      targets: this.memoryPanel,
-      alpha: 0.15,
-      duration: 700,
-      delay: settled * 0.4,
-    });
+    this.memoryPanel.fadeTo(0.15, 700, settled * 0.4);
 
     this.time.delayedCall(settled, () => {
       if (this.runOver === null) {
@@ -2315,11 +2193,7 @@ export class BoardScene extends Scene {
       });
     });
 
-    this.tweens.add({
-      targets: this.memoryPanel,
-      alpha: 1,
-      duration: 900,
-    });
+    this.memoryPanel.fadeTo(1, 900);
 
     const settled = built.length * 60 + 520;
 
