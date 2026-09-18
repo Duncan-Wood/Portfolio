@@ -29,7 +29,6 @@ import {
   SHADOW_EYES_TEXTURE,
   TRACE_TEXTURE,
   bakeTileTextures,
-  memoryArtTexture,
   SHADOW_BODY_TEXTURE,
   tileTexture,
 } from './tile-textures';
@@ -38,6 +37,7 @@ import { reportCrash } from '../crash-reporter';
 import { MEMORY_ART, type MemoryGrid } from '../memory-art';
 import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
 import { bakeCharacterStandIn, characterTexture } from './character-textures';
+import { RevealCard } from './reveal-card';
 import { revealOrder } from '../memory-reveal';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
@@ -91,12 +91,6 @@ const SHADOW_BOB_PIXELS = 2.4;
 const SHADOW_LEAN_DEGREES = 3.2;
 const SHADOW_BREATH = 0.045;
 const SHADOW_ARRIVAL_DURATION = 340;
-
-const PHOTO_MAX_WIDTH = 368;
-const PHOTO_MAX_HEIGHT = 300;
-const REVEAL_GAP = 26;
-
-const REVEAL_SKIP_GRACE = 420;
 
 const HANDOVER_BEHIND_REVEAL = 300;
 const HANDOVER_IN_THE_OPEN = 900;
@@ -162,7 +156,6 @@ const PREVIEW_TOP_Y = ORIGIN_Y + 72;
 
 const BOARD_FRAME_MARGIN = 15;
 
-const REVEAL_BODY_COLOR = '#e8eef2';
 const BOARD_FRAME_CHAMFER = 20;
 
 function boardFrameCorners(): { x: number; y: number }[] {
@@ -335,8 +328,6 @@ export class BoardScene extends Scene {
 
   private pulsingCells = new Set<number>();
 
-  private revealPhoto: Phaser.GameObjects.Image;
-
   private shadowArrival: { cellIndex: number; age: number } | null = null;
 
   private shadowSpeech: Phaser.GameObjects.Text;
@@ -389,22 +380,13 @@ export class BoardScene extends Scene {
 
   private nodesRevealed = 0;
 
-  private revealHolding = false;
-
   private revealPending = false;
 
   private lastRevealPiece = -1;
 
-  private revealScrim: Phaser.GameObjects.Rectangle;
-  private revealTitle: Phaser.GameObjects.Text;
-
-  private revealHint: Phaser.GameObjects.Text;
-
-  private revealSkippableIn = 0;
+  private revealCard: RevealCard;
 
   private introCardShowing: number | null = null;
-
-  private revealBody: Phaser.GameObjects.Text;
 
   private cellsBeingFilled = new Set<number>();
 
@@ -688,39 +670,13 @@ export class BoardScene extends Scene {
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.revealScrim = this.add.rectangle(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2,
-      BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
-      BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
-      GROUND_COLOR,
-    ).setVisible(false);
-
-    this.revealPhoto = this.add.image(ORIGIN_X + BOARD_WIDTH / 2, 0, TRACE_TEXTURE)
-      .setVisible(false);
-
-    this.revealTitle = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 - 70, '', {
-      fontFamily: 'monospace',
-      fontSize: '26px',
-      color: '#c98cff',
-      align: 'center',
-      wordWrap: { width: BOARD_WIDTH - 40 },
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.revealBody = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 10, '', {
-      fontFamily: 'monospace',
-      fontSize: '17px',
-      color: REVEAL_BODY_COLOR,
-      align: 'center',
-      wordWrap: { width: BOARD_WIDTH - 56 },
-      lineSpacing: 7,
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.revealHint = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 96, SKIP_PROMPT, {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#9481aa',
-    }).setOrigin(0.5, 0.5).setVisible(false);
+    this.revealCard = new RevealCard(this, {
+      centerX: ORIGIN_X + BOARD_WIDTH / 2,
+      centerY: CANVAS_HEIGHT / 2,
+      coverWidth: BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
+      coverHeight: BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
+      textWidth: BOARD_WIDTH,
+    }, SKIP_PROMPT);
 
     this.gameOverHint = this.add.text(
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -858,19 +814,18 @@ export class BoardScene extends Scene {
     reportCrash(error);
 
     this.setPaused(false);
-    this.revealHolding = false;
 
     this.gameOverText.setText(CRASHED).setVisible(true).setAlpha(1);
     this.gameOverLine.setText(CRASH_LINE).setVisible(true).setAlpha(1);
     this.gameOverHint.setY(HINT_ALONE_Y).setVisible(true).setAlpha(1);
-    this.revealScrim.setVisible(true).setAlpha(1);
+    this.revealCard.coverBoard();
   }
 
   private recoverFromCrash(): void {
     this.crashed = false;
     this.gameOverText.setVisible(false);
     this.gameOverLine.setVisible(false);
-    this.revealScrim.setVisible(false);
+    this.revealCard.uncoverBoard();
     this.restart(this.moreToReach);
   }
 
@@ -908,15 +863,11 @@ export class BoardScene extends Scene {
 
     this.advanceCharacter(delta);
 
-    if (this.revealHolding) {
-      if (this.revealSkippableIn > 0) {
-        this.revealSkippableIn -= delta;
-        if (this.revealSkippableIn <= 0) {
-          this.revealHint.setVisible(true).setAlpha(0);
-          this.tweens.add({ targets: this.revealHint, alpha: 1, duration: 260 });
-        }
-      } else if (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop()) {
-        this.revealHolding = false;
+    if (this.revealCard.holding) {
+      if (this.revealCard.waitForSkip(
+        delta,
+        () => Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop(),
+      )) {
         this.advanceReveal();
       }
     } else if (this.hitStopRemaining > 0) {
@@ -1057,13 +1008,7 @@ export class BoardScene extends Scene {
     }
 
     if (!keepStory) {
-      this.tweens.killTweensOf([
-        this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
-      ]);
-      for (const part of [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]) {
-        part.setVisible(false).setAlpha(1);
-      }
-      this.revealSkippableIn = 0;
+      this.revealCard.reset();
     }
     if (!keepStory) {
       this.objectiveHeld = false;
@@ -1101,7 +1046,6 @@ export class BoardScene extends Scene {
     this.nextScorePopup = 0;
 
     if (!keepStory) {
-      this.revealHolding = false;
       this.revealPending = false;
       this.introCardShowing = null;
     }
@@ -1117,8 +1061,8 @@ export class BoardScene extends Scene {
     if (!introSeen()) {
       this.showIntroCard(0);
     } else if (playedBefore()) {
-      this.showReveal('', SHADOW_OPENING_LINE);
-      this.revealBody.setColor('#b07dff');
+      this.revealCard.show('', SHADOW_OPENING_LINE);
+      this.revealCard.setBodyColor('#b07dff');
     }
     rememberPlayed();
 
@@ -1235,7 +1179,7 @@ export class BoardScene extends Scene {
   }
 
   private get betweenPlay(): boolean {
-    return this.paused || this.revealHolding || this.runOver !== null || this.crashed;
+    return this.paused || this.revealCard.holding || this.runOver !== null || this.crashed;
   }
 
   private shift(direction: HorizontalDirection): boolean {
@@ -1385,7 +1329,7 @@ export class BoardScene extends Scene {
         return;
       }
 
-      if (this.revealHolding) {
+      if (this.revealCard.holding) {
         this.holdObjective(HANDOVER_DIM);
         this.lockEndingIn = HANDOVER_BEHIND_REVEAL;
         return;
@@ -1738,7 +1682,7 @@ export class BoardScene extends Scene {
     this.shownPanelProgress = -1;
     this.redrawMemoryPanel(0);
 
-    this.showReveal(node.title, node.body, node.photo);
+    this.revealCard.show(node.title, node.body, node.photo);
   }
 
   private holdFor(text: string, floor: number): number {
@@ -1756,7 +1700,7 @@ export class BoardScene extends Scene {
   }
 
   private get storyHolding(): boolean {
-    return this.revealHolding;
+    return this.revealCard.holding;
   }
 
   private advanceReveal(): void {
@@ -1770,14 +1714,14 @@ export class BoardScene extends Scene {
       rememberIntroSeen();
     }
 
-    this.hideReveal();
+    this.revealCard.hide();
     this.endRunIfNothingLeft(700);
   }
 
   private showIntroCard(index: number): void {
     const card = introCards(INTRO_CONTROLS)[index];
     this.introCardShowing = index;
-    this.showReveal(card.title, card.body);
+    this.revealCard.show(card.title, card.body);
   }
 
   private endRunIfNothingLeft(after: number): void {
@@ -1790,90 +1734,6 @@ export class BoardScene extends Scene {
         return;
       }
       this.winTheRun();
-    });
-  }
-
-  private showRevealPicture(picture?: string): void {
-    const key = picture === undefined ? null : memoryArtTexture(picture);
-    if (key === null || !this.textures.exists(key)) {
-      this.revealPhoto.setVisible(false);
-      return;
-    }
-
-    const image = this.revealPhoto.setTexture(key);
-    const fit = Math.min(
-      PHOTO_MAX_WIDTH / image.width,
-      PHOTO_MAX_HEIGHT / image.height,
-      1,
-    );
-
-    image.setScale(fit).setVisible(true);
-  }
-
-  // Fixed offsets cannot hold a body whose length varies; the card is a stack.
-  private layOutReveal(): void {
-    const centerX = ORIGIN_X + BOARD_WIDTH / 2;
-    const photoHeight = this.revealPhoto.visible ? this.revealPhoto.displayHeight : 0;
-    const titleHeight = this.revealTitle.visible ? this.revealTitle.height : 0;
-    const bodyHeight = this.revealBody.height;
-    const hintHeight = this.revealHint.height;
-
-    const parts: { target: Phaser.GameObjects.Components.Transform; height: number }[] = [];
-    if (photoHeight > 0) parts.push({ target: this.revealPhoto, height: photoHeight });
-    if (titleHeight > 0) parts.push({ target: this.revealTitle, height: titleHeight });
-    parts.push({ target: this.revealBody, height: bodyHeight });
-    parts.push({ target: this.revealHint, height: hintHeight });
-
-    const total = parts.reduce((sum, part) => sum + part.height, 0)
-      + REVEAL_GAP * (parts.length - 1);
-
-    let y = CANVAS_HEIGHT / 2 - total / 2;
-    for (const part of parts) {
-      part.target.setPosition(centerX, y + part.height / 2);
-      y += part.height + REVEAL_GAP;
-    }
-  }
-
-  private showReveal(title: string, body: string, photo?: string): void {
-    this.revealBody.setColor(REVEAL_BODY_COLOR);
-    this.revealHolding = true;
-    this.revealSkippableIn = REVEAL_SKIP_GRACE;
-    this.revealHint.setText(SKIP_PROMPT).setVisible(false);
-
-    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody, this.revealPhoto]);
-
-    this.showRevealPicture(photo);
-    this.revealTitle.setText(title).setVisible(title !== '');
-    this.revealBody.setText(body).setVisible(true);
-
-    this.layOutReveal();
-
-    const scrimAlpha = this.revealScrim.visible ? this.revealScrim.alpha : 0;
-    this.revealScrim.setVisible(true).setAlpha(scrimAlpha);
-    this.tweens.add({ targets: this.revealScrim, alpha: 1, duration: 240 });
-
-    for (const part of [this.revealTitle, this.revealBody, this.revealPhoto]) {
-      if (!part.visible) {
-        continue;
-      }
-      part.setAlpha(0);
-      this.tweens.add({ targets: part, alpha: 1, duration: 340, delay: 160 });
-    }
-  }
-
-  private hideReveal(): void {
-    const parts = [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
-      this.revealPhoto];
-    this.tweens.killTweensOf(parts);
-    this.tweens.add({
-      targets: parts,
-      alpha: 0,
-      duration: 280,
-      onComplete: () => {
-        for (const part of parts) {
-          part.setVisible(false);
-        }
-      },
     });
   }
 
