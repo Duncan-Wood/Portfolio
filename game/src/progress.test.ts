@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   forgetProgressFromOlderMemories,
+  foundFragments,
+  foundIndices,
   introSeen,
   loggedWith,
   rememberBestChain,
@@ -59,6 +61,48 @@ describe('the log of what a run surfaced', () => {
 
     expect(gappy).toHaveLength(3);
     expect(gappy.every((entry) => entry !== undefined)).toBe(true);
+  });
+
+  it('counts a memory as found only where the log holds its title', () => {
+    const log = [{ title: 'The Build' }, { title: '' }, { title: 'The Laptop' }];
+
+    expect(foundIndices(log)).toEqual([0, 2]);
+  });
+});
+
+describe('the memories a player has found', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('has found nothing on a first visit', () => {
+    expect(foundFragments()).toEqual([]);
+  });
+
+  it('keeps what an earlier visit found', () => {
+    held.set('connected.log', '[{"title":"The Build"},{"title":"No Johns"}]');
+
+    expect(foundFragments()).toEqual([0, 1]);
+  });
+
+  it('has found nothing when the stored log is not a list', () => {
+    held.set('connected.log', '{"title":"The Build"}');
+
+    expect(foundFragments()).toEqual([]);
   });
 });
 

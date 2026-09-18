@@ -41,22 +41,29 @@ export function loggedWith(
   return [...next].map((held) => held ?? { title: '' });
 }
 
+function readLog(): SurfacedFragment[] {
+  try {
+    const held: unknown = JSON.parse(readStored(LOG_KEY) ?? '[]');
+    return Array.isArray(held) ? held as SurfacedFragment[] : [];
+  } catch {
+    return [];
+  }
+}
+
+export function foundIndices(log: readonly SurfacedFragment[]): number[] {
+  return log.flatMap((entry, index) => (entry?.title ? [index] : []));
+}
+
+export function foundFragments(): number[] {
+  return foundIndices(readLog());
+}
+
 export function rememberFragment(
   index: number,
   entry: SurfacedFragment,
   total: number,
 ): void {
-  let log: SurfacedFragment[] = [];
-  try {
-    const held: unknown = JSON.parse(readStored(LOG_KEY) ?? '[]');
-    if (Array.isArray(held)) {
-      log = held as SurfacedFragment[];
-    }
-  } catch {
-    log = [];
-  }
-
-  writeStored(LOG_KEY, JSON.stringify(loggedWith(log, index, entry)));
+  writeStored(LOG_KEY, JSON.stringify(loggedWith(readLog(), index, entry)));
   writeStored(FRAGMENTS_TOTAL_KEY, String(total));
 }
 
