@@ -39,11 +39,10 @@ export const MEMORIES: Memory[] = [
         photo: 'the-laptop',
         body:
           'My mom’s old MacBook. Slow enough to be annoying, good enough to get me '
-          + 'through a bootcamp. It is where I learned to actually build software.\n\n'
-          + 'Tools have always carried me further than I can go alone. Claude writes '
-          + 'code faster than I ever will.\n\n'
-          + 'Some of what is committed here I could not explain yet. There is more I '
-          + 'want to build than I have time for, so I keep using it.'
+          + 'through a bootcamp.\n\n'
+          + 'It is where I learned to actually build software, one error message at '
+          + 'a time.\n\n'
+          + 'I still open it when I want to learn something from the ground up.'
       },
       {
         title: 'The Kickball',
