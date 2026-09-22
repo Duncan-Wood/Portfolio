@@ -1,7 +1,7 @@
 # System Context & Constraints
 
 ## Repository Structure
-This mono-repo contains two independent Vite applications joined only by root scripts and a dev proxy:
+This mono-repo contains two independent Vite applications joined only by root scripts and the root dev server, which serves the game under `/game/`:
 - `/` — React Portfolio (Stable, default landing page, crawlable).
 - `/game` — Phaser 4 + TypeScript Game (Active development workspace).
 
@@ -23,7 +23,7 @@ This mono-repo contains two independent Vite applications joined only by root sc
 ## Git & Deployment Protocol
 - **Commits:** NEVER commit or stage code without explicit user approval for that exact diff. Author commits as the user. Split large tasks into reviewable chunks.
 - **Root Commands:** 
-  - `npm start` (Runs both dev environments at `:3000` and `:3000/game/`).
+  - `npm start` (Runs both apps on one dev server at `:3000` and `:3000/game/`, or the next free port).
   - `npm run build` (Builds both into `build/`).
   - Preview production build using `npx serve build`. **NEVER use `serve -s build`** (breaks the `/game` routing asset catching).
 - **Sub-package Commands:** Run `npm test`, `npm run typecheck`, and `npm run dev` strictly from inside `/game`. Root tests intentionally ignore the game directory.
