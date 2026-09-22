@@ -108,13 +108,13 @@ const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
 const READ_PROMPT = TOUCH_PRIMARY
   ? 'tap a memory to read it\ntap anywhere else to resume'
-  : '\u2190 \u2192  choose     space  read     esc  resume';
+  : '\u2190 \u2192  choose     \u2191 \u2193  move     space  pick     esc  resume';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
 const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
 const VICTORY_HINT = TOUCH_PRIMARY
   ? 'tap a memory to read it'
-  : '\u2190 \u2192  choose     space  read     enter  play again';
+  : '\u2190 \u2192  choose     \u2191 \u2193  move     space  pick';
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
@@ -329,6 +329,10 @@ export class BoardScene extends Scene {
   private victory: VictoryScreen;
 
   private playAgainPressed = false;
+
+  private focusRow = -1;
+
+  private focusFrame: Phaser.GameObjects.Graphics;
 
   private enterKey: Phaser.Input.Keyboard.Key;
 
@@ -780,6 +784,8 @@ export class BoardScene extends Scene {
       this.resetPressed = true;
     });
 
+    this.focusFrame = this.add.graphics().setVisible(false);
+
     this.resetShownState();
   }
 
@@ -929,10 +935,13 @@ export class BoardScene extends Scene {
       this.tweens.pauseAll();
       this.foundMemories.show(this.storyHolding ? [] : foundFragments(), select);
       this.pauseHint.setText(this.foundMemories.showing ? READ_PROMPT : RESUME_PROMPT);
+      this.startFocus();
     } else {
       this.resetButton.hide();
       this.tweens.resumeAll();
       this.foundMemories.hide();
+      this.focusRow = -1;
+      this.drawFocus();
     }
   }
 
@@ -968,13 +977,15 @@ export class BoardScene extends Scene {
 
   private showVictory(): void {
     this.victory.show(foundFragments(), completions());
+    this.startFocus();
   }
 
   private readFromVictory(): void {
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
-    const spacePressed = Input.Keyboard.JustDown(this.hardDropKey);
-    const playAgainPressed = Input.Keyboard.JustDown(this.enterKey) || this.playAgainPressed;
+    const picked = Input.Keyboard.JustDown(this.hardDropKey)
+      || Input.Keyboard.JustDown(this.enterKey);
+    const playAgainPressed = this.playAgainPressed;
     this.playAgainPressed = false;
     const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
       || this.resetPressed;
@@ -982,34 +993,33 @@ export class BoardScene extends Scene {
     this.touch.takeDrop();
 
     if (resetPressed) {
-      if (this.victory.resetButton.press(this.time.now)) {
-        this.startOver();
-      }
+      this.pressVictoryReset();
       return;
     }
 
     this.victory.resetButton.expire(this.time.now);
-
-    if (Input.Keyboard.JustDown(this.cursors.left)) {
-      this.victory.memories.move(-1);
-    }
-    if (Input.Keyboard.JustDown(this.cursors.right)) {
-      this.victory.memories.move(1);
-    }
+    this.steerFocus(this.victory.memories);
 
     if (tapped !== null) {
       this.openFound(tapped);
-    } else if (spacePressed && this.victory.memories.showing) {
-      this.openFound(this.victory.memories.selected);
     } else if (playAgainPressed) {
       this.playAgain();
+    } else if (picked) {
+      this.pressFocused();
+    }
+  }
+
+  private pressVictoryReset(): void {
+    if (this.victory.resetButton.press(this.time.now)) {
+      this.startOver();
     }
   }
 
   private readFromPause(): void {
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
-    const spacePressed = Input.Keyboard.JustDown(this.hardDropKey);
+    const picked = Input.Keyboard.JustDown(this.hardDropKey)
+      || Input.Keyboard.JustDown(this.enterKey);
     const tappedAway = this.touch.takeDrop();
     const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
       || this.resetPressed;
@@ -1021,21 +1031,107 @@ export class BoardScene extends Scene {
     }
 
     this.resetButton.expire(this.time.now);
-
-    if (Input.Keyboard.JustDown(this.cursors.left)) {
-      this.foundMemories.move(-1);
-    }
-    if (Input.Keyboard.JustDown(this.cursors.right)) {
-      this.foundMemories.move(1);
-    }
+    this.steerFocus(this.foundMemories);
 
     if (tapped !== null) {
       this.openFound(tapped);
-    } else if (spacePressed && this.foundMemories.showing) {
-      this.openFound(this.foundMemories.selected);
-    } else if (spacePressed || tappedAway) {
+    } else if (picked) {
+      if (!this.pressFocused()) {
+        this.setPaused(false);
+      }
+    } else if (tappedAway) {
       this.setPaused(false);
     }
+  }
+
+  private focusRows(): (Phaser.GameObjects.Text | null)[] {
+    if (this.victory.active) {
+      return [
+        null,
+        this.victory.contactButton,
+        this.victory.playAgainButton,
+        this.victory.resetButton.text,
+      ];
+    }
+
+    return this.foundMemories.showing ? [null, this.resetButton.text] : [this.resetButton.text];
+  }
+
+  private startFocus(): void {
+    this.focusRow = this.focusRows()[0] === null ? 0 : -1;
+    this.drawFocus();
+  }
+
+  private steerFocus(memories: FoundMemories): void {
+    if (Input.Keyboard.JustDown(this.cursors.up)) {
+      this.moveFocus(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.down)) {
+      this.moveFocus(1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.left)) {
+      memories.move(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.right)) {
+      memories.move(1);
+    }
+  }
+
+  private moveFocus(direction: -1 | 1): void {
+    const rows = this.focusRows();
+    const first = rows[0] === null ? 0 : -1;
+
+    this.focusRow = Math.max(first, Math.min(rows.length - 1, this.focusRow + direction));
+    this.drawFocus();
+  }
+
+  private drawFocus(): void {
+    const button = this.focusRows()[this.focusRow];
+    this.focusFrame.clear().setVisible(false);
+
+    if (this.focusRow < 0 || button === null || button === undefined) {
+      return;
+    }
+
+    this.focusFrame
+      .lineStyle(2, 0xc98cff, 1)
+      .strokeRect(
+        button.x - button.width / 2 - 5,
+        button.y - button.height / 2 - 5,
+        button.width + 10,
+        button.height + 10,
+      )
+      .setVisible(true);
+  }
+
+  private pressFocused(): boolean {
+    const rows = this.focusRows();
+    const button = rows[this.focusRow];
+
+    if (this.focusRow < 0 || button === undefined) {
+      return false;
+    }
+
+    if (button === null) {
+      const memories = this.victory.active ? this.victory.memories : this.foundMemories;
+      if (!memories.showing) {
+        return false;
+      }
+      this.openFound(memories.selected);
+      return true;
+    }
+
+    if (button === this.victory.contactButton) {
+      window.location.href = '/#contact';
+    } else if (button === this.victory.playAgainButton) {
+      this.playAgain();
+    } else if (button === this.victory.resetButton.text) {
+      this.pressVictoryReset();
+    } else {
+      this.pressReset();
+    }
+
+    return true;
   }
 
   private openFound(index: number): void {
@@ -1043,6 +1139,7 @@ export class BoardScene extends Scene {
     const node = MEMORIES[at.memoryIndex].nodes[at.nodeIndex];
 
     this.readingIndex = index;
+    this.focusFrame.setVisible(false);
     if (this.victory.active) {
       this.victory.hideContents();
     } else {
@@ -1057,6 +1154,7 @@ export class BoardScene extends Scene {
     this.revealCard.reset();
     if (this.victory.active) {
       this.victory.showContents(read);
+      this.startFocus();
     } else {
       this.setPaused(true, read);
     }
