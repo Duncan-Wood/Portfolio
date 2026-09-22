@@ -3,7 +3,6 @@ import {
   CONNECTION_LOST,
   REACH_OUT_LINE,
   RECOVERED_LINE,
-  SHADOW_CLOSING_LINE,
   STILL_CONNECTED,
 } from '../shadow-voice';
 
@@ -80,7 +79,7 @@ export class EndingScreen {
     this.title = scene.add.text(
       area.centerX,
       area.centerY + TITLE_OFFSET,
-      CONNECTION_LOST,
+      '',
       {
         fontFamily: 'monospace',
         fontSize: '40px',
@@ -93,7 +92,7 @@ export class EndingScreen {
     this.line = scene.add.text(
       area.centerX,
       area.centerY + LINE_OFFSET,
-      SHADOW_CLOSING_LINE,
+      '',
       {
         fontFamily: 'monospace',
         fontSize: '17px',
@@ -107,6 +106,7 @@ export class EndingScreen {
   }
 
   showLost(closingLine: string, bestChain: number): void {
+    this.title.setText(CONNECTION_LOST);
     this.line.setText(closingLine);
     this.hint.setY(this.centerY + HINT_ALONE_OFFSET);
 
