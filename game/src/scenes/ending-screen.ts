@@ -30,6 +30,8 @@ export class EndingScreen {
   private readonly hint: Phaser.GameObjects.Text;
   private readonly chainNote: Phaser.GameObjects.Text;
 
+  private shown: Phaser.GameObjects.Text[] = [];
+
   constructor(scene: Phaser.Scene, area: EndingArea, restartPrompt: string) {
     this.scene = scene;
     this.centerY = area.centerY;
@@ -141,9 +143,16 @@ export class EndingScreen {
     }
   }
 
+  restore(): void {
+    for (const text of this.shown) {
+      text.setVisible(true);
+    }
+  }
+
   reset(): void {
     this.scene.tweens.killTweensOf(this.all());
     this.hide();
+    this.shown = [];
   }
 
   private chainNoteIfEarned(bestChain: number): Phaser.GameObjects.Text[] {
@@ -156,6 +165,7 @@ export class EndingScreen {
   }
 
   private fadeIn(texts: Phaser.GameObjects.Text[]): void {
+    this.shown = texts;
     for (const text of texts) {
       text.setVisible(true).setAlpha(0);
       this.scene.tweens.add({ targets: text, alpha: 1, duration: 420 });

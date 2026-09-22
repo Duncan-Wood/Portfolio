@@ -38,6 +38,7 @@ import { bakeCharacterStandIn, characterTexture } from './character-textures';
 import { RevealCard } from './reveal-card';
 import { MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
+import { FoundMemories } from './found-memories';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
@@ -99,6 +100,9 @@ export const TOUCH_PRIMARY = typeof matchMedia === 'function'
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
 const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
+const READ_PROMPT = TOUCH_PRIMARY
+  ? 'tap a memory to read it\ntap anywhere else to resume'
+  : '\u2190 \u2192  choose     space  read     esc  resume';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
@@ -124,6 +128,8 @@ const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 
 
 const MEMORY_PANEL_TOP = 300;
+
+const FOUND_ROW_Y = CANVAS_HEIGHT / 2 + 160;
 
 const SIDE_COMMAND_GAP = 8;
 
@@ -298,6 +304,12 @@ export class BoardScene extends Scene {
   private pauseScrim: Phaser.GameObjects.Rectangle;
   private pauseText: Phaser.GameObjects.Text;
   private pauseHint: Phaser.GameObjects.Text;
+
+  private foundMemories: FoundMemories;
+
+  private readingIndex: number | null = null;
+
+  private tappedMemory: number | null = null;
 
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
@@ -591,7 +603,8 @@ export class BoardScene extends Scene {
         }
 
         if (over.includes(this.endingScreen.contactOffer)
-          || this.sideCommands.some((command) => over.includes(command))) {
+          || this.sideCommands.some((command) => over.includes(command))
+          || this.foundMemories.pictures.some((picture) => picture !== null && over.includes(picture))) {
           return;
         }
 
@@ -696,7 +709,22 @@ export class BoardScene extends Scene {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#9481aa',
+      align: 'center',
     }).setOrigin(0.5, 0.5).setVisible(false);
+
+    this.foundMemories = new FoundMemories(
+      this,
+      MEMORIES.flatMap((memory) => memory.nodes),
+      CANVAS_WIDTH / 2,
+      FOUND_ROW_Y,
+    );
+    this.foundMemories.pictures.forEach((picture, index) => {
+      if (picture !== null) {
+        this.onPress(picture, () => {
+          this.tappedMemory = index;
+        });
+      }
+    });
 
     this.resetShownState();
   }
@@ -736,12 +764,16 @@ export class BoardScene extends Scene {
 
   private step(time: number, delta: number): void {
     if (Input.Keyboard.JustDown(this.pauseKey) || this.touch.takePause()) {
-      this.setPaused(!this.paused);
+      if (this.readingIndex !== null) {
+        this.closeReading();
+      } else {
+        this.setPaused(!this.paused);
+      }
     }
 
     // `JustDown` consumes the press, so the `paused` test must come first.
-    if (this.paused && (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop())) {
-      this.setPaused(false);
+    if (this.paused) {
+      this.readFromPause();
     }
 
     if (Input.Keyboard.JustDown(this.restartKey)
@@ -825,7 +857,7 @@ export class BoardScene extends Scene {
     this.staticOverlay.setAlpha(this.staticStrength * (0.1 + Math.random() * 0.14));
   }
 
-  private setPaused(paused: boolean): void {
+  private setPaused(paused: boolean, select?: number): void {
     if (paused === this.paused) {
       return;
     }
@@ -838,9 +870,50 @@ export class BoardScene extends Scene {
 
     if (paused) {
       this.tweens.pauseAll();
+      this.foundMemories.show(this.storyHolding ? [] : foundFragments(), select);
+      this.pauseHint.setText(this.foundMemories.showing ? READ_PROMPT : RESUME_PROMPT);
     } else {
       this.tweens.resumeAll();
+      this.foundMemories.hide();
     }
+  }
+
+  private readFromPause(): void {
+    const tapped = this.tappedMemory;
+    this.tappedMemory = null;
+    const spacePressed = Input.Keyboard.JustDown(this.hardDropKey);
+    const tappedAway = this.touch.takeDrop();
+
+    if (Input.Keyboard.JustDown(this.cursors.left)) {
+      this.foundMemories.move(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.right)) {
+      this.foundMemories.move(1);
+    }
+
+    if (tapped !== null) {
+      this.openFound(tapped);
+    } else if (spacePressed && this.foundMemories.showing) {
+      this.openFound(this.foundMemories.selected);
+    } else if (spacePressed || tappedAway) {
+      this.setPaused(false);
+    }
+  }
+
+  private openFound(index: number): void {
+    const at = this.locate(index)!;
+    const node = MEMORIES[at.memoryIndex].nodes[at.nodeIndex];
+
+    this.readingIndex = index;
+    this.setPaused(false);
+    this.revealCard.show(node.title, node.body, node.photo);
+  }
+
+  private closeReading(): void {
+    const read = this.readingIndex ?? undefined;
+    this.readingIndex = null;
+    this.revealCard.reset();
+    this.setPaused(true, read);
   }
 
   private get deepestChainThisRun(): number {
@@ -942,6 +1015,7 @@ export class BoardScene extends Scene {
     if (!keepStory) {
       this.revealPending = false;
       this.introCardShowing = null;
+      this.readingIndex = null;
     }
     this.lastRevealPiece = -1;
     this.memoryPanel.startOver(this.upcomingPhoto());
@@ -1057,7 +1131,7 @@ export class BoardScene extends Scene {
 
   // Phaser fires pointerup on whatever the finger is over, not on what it
   // pressed, so a drag that ends on a control would trigger it.
-  private onPress<T extends Phaser.GameObjects.Text>(target: T, run: () => void): T {
+  private onPress<T extends Phaser.GameObjects.GameObject>(target: T, run: () => void): T {
     let armed = false;
 
     target.on('pointerdown', () => {
@@ -1605,6 +1679,11 @@ export class BoardScene extends Scene {
   }
 
   private advanceReveal(): void {
+    if (this.readingIndex !== null) {
+      this.closeReading();
+      return;
+    }
+
     if (this.introCardShowing !== null) {
       const next = this.introCardShowing + 1;
       if (next < introCards(INTRO_CONTROLS).length) {
@@ -1998,8 +2077,10 @@ export class BoardScene extends Scene {
   }
 
   private refreshGameOver(): void {
-    if (this.runOver === null || this.storyHolding) {
+    if (this.runOver === null || this.storyHolding || this.paused) {
       this.endingScreen.hide();
+    } else {
+      this.endingScreen.restore();
     }
   }
 
