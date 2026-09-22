@@ -42,8 +42,6 @@ export class Simulation {
 
   toppedOut = false;
 
-  pieceBudget = 0;
-
   chainLength = 0;
 
   deepestChain = 0;
@@ -105,10 +103,6 @@ export class Simulation {
 
     if (this.resolving) {
       this.advanceChain(delta);
-      return;
-    }
-
-    if (this.outOfPieces) {
       return;
     }
 
@@ -194,22 +188,8 @@ export class Simulation {
     this.deepestChain = Math.max(this.deepestChain, this.chainLength);
   }
 
-  get piecesRemaining(): number {
-    return this.pieceBudget === 0
-      ? Infinity
-      : Math.max(this.pieceBudget - this.piecesLocked, 0);
-  }
-
-  get outOfPieces(): boolean {
-    return this.pieceBudget !== 0 && this.piecesLocked >= this.pieceBudget;
-  }
-
-  get hasNextPiece(): boolean {
-    return this.piecesRemaining > 1;
-  }
-
   private get acceptsInput(): boolean {
-    return !this.resolving && !this.toppedOut && !this.outOfPieces;
+    return !this.resolving && !this.toppedOut;
   }
 
   private advanceChain(delta: number): void {
@@ -313,7 +293,7 @@ export class Simulation {
   }
 
   private countTowardShadow(): void {
-    if (this.shadowHeld || this.outOfPieces) {
+    if (this.shadowHeld) {
       return;
     }
 

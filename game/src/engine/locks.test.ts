@@ -198,10 +198,9 @@ describe('the run escalates across the memory it is unlocking', () => {
   });
 
   it('never eases the pressure as the memory fills in', () => {
-    const roomPerNeuron = LOCKS.map((lock) => lock.pieces / lock.neurons);
-
-    for (let index = 1; index < roomPerNeuron.length; index += 1) {
-      expect(roomPerNeuron[index]).toBeLessThan(roomPerNeuron[index - 1]);
+    for (let index = 1; index < LOCKS.length; index += 1) {
+      expect(LOCKS[index].neurons).toBeGreaterThanOrEqual(LOCKS[index - 1].neurons);
+      expect(LOCKS[index].shadows).toBeGreaterThanOrEqual(LOCKS[index - 1].shadows);
     }
   });
 

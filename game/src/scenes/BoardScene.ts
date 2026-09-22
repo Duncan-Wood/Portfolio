@@ -92,7 +92,6 @@ const SHADOW_ARRIVAL_DURATION = 340;
 const HANDOVER_BEHIND_REVEAL = 300;
 const HANDOVER_IN_THE_OPEN = 900;
 const HANDOVER_DIM = 240;
-const OUT_OF_PIECES_PAUSE = 2600;
 
 
 export const TOUCH_PRIMARY = typeof matchMedia === 'function'
@@ -267,8 +266,6 @@ export class BoardScene extends Scene {
 
   private lockEndingIn = 0;
 
-  private shownPiecesRemaining = -1;
-
   private litNeurons: NeuronSite[] = [];
 
   private neuronThread: Phaser.GameObjects.Graphics;
@@ -282,11 +279,7 @@ export class BoardScene extends Scene {
   private endingScreen: EndingScreen;
   private previewTiles: Phaser.GameObjects.Image[];
 
-  private piecesText: Phaser.GameObjects.Text;
-
   private shownPivotType = -1;
-
-  private shownPreviewShowing = true;
 
   private shownSatelliteType = -1;
   private shownChain = -1;
@@ -358,8 +351,6 @@ export class BoardScene extends Scene {
   private shownCharacterTexture = characterTexture('idle', 0);
 
   private chainCarriedFromEarlierBoards = 0;
-
-  private shadowGroundHeld = 0;
 
   private runReadouts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
 
@@ -545,18 +536,6 @@ export class BoardScene extends Scene {
       fontSize: '18px',
       color: '#8ea3b0',
     }).setOrigin(0.5, 0.5));
-
-    this.runReadouts.push(this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 88, 'PIECES', {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#7a5f96',
-    }).setOrigin(0.5, 0.5));
-
-    this.piecesText = this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 112, '', {
-      fontFamily: 'monospace',
-      fontSize: '32px',
-      color: '#e9dcff',
-    }).setOrigin(0.5, 0.5);
 
     this.add.text(PREVIEW_CENTER_X, MEMORY_PANEL_TOP - 40, 'MEMORY', {
       fontFamily: 'monospace',
@@ -861,7 +840,7 @@ export class BoardScene extends Scene {
     this.playSounds();
     this.drawBoard();
     this.checkLock();
-    this.refreshPieces(delta);
+    this.handOverSolvedBoard(delta);
     this.drawNeuronThread();
     this.drawThreat();
     this.drawConnections(delta);
@@ -1040,10 +1019,10 @@ export class BoardScene extends Scene {
     if (!keepStory) {
       this.objectiveHeld = false;
       this.tweens.killTweensOf([
-        this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
+        this.objectiveText, ...this.runReadouts, ...this.previewTiles,
       ]);
       for (const part of [
-        this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
+        this.objectiveText, ...this.runReadouts, ...this.previewTiles,
       ]) {
         part.setAlpha(1);
       }
@@ -1103,18 +1082,15 @@ export class BoardScene extends Scene {
   }
 
   private holdObjective(fade: number): void {
-    const held = [this.objectiveText, this.piecesText];
     this.objectiveHeld = true;
-    this.tweens.killTweensOf(held);
+    this.tweens.killTweensOf(this.objectiveText);
 
     if (fade === 0) {
-      for (const part of held) {
-        part.setAlpha(0);
-      }
+      this.objectiveText.setAlpha(0);
       return;
     }
 
-    this.tweens.add({ targets: held, alpha: 0, duration: fade });
+    this.tweens.add({ targets: this.objectiveText, alpha: 0, duration: fade });
   }
 
   private releaseObjective(): void {
@@ -1124,7 +1100,7 @@ export class BoardScene extends Scene {
 
     this.objectiveHeld = false;
     this.tweens.add({
-      targets: [this.objectiveText, this.piecesText],
+      targets: this.objectiveText,
       alpha: 1,
       duration: 520,
     });
@@ -1254,10 +1230,8 @@ export class BoardScene extends Scene {
     const lock = lockFor(this.nodesRevealed);
     this.lockSolved = false;
     this.lockEndingIn = 0;
-    this.simulation.pieceBudget = lock.pieces;
     this.tuning.fallInterval = lock.fallInterval;
     seedLock(this.simulation.board, lock, Math.random);
-    this.shownPiecesRemaining = -1;
     this.litNeurons = [];
     this.refreshObjective();
   }
@@ -1335,16 +1309,9 @@ export class BoardScene extends Scene {
     }
   }
 
-  private refreshPieces(delta: number): void {
+  private handOverSolvedBoard(delta: number): void {
     if (this.runOver === 'won') {
       return;
-    }
-
-    const remaining = this.simulation.piecesRemaining;
-    if (remaining !== this.shownPiecesRemaining) {
-      this.shownPiecesRemaining = remaining;
-      this.piecesText.setText(Number.isFinite(remaining) ? `${remaining}` : '');
-      this.piecesText.setColor(remaining <= 2 ? '#e4572e' : '#e9dcff');
     }
 
     if (this.lockEndingIn > 0) {
@@ -1352,8 +1319,6 @@ export class BoardScene extends Scene {
       if (this.lockEndingIn <= 0) {
         this.lockEndingIn = 0;
         this.restart(true, this.storyHolding);
-        this.simulation.shadowTaken = this.shadowGroundHeld;
-        this.shadowGroundHeld = 0;
       }
       return;
     }
@@ -1370,32 +1335,7 @@ export class BoardScene extends Scene {
       }
 
       this.lockEndingIn = HANDOVER_IN_THE_OPEN;
-      return;
     }
-
-    if (!this.simulation.outOfPieces || this.simulation.resolving || this.storyHolding) {
-      return;
-    }
-
-    this.reseedAfterRunningOut();
-  }
-
-  // The shadow keeps what it took; only `startLock` reseeds the board itself.
-  private reseedAfterRunningOut(): void {
-    this.lockEndingIn = OUT_OF_PIECES_PAUSE;
-    this.shadowGroundHeld = this.simulation.shadowTaken;
-    this.objectiveText.setText('out of pieces').setAlpha(1);
-    this.soundBoard.play(connectionLostVoice(0));
-
-    this.staticOverlay.setVisible(true).setAlpha(0);
-    this.tweens.addCounter({
-      from: 1,
-      to: 0,
-      duration: OUT_OF_PIECES_PAUSE,
-      onUpdate: (tween) => {
-        this.staticStrength = tween.getValue() ?? 0;
-      },
-    });
   }
 
   private drawThreat(): void {
@@ -2102,18 +2042,6 @@ export class BoardScene extends Scene {
   }
 
   private drawPreview(): void {
-    const showing = this.simulation.hasNextPiece;
-    if (showing !== this.shownPreviewShowing) {
-      this.shownPreviewShowing = showing;
-      for (const tile of this.previewTiles) {
-        tile.setVisible(showing);
-      }
-    }
-
-    if (!showing) {
-      return;
-    }
-
     const [pivotType, satelliteType] = this.simulation.upcoming;
     if (pivotType === this.shownPivotType && satelliteType === this.shownSatelliteType) {
       return;
@@ -2198,7 +2126,7 @@ export class BoardScene extends Scene {
     this.characterState = characterOn(this.characterState, 'won');
 
     this.tweens.add({
-      targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],
+      targets: [this.objectiveText, ...this.runReadouts, ...this.previewTiles],
       alpha: 0,
       duration: 420,
     });
