@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  completions,
   forgetAllProgress,
   forgetProgressFromOlderMemories,
+  forgetRun,
   foundFragments,
   foundIndices,
   introSeen,
   loggedWith,
   rememberBestChain,
+  rememberCompletion,
   rememberIntroSeen,
   resumePoint,
+  runFinished,
 } from './progress';
 
 describe('resumePoint', () => {
@@ -294,6 +298,7 @@ describe('a player starting over', () => {
     held.set('connected.bestChain', '4');
     held.set('connected.played', 'true');
     held.set('connected.introSeen', 'true');
+    held.set('connected.completions', '2');
     held.set('connected.unlocked', 'true');
   }
 
@@ -309,6 +314,7 @@ describe('a player starting over', () => {
       'connected.bestChain',
       'connected.played',
       'connected.introSeen',
+      'connected.completions',
     ]) {
       expect(held.has(key)).toBe(false);
     }
@@ -319,6 +325,67 @@ describe('a player starting over', () => {
 
     forgetAllProgress();
 
+    expect(held.get('connected.unlocked')).toBe('true');
+  });
+});
+
+describe('finishing the game and playing it again', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  const everyMemory = JSON.stringify(
+    ['The Build', 'No Johns', 'The Laptop', 'The Kickball', 'The Notebook'].map((title) => ({ title })),
+  );
+
+  it('counts a run as finished only once every memory has been found', () => {
+    expect(runFinished(5)).toBe(false);
+
+    held.set('connected.log', '[{"title":"The Build"},{"title":""},{"title":"The Laptop"}]');
+    expect(runFinished(5)).toBe(false);
+
+    held.set('connected.log', everyMemory);
+    expect(runFinished(5)).toBe(true);
+  });
+
+  it('tallies every playthrough completed', () => {
+    expect(completions()).toBe(0);
+
+    rememberCompletion();
+    rememberCompletion();
+
+    expect(completions()).toBe(2);
+  });
+
+  it('starts the memories over for another run, keeping the tally and what the player knows', () => {
+    held.set('connected.log', everyMemory);
+    held.set('connected.fragmentsTotal', '5');
+    held.set('connected.resume', '3');
+    held.set('connected.introSeen', 'true');
+    held.set('connected.played', 'true');
+    held.set('connected.unlocked', 'true');
+    rememberCompletion();
+
+    forgetRun();
+
+    expect(runFinished(5)).toBe(false);
+    expect(held.has('connected.resume')).toBe(false);
+    expect(completions()).toBe(1);
+    expect(held.get('connected.introSeen')).toBe('true');
     expect(held.get('connected.unlocked')).toBe('true');
   });
 });

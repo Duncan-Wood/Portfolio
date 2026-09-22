@@ -10,6 +10,7 @@ const FRAGMENTS_TOTAL_KEY = 'connected.fragmentsTotal';
 const LOG_KEY = 'connected.log';
 const RESUME_KEY = 'connected.resume';
 const INTRO_SEEN_KEY = 'connected.introSeen';
+const COMPLETIONS_KEY = 'connected.completions';
 
 export function playedBefore(): boolean {
   return readStored(PLAYED_KEY) === 'true';
@@ -97,15 +98,28 @@ export function rememberResume(nodesRevealed: number, total: number): void {
   writeStored(RESUME_KEY, String(nodesRevealed));
 }
 
+export function runFinished(total: number): boolean {
+  return foundFragments().length >= total;
+}
+
+export function completions(): number {
+  const held = Number(readStored(COMPLETIONS_KEY));
+  return Number.isInteger(held) && held > 0 ? held : 0;
+}
+
+export function rememberCompletion(): void {
+  writeStored(COMPLETIONS_KEY, String(completions() + 1));
+}
+
+export function forgetRun(): void {
+  for (const key of [LOG_KEY, FRAGMENTS_TOTAL_KEY, RESUME_KEY]) {
+    clearStored(key);
+  }
+}
+
 export function forgetAllProgress(): void {
-  for (const key of [
-    LOG_KEY,
-    FRAGMENTS_TOTAL_KEY,
-    RESUME_KEY,
-    BEST_CHAIN_KEY,
-    PLAYED_KEY,
-    INTRO_SEEN_KEY,
-  ]) {
+  forgetRun();
+  for (const key of [BEST_CHAIN_KEY, PLAYED_KEY, INTRO_SEEN_KEY, COMPLETIONS_KEY]) {
     clearStored(key);
   }
 }
