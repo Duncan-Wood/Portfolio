@@ -19,6 +19,7 @@ export interface Lock {
   shadows: number;
   tiles: number;
   pieces: number;
+  fallInterval: number;
 
   /** Score that fills the memory picture. Solving fills it regardless. */
   fillScore: number;
@@ -35,6 +36,7 @@ export const LOCKS: readonly Lock[] = [
     shadows: 0,
     tiles: 13,
     pieces: 14,
+    fallInterval: 750,
     fillScore: 80,
   },
   {
@@ -43,6 +45,7 @@ export const LOCKS: readonly Lock[] = [
     shadows: 1,
     tiles: 11,
     pieces: 12,
+    fallInterval: 650,
     fillScore: 180,
   },
   {
@@ -51,6 +54,7 @@ export const LOCKS: readonly Lock[] = [
     shadows: 2,
     tiles: 11,
     pieces: 11,
+    fallInterval: 560,
     fillScore: 180,
   },
   {
@@ -59,6 +63,7 @@ export const LOCKS: readonly Lock[] = [
     shadows: 2,
     tiles: 10,
     pieces: 11,
+    fallInterval: 480,
     fillScore: 220,
   },
   {
@@ -67,6 +72,7 @@ export const LOCKS: readonly Lock[] = [
     shadows: 3,
     tiles: 9,
     pieces: 10,
+    fallInterval: 400,
     fillScore: 280,
   },
 ];

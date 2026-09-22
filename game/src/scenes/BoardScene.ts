@@ -1255,6 +1255,7 @@ export class BoardScene extends Scene {
     this.lockSolved = false;
     this.lockEndingIn = 0;
     this.simulation.pieceBudget = lock.pieces;
+    this.tuning.fallInterval = lock.fallInterval;
     seedLock(this.simulation.board, lock, Math.random);
     this.shownPiecesRemaining = -1;
     this.litNeurons = [];

@@ -191,6 +191,12 @@ describe('a seeded lock is always solvable', () => {
 });
 
 describe('the run escalates across the memory it is unlocking', () => {
+  it('starts slowest and falls faster board by board', () => {
+    for (let index = 1; index < LOCKS.length; index += 1) {
+      expect(LOCKS[index].fallInterval).toBeLessThan(LOCKS[index - 1].fallInterval);
+    }
+  });
+
   it('never eases the pressure as the memory fills in', () => {
     const roomPerNeuron = LOCKS.map((lock) => lock.pieces / lock.neurons);
 
