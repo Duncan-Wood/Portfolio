@@ -42,6 +42,7 @@ import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
+  foundFragments,
   introSeen,
   playedBefore,
   rememberBestChain,
@@ -96,6 +97,7 @@ export const TOUCH_PRIMARY = typeof matchMedia === 'function'
   && matchMedia('(pointer: coarse)').matches;
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
+const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
@@ -347,6 +349,8 @@ export class BoardScene extends Scene {
   private sideCommands: Phaser.GameObjects.Text[] = [];
 
   private nodesRevealed = 0;
+
+  private foundBeat: { photo?: string; title: string; hint: string | null } | null = null;
 
   private revealPending = false;
 
@@ -942,6 +946,11 @@ export class BoardScene extends Scene {
     this.lastRevealPiece = -1;
     this.memoryPanel.startOver(this.upcomingPhoto());
 
+    if (this.foundBeat !== null) {
+      this.memoryPanel.showFound(this.foundBeat.photo, this.foundBeat.title, this.foundBeat.hint);
+      this.foundBeat = null;
+    }
+
     if (!keepMemory) {
       this.openTheRun();
     }
@@ -1497,7 +1506,7 @@ export class BoardScene extends Scene {
   }
 
   private drawProgress(): void {
-    if (this.storyHolding) {
+    if (this.storyHolding || this.foundBeat !== null) {
       return;
     }
 
@@ -1556,6 +1565,7 @@ export class BoardScene extends Scene {
     const { memoryIndex, nodeIndex } = at;
     const memory = MEMORIES[memoryIndex];
     const node = memory.nodes[nodeIndex];
+    const firstFind = foundFragments().length === 0;
     this.nodesRevealed += 1;
     this.simulation.shadowHeld = this.nodesRevealed === 0;
     rememberFragment(
@@ -1565,9 +1575,15 @@ export class BoardScene extends Scene {
     );
     rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
 
-    this.memoryPanel.startOver(this.upcomingPhoto());
+    const hint = firstFind ? FOUND_HINT : null;
 
-    this.revealCard.show(node.title, node.body, node.photo);
+    if (!this.moreToReach) {
+      this.winTheRun();
+      this.memoryPanel.showFound(node.photo, node.title, hint);
+      return;
+    }
+
+    this.foundBeat = { photo: node.photo, title: node.title, hint };
   }
 
   private holdFor(text: string, floor: number): number {
@@ -1600,26 +1616,12 @@ export class BoardScene extends Scene {
     }
 
     this.revealCard.hide();
-    this.endRunIfNothingLeft(700);
   }
 
   private showIntroCard(index: number): void {
     const card = introCards(INTRO_CONTROLS)[index];
     this.introCardShowing = index;
     this.revealCard.show(card.title, card.body);
-  }
-
-  private endRunIfNothingLeft(after: number): void {
-    if (this.locate(this.nodesRevealed) !== null) {
-      return;
-    }
-
-    this.time.delayedCall(after, () => {
-      if (this.runOver !== null || this.storyHolding) {
-        return;
-      }
-      this.winTheRun();
-    });
   }
 
   private upcomingPhoto(): string | undefined {
