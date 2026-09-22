@@ -40,20 +40,25 @@ import { MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
 import { PressTwiceButton } from './press-twice-button';
+import { VictoryScreen } from './victory-screen';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
+  completions,
   forgetAllProgress,
+  forgetRun,
   foundFragments,
   introSeen,
   playedBefore,
   rememberBestChain,
+  rememberCompletion,
   rememberFragment,
   rememberIntroSeen,
   rememberPlayed,
   rememberResume,
   resumeAt,
+  runFinished,
 } from '../progress';
 import { type IntroControls, introCards } from '../intro';
 import {
@@ -107,6 +112,9 @@ const READ_PROMPT = TOUCH_PRIMARY
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
 const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
+const VICTORY_HINT = TOUCH_PRIMARY
+  ? 'tap a memory to read it'
+  : '\u2190 \u2192  choose     space  read     enter  play again';
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
@@ -314,6 +322,12 @@ export class BoardScene extends Scene {
   private resetKeys: Phaser.Input.Keyboard.Key[];
 
   private resetPressed = false;
+
+  private victory: VictoryScreen;
+
+  private playAgainPressed = false;
+
+  private enterKey: Phaser.Input.Keyboard.Key;
 
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
@@ -580,6 +594,7 @@ export class BoardScene extends Scene {
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
+    this.enterKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ENTER);
     this.resetKeys = [Input.Keyboard.KeyCodes.BACKSPACE, Input.Keyboard.KeyCodes.DELETE]
       .map((code) => this.input.keyboard!.addKey(code));
 
@@ -594,7 +609,7 @@ export class BoardScene extends Scene {
           return;
         }
 
-        if (over.includes(this.endingScreen.contactOffer)
+        if (this.victory.pressables.some((target) => over.includes(target))
           || this.sideCommands.some((command) => over.includes(command))
           || this.foundMemories.pictures.some((picture) => picture !== null && over.includes(picture))
           || over.includes(this.resetButton.text)) {
@@ -648,6 +663,30 @@ export class BoardScene extends Scene {
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
+    this.victory = new VictoryScreen(
+      this,
+      MEMORIES.flatMap((memory) => memory.nodes),
+      CANVAS_WIDTH,
+      CANVAS_HEIGHT,
+      { hint: VICTORY_HINT, reset: RESET_PROMPT, resetArmed: RESET_ARMED_PROMPT },
+    );
+    this.victory.memories.pictures.forEach((picture, index) => {
+      if (picture !== null) {
+        this.onPress(picture, () => {
+          this.tappedMemory = index;
+        });
+      }
+    });
+    this.onPress(this.victory.contactButton, () => {
+      window.location.href = '/#contact';
+    });
+    this.onPress(this.victory.playAgainButton, () => {
+      this.playAgainPressed = true;
+    });
+    this.onPress(this.victory.resetButton.text, () => {
+      this.resetPressed = true;
+    });
+
     this.revealCard = new RevealCard(this, {
       centerX: ORIGIN_X + BOARD_WIDTH / 2,
       centerY: CANVAS_HEIGHT / 2,
@@ -670,9 +709,6 @@ export class BoardScene extends Scene {
       textWidth: BOARD_WIDTH,
     }, RESTART_PROMPT);
 
-    this.onPress(this.endingScreen.contactOffer, () => {
-      window.location.href = '/#contact';
-    });
 
     this.shadowSpeech = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, ORIGIN_Y + BOARD_HEIGHT * 0.28, '', {
       fontFamily: 'monospace',
@@ -770,7 +806,7 @@ export class BoardScene extends Scene {
     if (Input.Keyboard.JustDown(this.pauseKey) || this.touch.takePause()) {
       if (this.readingIndex !== null) {
         this.closeReading();
-      } else {
+      } else if (!this.victory.active) {
         this.setPaused(!this.paused);
       }
     }
@@ -778,11 +814,13 @@ export class BoardScene extends Scene {
     // `JustDown` consumes the press, so the `paused` test must come first.
     if (this.paused) {
       this.readFromPause();
+    } else if (this.victory.active && this.readingIndex === null) {
+      this.readFromVictory();
     }
 
-    if (Input.Keyboard.JustDown(this.restartKey)
-      || this.touch.takeRestart()
-      || (this.runOver !== null && this.touch.takeDrop())) {
+    const restartPressed = Input.Keyboard.JustDown(this.restartKey) || this.touch.takeRestart();
+    if (!this.victory.active
+      && (restartPressed || (this.runOver === 'topped-out' && this.touch.takeDrop()))) {
       this.restart(this.moreToReach);
     }
 
@@ -886,9 +924,59 @@ export class BoardScene extends Scene {
 
   private pressReset(): void {
     if (this.resetButton.press(this.time.now)) {
-      this.foundBeat = null;
-      forgetAllProgress();
-      this.restart();
+      this.startOver();
+    }
+  }
+
+  private startOver(): void {
+    this.foundBeat = null;
+    forgetAllProgress();
+    this.restart();
+  }
+
+  private playAgain(): void {
+    this.foundBeat = null;
+    forgetRun();
+    this.restart();
+  }
+
+  private showVictory(): void {
+    this.victory.show(foundFragments(), completions());
+  }
+
+  private readFromVictory(): void {
+    const tapped = this.tappedMemory;
+    this.tappedMemory = null;
+    const spacePressed = Input.Keyboard.JustDown(this.hardDropKey);
+    const playAgainPressed = Input.Keyboard.JustDown(this.enterKey) || this.playAgainPressed;
+    this.playAgainPressed = false;
+    const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
+      || this.resetPressed;
+    this.resetPressed = false;
+    this.touch.takeDrop();
+
+    if (resetPressed) {
+      if (this.victory.resetButton.press(this.time.now)) {
+        this.startOver();
+      }
+      return;
+    }
+
+    this.victory.resetButton.expire(this.time.now);
+
+    if (Input.Keyboard.JustDown(this.cursors.left)) {
+      this.victory.memories.move(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.right)) {
+      this.victory.memories.move(1);
+    }
+
+    if (tapped !== null) {
+      this.openFound(tapped);
+    } else if (spacePressed && this.victory.memories.showing) {
+      this.openFound(this.victory.memories.selected);
+    } else if (playAgainPressed) {
+      this.playAgain();
     }
   }
 
@@ -929,7 +1017,11 @@ export class BoardScene extends Scene {
     const node = MEMORIES[at.memoryIndex].nodes[at.nodeIndex];
 
     this.readingIndex = index;
-    this.setPaused(false);
+    if (this.victory.active) {
+      this.victory.hideContents();
+    } else {
+      this.setPaused(false);
+    }
     this.revealCard.show(node.title, node.body, node.photo);
   }
 
@@ -937,7 +1029,11 @@ export class BoardScene extends Scene {
     const read = this.readingIndex ?? undefined;
     this.readingIndex = null;
     this.revealCard.reset();
-    this.setPaused(true, read);
+    if (this.victory.active) {
+      this.victory.showContents(read);
+    } else {
+      this.setPaused(true, read);
+    }
   }
 
   private get deepestChainThisRun(): number {
@@ -983,6 +1079,7 @@ export class BoardScene extends Scene {
     }
 
     this.runOver = null;
+    this.victory.hide();
     this.characterState = characterOn(this.characterState, 'restart');
     this.endingScreen.reset();
     this.memoryPanel.reset();
@@ -1055,9 +1152,15 @@ export class BoardScene extends Scene {
   }
 
   private openTheRun(): void {
+    if (runFinished(FRAGMENT_COUNT)) {
+      this.runOver = 'won';
+      this.showVictory();
+      return;
+    }
+
     if (!introSeen()) {
       this.showIntroCard(0);
-    } else if (playedBefore()) {
+    } else if (playedBefore() && completions() === 0) {
       this.revealCard.show('', SHADOW_OPENING_LINE);
       this.revealCard.setBodyColor('#b07dff');
     }
@@ -2107,6 +2210,7 @@ export class BoardScene extends Scene {
 
   private winTheRun(): void {
     this.runOver = 'won';
+    rememberCompletion();
     rememberBestChain(this.deepestChainThisRun);
     this.characterState = characterOn(this.characterState, 'won');
 
@@ -2145,7 +2249,7 @@ export class BoardScene extends Scene {
         return;
       }
 
-      this.endingScreen.showWon(this.deepestChainThisRun);
+      this.showVictory();
     });
   }
 

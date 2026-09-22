@@ -1,16 +1,9 @@
 import { CRASHED, CRASH_LINE } from '../crash';
-import {
-  CONNECTION_LOST,
-  REACH_OUT_LINE,
-  RECOVERED_LINE,
-  STILL_CONNECTED,
-} from '../shadow-voice';
+import { CONNECTION_LOST } from '../shadow-voice';
 
 const TITLE_OFFSET = -18;
 const LINE_OFFSET = 34;
-const CONTACT_OFFER_OFFSET = 84;
-const HINT_ALONE_OFFSET = 84;
-const HINT_BELOW_OFFER_OFFSET = 132;
+const HINT_OFFSET = 84;
 const CHAIN_NOTE_OFFSET = 172;
 
 export interface EndingArea {
@@ -20,10 +13,7 @@ export interface EndingArea {
 }
 
 export class EndingScreen {
-  readonly contactOffer: Phaser.GameObjects.Text;
-
   private readonly scene: Phaser.Scene;
-  private readonly centerY: number;
 
   private readonly title: Phaser.GameObjects.Text;
   private readonly line: Phaser.GameObjects.Text;
@@ -34,11 +24,10 @@ export class EndingScreen {
 
   constructor(scene: Phaser.Scene, area: EndingArea, restartPrompt: string) {
     this.scene = scene;
-    this.centerY = area.centerY;
 
     this.hint = scene.add.text(
       area.centerX,
-      area.centerY + HINT_ALONE_OFFSET,
+      area.centerY + HINT_OFFSET,
       restartPrompt,
       {
         fontFamily: 'monospace',
@@ -61,22 +50,6 @@ export class EndingScreen {
         padding: { x: 10, y: 5 },
       },
     ).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.contactOffer = scene.add.text(
-      area.centerX,
-      area.centerY + CONTACT_OFFER_OFFSET,
-      REACH_OUT_LINE,
-      {
-        fontFamily: 'monospace',
-        fontSize: '19px',
-        color: '#221038',
-        backgroundColor: '#c98cff',
-        padding: { x: 18, y: 10 },
-      },
-    )
-      .setOrigin(0.5, 0.5)
-      .setVisible(false)
-      .setInteractive({ useHandCursor: true });
 
     this.title = scene.add.text(
       area.centerX,
@@ -110,26 +83,14 @@ export class EndingScreen {
   showLost(closingLine: string, bestChain: number): void {
     this.title.setText(CONNECTION_LOST);
     this.line.setText(closingLine);
-    this.hint.setY(this.centerY + HINT_ALONE_OFFSET);
 
     this.fadeIn([this.title, this.line, this.hint, ...this.chainNoteIfEarned(bestChain)]);
-  }
-
-  showWon(bestChain: number): void {
-    this.hint.setY(this.centerY + HINT_BELOW_OFFER_OFFSET);
-    this.title.setText(STILL_CONNECTED);
-    this.line.setText(RECOVERED_LINE);
-
-    this.fadeIn([
-      this.title, this.line, this.hint, this.contactOffer,
-      ...this.chainNoteIfEarned(bestChain),
-    ]);
   }
 
   showCrash(): void {
     this.title.setText(CRASHED).setVisible(true).setAlpha(1);
     this.line.setText(CRASH_LINE).setVisible(true).setAlpha(1);
-    this.hint.setY(this.centerY + HINT_ALONE_OFFSET).setVisible(true).setAlpha(1);
+    this.hint.setVisible(true).setAlpha(1);
   }
 
   hideCrash(): void {
@@ -173,6 +134,6 @@ export class EndingScreen {
   }
 
   private all(): Phaser.GameObjects.Text[] {
-    return [this.title, this.line, this.hint, this.contactOffer, this.chainNote];
+    return [this.title, this.line, this.hint, this.chainNote];
   }
 }
