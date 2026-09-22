@@ -1,4 +1,5 @@
 import { PIECE_TYPE_COUNT } from '../engine/grid';
+import { TRACE_TEXTURE, memoryArtTexture } from './tile-textures';
 import { MEMORY_ART, type MemoryGrid } from '../memory-art';
 import { revealOrder } from '../memory-reveal';
 import { PIECE_COLORS, mix } from '../palette';
@@ -6,10 +7,17 @@ import { PIECE_COLORS, mix } from '../palette';
 const MEMORY_PICTURE_DARKEN = 0.88;
 const MEMORY_PICTURE_FILL_MS = 620;
 
+const FOUND_FLIGHT_DELAY = 900;
+const FOUND_FLIGHT_MS = 620;
+const FOUND_CROSSFADE_MS = 140;
+const FOUND_LANDED_WIDTH = 18;
+
+export const FOUND_FLIGHT_END_MS = FOUND_FLIGHT_DELAY + FOUND_CROSSFADE_MS + FOUND_FLIGHT_MS;
+
 const FOUND_HOLD_MS = 3200;
 const FOUND_FADE_MS = 500;
-const FOUND_TITLE_GAP = 16;
-const FOUND_HINT_GAP = 20;
+const FOUND_TITLE_ABOVE_BOTTOM = 34;
+const FOUND_HINT_GAP = 22;
 
 export interface PanelBox {
   left: number;
@@ -18,10 +26,17 @@ export interface PanelBox {
   height: number;
 }
 
+export interface FlightTarget {
+  x: number;
+  y: number;
+}
+
 export class MemoryPanel {
   private readonly scene: Phaser.Scene;
   private readonly box: PanelBox;
+  private readonly flyTo: FlightTarget;
   private readonly graphics: Phaser.GameObjects.Graphics;
+  private readonly flier: Phaser.GameObjects.Image;
   private readonly foundTitle: Phaser.GameObjects.Text;
   private readonly foundHint: Phaser.GameObjects.Text;
 
@@ -33,10 +48,12 @@ export class MemoryPanel {
   private fill: Phaser.Tweens.Tween | null = null;
   private showingFound = false;
 
-  constructor(scene: Phaser.Scene, box: PanelBox) {
+  constructor(scene: Phaser.Scene, box: PanelBox, flyTo: FlightTarget) {
     this.scene = scene;
     this.box = box;
+    this.flyTo = flyTo;
     this.graphics = scene.add.graphics();
+    this.flier = scene.add.image(0, 0, TRACE_TEXTURE).setVisible(false);
 
     const centerX = box.left + box.width / 2;
     this.foundTitle = scene.add.text(centerX, 0, '', {
@@ -77,12 +94,17 @@ export class MemoryPanel {
     this.scene.tweens.add({ targets: this.graphics, alpha, duration, delay });
   }
 
-  showFound(photo: string | undefined, title: string, hint: string | null): void {
+  showFound(
+    photo: string | undefined,
+    title: string,
+    hint: string | null,
+    onLanded: () => void,
+  ): void {
     this.fill?.remove();
     this.fill = null;
 
     const art = this.choose(photo);
-    if (art === null) {
+    if (art === null || photo === undefined) {
       return;
     }
 
@@ -90,7 +112,7 @@ export class MemoryPanel {
     this.draw();
     this.showingFound = true;
 
-    const below = this.pictureBottom(art) + FOUND_TITLE_GAP;
+    const below = this.box.top + this.box.height - FOUND_TITLE_ABOVE_BOTTOM;
     const shown = [this.foundTitle.setText(title).setY(below)];
     if (hint !== null) {
       shown.push(this.foundHint.setText(hint).setY(below + FOUND_HINT_GAP));
@@ -100,6 +122,7 @@ export class MemoryPanel {
     }
 
     this.scene.tweens.add({ targets: shown, alpha: 1, duration: FOUND_FADE_MS });
+    this.flyToTarget(art, photo, onLanded);
     this.scene.tweens.add({
       targets: [this.graphics, ...shown],
       alpha: 0,
@@ -113,15 +136,63 @@ export class MemoryPanel {
   }
 
   reset(): void {
-    this.scene.tweens.killTweensOf([this.graphics, this.foundTitle, this.foundHint]);
+    this.scene.tweens.killTweensOf([this.graphics, this.foundTitle, this.foundHint, this.flier]);
     this.stopShowingFound();
     this.graphics.setAlpha(1);
     this.photo = null;
     this.shownCells = 0;
   }
 
+  private flyToTarget(art: MemoryGrid, photo: string, onLanded: () => void): void {
+    const key = memoryArtTexture(photo);
+    if (!this.scene.textures.exists(key)) {
+      return;
+    }
+
+    const size = this.cellSize(art);
+    const tall = size * art.rows.length;
+    const wide = size * art.columns;
+
+    this.flier
+      .setTexture(key)
+      .setPosition(this.box.left + this.box.width / 2, this.box.top + this.box.height / 2)
+      .setDisplaySize(wide, tall)
+      .setAlpha(0)
+      .setVisible(true);
+
+    this.scene.tweens.add({
+      targets: this.flier,
+      alpha: 1,
+      delay: FOUND_FLIGHT_DELAY,
+      duration: FOUND_CROSSFADE_MS,
+    });
+    this.scene.tweens.add({
+      targets: this.graphics,
+      alpha: 0,
+      delay: FOUND_FLIGHT_DELAY,
+      duration: FOUND_CROSSFADE_MS,
+    });
+
+    const flying = { delay: FOUND_FLIGHT_DELAY + FOUND_CROSSFADE_MS, duration: FOUND_FLIGHT_MS };
+    this.scene.tweens.add({ targets: this.flier, x: this.flyTo.x, ease: 'Sine.easeInOut', ...flying });
+    this.scene.tweens.add({
+      targets: this.flier,
+      y: this.flyTo.y,
+      displayWidth: FOUND_LANDED_WIDTH,
+      displayHeight: FOUND_LANDED_WIDTH * (tall / wide),
+      ease: 'Quad.easeIn',
+      ...flying,
+      onComplete: () => {
+        this.flier.setVisible(false);
+        onLanded();
+      },
+    });
+  }
+
   private stopShowingFound(): void {
     this.showingFound = false;
+    this.scene.tweens.killTweensOf(this.flier);
+    this.flier.setVisible(false);
     this.foundTitle.setVisible(false);
     this.foundHint.setVisible(false);
     this.shownProgress = -1;
@@ -182,10 +253,6 @@ export class MemoryPanel {
 
   private cellSize(art: MemoryGrid): number {
     return Math.min(this.box.width / art.columns, this.box.height / art.rows.length);
-  }
-
-  private pictureBottom(art: MemoryGrid): number {
-    return this.box.top + (this.box.height + this.cellSize(art) * art.rows.length) / 2;
   }
 
   private draw(): void {

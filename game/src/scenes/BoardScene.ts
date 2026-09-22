@@ -36,7 +36,7 @@ import { reportCrash } from '../crash-reporter';
 import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
 import { bakeCharacterStandIn, characterTexture } from './character-textures';
 import { RevealCard } from './reveal-card';
-import { MemoryPanel } from './memory-panel';
+import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
 import { PressTwiceButton } from './press-twice-button';
@@ -143,6 +143,7 @@ const MEMORY_PANEL_TOP = 300;
 const FOUND_ROW_Y = CANVAS_HEIGHT / 2 + 160;
 const RESET_Y = CANVAS_HEIGHT / 2 + 290;
 
+
 const SIDE_COMMAND_GAP = 8;
 
 const MEMORY_BOX = {
@@ -151,6 +152,8 @@ const MEMORY_BOX = {
   width: CANVAS_WIDTH - (ORIGIN_X + BOARD_WIDTH) - 26,
   height: 300,
 };
+
+const SHERIFF_COUNT_Y = MEMORY_BOX.top + MEMORY_BOX.height + 12;
 
 const SIDE_COMMAND_WIDTH = (MEMORY_BOX.width - SIDE_COMMAND_GAP) / 2;
 const SIDE_COMMAND_Y = ORIGIN_Y + BOARD_HEIGHT - 34;
@@ -380,6 +383,8 @@ export class BoardScene extends Scene {
 
   private foundBeat: { photo?: string; title: string; hint: string | null } | null = null;
 
+  private sheriffCount: Phaser.GameObjects.Text;
+
   private revealPending = false;
 
   private lastRevealPiece = -1;
@@ -440,7 +445,10 @@ export class BoardScene extends Scene {
     this.boardFrame.closePath();
     this.boardFrame.strokePath();
 
-    this.memoryPanel = new MemoryPanel(this, MEMORY_BOX);
+    this.memoryPanel = new MemoryPanel(this, MEMORY_BOX, {
+      x: CHARACTER_X,
+      y: CHARACTER_BOTTOM - 90,
+    });
 
     bakeTileTextures(this, CELL_SIZE, GAP);
 
@@ -581,6 +589,12 @@ export class BoardScene extends Scene {
 
     this.character = this.add.image(CHARACTER_X, CHARACTER_BOTTOM, characterTexture('idle', 0))
       .setOrigin(0.5, 1);
+
+    this.sheriffCount = this.add.text(CHARACTER_X, SHERIFF_COUNT_Y, '', {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#9481aa',
+    }).setOrigin(0.5, 0.5);
 
     this.previewTiles = [
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
@@ -940,6 +954,18 @@ export class BoardScene extends Scene {
     this.restart();
   }
 
+  private memoryLanded(): void {
+    const found = foundFragments().length;
+
+    this.characterState = characterOn(this.characterState, 'good');
+    this.soundBoard.play(nodeVoice(Math.max(found - 1, 0), FRAGMENT_COUNT));
+    this.refreshSheriffCount();
+  }
+
+  private refreshSheriffCount(): void {
+    this.sheriffCount.setText(`${foundFragments().length} / ${FRAGMENT_COUNT}`);
+  }
+
   private showVictory(): void {
     this.victory.show(foundFragments(), completions());
   }
@@ -1139,10 +1165,16 @@ export class BoardScene extends Scene {
       this.readingIndex = null;
     }
     this.lastRevealPiece = -1;
+    this.refreshSheriffCount();
     this.memoryPanel.startOver(this.upcomingPhoto());
 
     if (this.foundBeat !== null) {
-      this.memoryPanel.showFound(this.foundBeat.photo, this.foundBeat.title, this.foundBeat.hint);
+      this.memoryPanel.showFound(
+        this.foundBeat.photo,
+        this.foundBeat.title,
+        this.foundBeat.hint,
+        () => this.memoryLanded(),
+      );
       this.foundBeat = null;
     }
 
@@ -1742,7 +1774,7 @@ export class BoardScene extends Scene {
 
     if (!this.moreToReach) {
       this.winTheRun();
-      this.memoryPanel.showFound(node.photo, node.title, hint);
+      this.memoryPanel.showFound(node.photo, node.title, hint, () => this.memoryLanded());
       return;
     }
 
@@ -2242,7 +2274,7 @@ export class BoardScene extends Scene {
 
     this.memoryPanel.fadeTo(1, 900);
 
-    const settled = built.length * 60 + 520;
+    const settled = Math.max(built.length * 60 + 520, FOUND_FLIGHT_END_MS + 400);
 
     this.time.delayedCall(settled, () => {
       if (this.runOver !== 'won') {
