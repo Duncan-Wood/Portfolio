@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  forgetAllProgress,
   forgetProgressFromOlderMemories,
   foundFragments,
   foundIndices,
@@ -264,5 +265,60 @@ describe('progress left behind by an older set of memories', () => {
     forgetProgressFromOlderMemories('new signature');
 
     expect(held.get('connected.memories')).toBe('new signature');
+  });
+});
+
+describe('a player starting over', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  function playedThrough(): void {
+    held.set('connected.log', '[{"title":"The Build"}]');
+    held.set('connected.fragmentsTotal', '5');
+    held.set('connected.resume', '1');
+    held.set('connected.bestChain', '4');
+    held.set('connected.played', 'true');
+    held.set('connected.introSeen', 'true');
+    held.set('connected.unlocked', 'true');
+  }
+
+  it('forgets everything a run left behind, so the next visit is a first visit', () => {
+    playedThrough();
+
+    forgetAllProgress();
+
+    for (const key of [
+      'connected.log',
+      'connected.fragmentsTotal',
+      'connected.resume',
+      'connected.bestChain',
+      'connected.played',
+      'connected.introSeen',
+    ]) {
+      expect(held.has(key)).toBe(false);
+    }
+  });
+
+  it('keeps the gate open, so starting over does not ask for the code again', () => {
+    playedThrough();
+
+    forgetAllProgress();
+
+    expect(held.get('connected.unlocked')).toBe('true');
   });
 });

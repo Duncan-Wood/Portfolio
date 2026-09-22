@@ -43,6 +43,7 @@ import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
+  forgetAllProgress,
   foundFragments,
   introSeen,
   playedBefore,
@@ -104,6 +105,9 @@ const READ_PROMPT = TOUCH_PRIMARY
   ? 'tap a memory to read it\ntap anywhere else to resume'
   : '\u2190 \u2192  choose     space  read     esc  resume';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
+const RESET_PROMPT = 'reset progress';
+const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
+const RESET_WINDOW_MS = 3000;
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
@@ -130,6 +134,7 @@ const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 const MEMORY_PANEL_TOP = 300;
 
 const FOUND_ROW_Y = CANVAS_HEIGHT / 2 + 160;
+const RESET_Y = CANVAS_HEIGHT / 2 + 290;
 
 const SIDE_COMMAND_GAP = 8;
 
@@ -310,6 +315,14 @@ export class BoardScene extends Scene {
   private readingIndex: number | null = null;
 
   private tappedMemory: number | null = null;
+
+  private resetButton: Phaser.GameObjects.Text;
+
+  private resetKeys: Phaser.Input.Keyboard.Key[];
+
+  private resetPressed = false;
+
+  private resetArmedUntil = 0;
 
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
@@ -590,6 +603,8 @@ export class BoardScene extends Scene {
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
+    this.resetKeys = [Input.Keyboard.KeyCodes.BACKSPACE, Input.Keyboard.KeyCodes.DELETE]
+      .map((code) => this.input.keyboard!.addKey(code));
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
@@ -604,7 +619,8 @@ export class BoardScene extends Scene {
 
         if (over.includes(this.endingScreen.contactOffer)
           || this.sideCommands.some((command) => over.includes(command))
-          || this.foundMemories.pictures.some((picture) => picture !== null && over.includes(picture))) {
+          || this.foundMemories.pictures.some((picture) => picture !== null && over.includes(picture))
+          || over.includes(this.resetButton)) {
           return;
         }
 
@@ -724,6 +740,18 @@ export class BoardScene extends Scene {
           this.tappedMemory = index;
         });
       }
+    });
+
+    this.resetButton = this.add.text(CANVAS_WIDTH / 2, RESET_Y, RESET_PROMPT, {
+      fontFamily: 'monospace',
+      fontSize: '19px',
+      padding: { x: 20, y: 12 },
+    })
+      .setOrigin(0.5, 0.5)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+    this.onPress(this.resetButton, () => {
+      this.resetPressed = true;
     });
 
     this.resetShownState();
@@ -868,6 +896,9 @@ export class BoardScene extends Scene {
     this.pauseText.setVisible(paused);
     this.pauseHint.setVisible(paused);
 
+    this.resetButton.setVisible(paused);
+    this.disarmReset();
+
     if (paused) {
       this.tweens.pauseAll();
       this.foundMemories.show(this.storyHolding ? [] : foundFragments(), select);
@@ -878,11 +909,40 @@ export class BoardScene extends Scene {
     }
   }
 
+  private pressReset(): void {
+    if (this.time.now <= this.resetArmedUntil) {
+      this.foundBeat = null;
+      forgetAllProgress();
+      this.restart();
+      return;
+    }
+
+    this.resetArmedUntil = this.time.now + RESET_WINDOW_MS;
+    this.resetButton.setText(RESET_ARMED_PROMPT).setColor('#221038').setBackgroundColor('#e4572e');
+  }
+
+  private disarmReset(): void {
+    this.resetArmedUntil = 0;
+    this.resetButton.setText(RESET_PROMPT).setColor('#d8c8ee').setBackgroundColor('#3a2159');
+  }
+
   private readFromPause(): void {
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
     const spacePressed = Input.Keyboard.JustDown(this.hardDropKey);
     const tappedAway = this.touch.takeDrop();
+    const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
+      || this.resetPressed;
+    this.resetPressed = false;
+
+    if (resetPressed) {
+      this.pressReset();
+      return;
+    }
+
+    if (this.resetArmedUntil > 0 && this.time.now > this.resetArmedUntil) {
+      this.disarmReset();
+    }
 
     if (Input.Keyboard.JustDown(this.cursors.left)) {
       this.foundMemories.move(-1);

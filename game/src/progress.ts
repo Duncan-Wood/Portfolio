@@ -97,6 +97,19 @@ export function rememberResume(nodesRevealed: number, total: number): void {
   writeStored(RESUME_KEY, String(nodesRevealed));
 }
 
+export function forgetAllProgress(): void {
+  for (const key of [
+    LOG_KEY,
+    FRAGMENTS_TOTAL_KEY,
+    RESUME_KEY,
+    BEST_CHAIN_KEY,
+    PLAYED_KEY,
+    INTRO_SEEN_KEY,
+  ]) {
+    clearStored(key);
+  }
+}
+
 export function forgetProgressFromOlderMemories(signature: string): void {
   if (readStored(MEMORIES_KEY) === signature) {
     return;
