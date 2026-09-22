@@ -32,12 +32,12 @@ import {
   SHADOW_BODY_TEXTURE,
   tileTexture,
 } from './tile-textures';
-import { CRASHED, CRASH_LINE } from '../crash';
 import { reportCrash } from '../crash-reporter';
 import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
 import { bakeCharacterStandIn, characterTexture } from './character-textures';
 import { RevealCard } from './reveal-card';
 import { MemoryPanel } from './memory-panel';
+import { EndingScreen } from './ending-screen';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
@@ -53,13 +53,8 @@ import {
 } from '../progress';
 import { type IntroControls, introCards } from '../intro';
 import {
-  CONNECTION_LOST,
-  REACH_OUT_LINE,
-  SHADOW_CLOSING_LINE,
   SHADOW_OPENING_LINE,
-  STILL_CONNECTED,
   closingLine,
-  RECOVERED_LINE,
   shadowLine,
   type UnfinishedBusiness,
 } from '../shadow-voice';
@@ -125,10 +120,6 @@ const ORIGIN_X = 40;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE + (VISIBLE_ROWS - 1) * GAP;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 
-const CONTACT_OFFER_Y = CANVAS_HEIGHT / 2 + 84;
-const CHAIN_NOTE_Y = CANVAS_HEIGHT / 2 + 172;
-const HINT_ALONE_Y = CANVAS_HEIGHT / 2 + 84;
-const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
 
@@ -275,13 +266,7 @@ export class BoardScene extends Scene {
 
   private staticStrength = 0;
 
-  private gameOverText: Phaser.GameObjects.Text;
-
-  private gameOverLine: Phaser.GameObjects.Text;
-
-  private gameOverHint: Phaser.GameObjects.Text;
-
-  private contactOffer: Phaser.GameObjects.Text;
+  private endingScreen: EndingScreen;
   private previewTiles: Phaser.GameObjects.Image[];
 
   private piecesText: Phaser.GameObjects.Text;
@@ -290,7 +275,6 @@ export class BoardScene extends Scene {
 
   private shownPreviewShowing = true;
 
-  private chainNote!: Phaser.GameObjects.Text;
   private shownSatelliteType = -1;
   private shownChain = -1;
   private nextFpsRefresh = 0;
@@ -602,7 +586,7 @@ export class BoardScene extends Scene {
           return;
         }
 
-        if (over.includes(this.contactOffer)
+        if (over.includes(this.endingScreen.contactOffer)
           || this.sideCommands.some((command) => over.includes(command))) {
           return;
         }
@@ -662,52 +646,6 @@ export class BoardScene extends Scene {
       textWidth: BOARD_WIDTH,
     }, SKIP_PROMPT);
 
-    this.gameOverHint = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      HINT_ALONE_Y,
-      RESTART_PROMPT,
-      {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#8ea3b0',
-        backgroundColor: '#221038',
-        padding: { x: 10, y: 5 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.chainNote = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CHAIN_NOTE_Y,
-      '',
-      {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffc914',
-        backgroundColor: '#221038',
-        padding: { x: 10, y: 5 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.contactOffer = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CONTACT_OFFER_Y,
-      REACH_OUT_LINE,
-      {
-        fontFamily: 'monospace',
-        fontSize: '19px',
-        color: '#221038',
-        backgroundColor: '#c98cff',
-        padding: { x: 18, y: 10 },
-      },
-    )
-      .setOrigin(0.5, 0.5)
-      .setVisible(false)
-      .setInteractive({ useHandCursor: true });
-
-    this.onPress(this.contactOffer, () => {
-      window.location.href = '/#contact';
-    });
-
     this.staticOverlay = this.add.tileSprite(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2,
@@ -716,33 +654,15 @@ export class BoardScene extends Scene {
       STATIC_TEXTURE,
     ).setVisible(false).setBlendMode(BlendModes.ADD);
 
-    this.gameOverText = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2 - 18,
-      CONNECTION_LOST,
-      {
-        fontFamily: 'monospace',
-        fontSize: '40px',
-        color: '#e8eef2',
-        backgroundColor: '#221038',
-        padding: { x: 16, y: 10 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
+    this.endingScreen = new EndingScreen(this, {
+      centerX: ORIGIN_X + BOARD_WIDTH / 2,
+      centerY: CANVAS_HEIGHT / 2,
+      textWidth: BOARD_WIDTH,
+    }, RESTART_PROMPT);
 
-    this.gameOverLine = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2 + 34,
-      SHADOW_CLOSING_LINE,
-      {
-        fontFamily: 'monospace',
-        fontSize: '17px',
-        color: '#b07dff',
-        backgroundColor: '#221038',
-        padding: { x: 12, y: 6 },
-        align: 'center',
-        wordWrap: { width: BOARD_WIDTH - 24 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
+    this.onPress(this.endingScreen.contactOffer, () => {
+      window.location.href = '/#contact';
+    });
 
     this.shadowSpeech = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, ORIGIN_Y + BOARD_HEIGHT * 0.28, '', {
       fontFamily: 'monospace',
@@ -799,16 +719,13 @@ export class BoardScene extends Scene {
 
     this.setPaused(false);
 
-    this.gameOverText.setText(CRASHED).setVisible(true).setAlpha(1);
-    this.gameOverLine.setText(CRASH_LINE).setVisible(true).setAlpha(1);
-    this.gameOverHint.setY(HINT_ALONE_Y).setVisible(true).setAlpha(1);
+    this.endingScreen.showCrash();
     this.revealCard.coverBoard();
   }
 
   private recoverFromCrash(): void {
     this.crashed = false;
-    this.gameOverText.setVisible(false);
-    this.gameOverLine.setVisible(false);
+    this.endingScreen.hideCrash();
     this.revealCard.uncoverBoard();
     this.restart(this.moreToReach);
   }
@@ -966,14 +883,7 @@ export class BoardScene extends Scene {
 
     this.runOver = null;
     this.characterState = characterOn(this.characterState, 'restart');
-    this.tweens.killTweensOf([
-      this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer, this.chainNote,
-    ]);
-    this.contactOffer.setVisible(false);
-    this.gameOverText.setVisible(false);
-    this.gameOverLine.setVisible(false);
-    this.gameOverHint.setVisible(false);
-    this.chainNote.setVisible(false);
+    this.endingScreen.reset();
     this.memoryPanel.reset();
     if (!keepStory) {
       this.tweens.killAll();
@@ -2073,16 +1983,6 @@ export class BoardScene extends Scene {
     this.previewTiles[1].setTexture(tileTexture(satelliteType));
   }
 
-  private chainNoteIfEarned(): Phaser.GameObjects.Text[] {
-    const deepest = this.deepestChainThisRun;
-    if (deepest < 2) {
-      return [];
-    }
-
-    this.chainNote.setText(`BEST CHAIN  ${deepest}`);
-    return [this.chainNote];
-  }
-
   private refreshChain(): void {
     const { resolving, chainLength } = this.simulation;
 
@@ -2097,11 +1997,7 @@ export class BoardScene extends Scene {
 
   private refreshGameOver(): void {
     if (this.runOver === null || this.storyHolding) {
-      this.gameOverText.setVisible(false);
-      this.gameOverLine.setVisible(false);
-      this.gameOverHint.setVisible(false);
-      this.contactOffer.setVisible(false);
-      this.chainNote.setVisible(false);
+      this.endingScreen.hide();
     }
   }
 
@@ -2148,17 +2044,7 @@ export class BoardScene extends Scene {
       if (this.runOver === null) {
         return;
       }
-      this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
-      this.gameOverHint.setY(HINT_ALONE_Y);
-
-      const ending = [
-        this.gameOverText, this.gameOverLine, this.gameOverHint,
-        ...this.chainNoteIfEarned(),
-      ];
-      for (const text of ending) {
-        text.setVisible(true).setAlpha(0);
-        this.tweens.add({ targets: text, alpha: 1, duration: 420 });
-      }
+      this.endingScreen.showLost(closingLine(this.unfinishedBusiness()), this.deepestChainThisRun);
     });
   }
 
@@ -2202,17 +2088,7 @@ export class BoardScene extends Scene {
         return;
       }
 
-      this.gameOverHint.setY(HINT_BELOW_OFFER_Y);
-      this.gameOverText.setText(STILL_CONNECTED);
-      this.gameOverLine.setText(RECOVERED_LINE);
-
-      for (const text of [
-        this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
-        ...this.chainNoteIfEarned(),
-      ]) {
-        text.setVisible(true).setAlpha(0);
-        this.tweens.add({ targets: text, alpha: 1, duration: 420 });
-      }
+      this.endingScreen.showWon(this.deepestChainThisRun);
     });
   }
 
