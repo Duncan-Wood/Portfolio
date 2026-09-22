@@ -39,6 +39,7 @@ import { RevealCard } from './reveal-card';
 import { MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
+import { PressTwiceButton } from './press-twice-button';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import { FRAGMENT_COUNT, MEMORIES } from '../memories';
@@ -106,7 +107,6 @@ const READ_PROMPT = TOUCH_PRIMARY
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
 const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
-const RESET_WINDOW_MS = 3000;
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
@@ -309,13 +309,11 @@ export class BoardScene extends Scene {
 
   private tappedMemory: number | null = null;
 
-  private resetButton: Phaser.GameObjects.Text;
+  private resetButton: PressTwiceButton;
 
   private resetKeys: Phaser.Input.Keyboard.Key[];
 
   private resetPressed = false;
-
-  private resetArmedUntil = 0;
 
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
@@ -599,7 +597,7 @@ export class BoardScene extends Scene {
         if (over.includes(this.endingScreen.contactOffer)
           || this.sideCommands.some((command) => over.includes(command))
           || this.foundMemories.pictures.some((picture) => picture !== null && over.includes(picture))
-          || over.includes(this.resetButton)) {
+          || over.includes(this.resetButton.text)) {
           return;
         }
 
@@ -721,15 +719,14 @@ export class BoardScene extends Scene {
       }
     });
 
-    this.resetButton = this.add.text(CANVAS_WIDTH / 2, RESET_Y, RESET_PROMPT, {
-      fontFamily: 'monospace',
-      fontSize: '19px',
-      padding: { x: 20, y: 12 },
-    })
-      .setOrigin(0.5, 0.5)
-      .setVisible(false)
-      .setInteractive({ useHandCursor: true });
-    this.onPress(this.resetButton, () => {
+    this.resetButton = new PressTwiceButton(
+      this,
+      CANVAS_WIDTH / 2,
+      RESET_Y,
+      RESET_PROMPT,
+      RESET_ARMED_PROMPT,
+    );
+    this.onPress(this.resetButton.text, () => {
       this.resetPressed = true;
     });
 
@@ -875,34 +872,24 @@ export class BoardScene extends Scene {
     this.pauseText.setVisible(paused);
     this.pauseHint.setVisible(paused);
 
-    this.resetButton.setVisible(paused);
-    this.disarmReset();
-
     if (paused) {
+      this.resetButton.show();
       this.tweens.pauseAll();
       this.foundMemories.show(this.storyHolding ? [] : foundFragments(), select);
       this.pauseHint.setText(this.foundMemories.showing ? READ_PROMPT : RESUME_PROMPT);
     } else {
+      this.resetButton.hide();
       this.tweens.resumeAll();
       this.foundMemories.hide();
     }
   }
 
   private pressReset(): void {
-    if (this.time.now <= this.resetArmedUntil) {
+    if (this.resetButton.press(this.time.now)) {
       this.foundBeat = null;
       forgetAllProgress();
       this.restart();
-      return;
     }
-
-    this.resetArmedUntil = this.time.now + RESET_WINDOW_MS;
-    this.resetButton.setText(RESET_ARMED_PROMPT).setColor('#221038').setBackgroundColor('#e4572e');
-  }
-
-  private disarmReset(): void {
-    this.resetArmedUntil = 0;
-    this.resetButton.setText(RESET_PROMPT).setColor('#d8c8ee').setBackgroundColor('#3a2159');
   }
 
   private readFromPause(): void {
@@ -919,9 +906,7 @@ export class BoardScene extends Scene {
       return;
     }
 
-    if (this.resetArmedUntil > 0 && this.time.now > this.resetArmedUntil) {
-      this.disarmReset();
-    }
+    this.resetButton.expire(this.time.now);
 
     if (Input.Keyboard.JustDown(this.cursors.left)) {
       this.foundMemories.move(-1);
