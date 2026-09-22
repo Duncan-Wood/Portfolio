@@ -124,9 +124,9 @@ describe('what the shadow is reaching for', () => {
 
     expect(game.stallProgress).toBe(0);
 
-    game.update(DEFAULT_TUNING.shadowInterval / 2);
+    game.hardDrop();
 
     expect(game.stallProgress).toBeGreaterThan(0);
-    expect(game.stallProgress).toBeLessThanOrEqual(1);
+    expect(game.stallProgress).toBeLessThan(1);
   });
 });

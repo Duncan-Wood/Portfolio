@@ -1069,14 +1069,14 @@ describe('a board that has run out of pieces', () => {
 
   it('stops feeding the shadow once nothing can be done about it', () => {
     const simulation = new Simulation(() => [0, 1]);
-    simulation.pieceBudget = 1;
+    simulation.pieceBudget = DEFAULT_TUNING.piecesPerShadow;
     simulation.restart();
-    simulation.hardDrop();
 
-    for (let step = 0; step < 200; step += 1) {
-      simulation.update(50);
+    for (let piece = 0; piece < simulation.pieceBudget; piece += 1) {
+      simulation.hardDrop();
     }
 
+    expect(simulation.outOfPieces).toBe(true);
     expect(simulation.shadowTaken).toBe(0);
   });
 });
@@ -1095,7 +1095,7 @@ describe('the shadow waits for the player to start', () => {
     expect(simulation.shadowTaken).toBe(0);
   });
 
-  it('starts the clock once a piece is down, and keeps it running after', () => {
+  it('counts pieces placed, never time spent thinking', () => {
     const simulation = new Simulation(() => [0, 1], THINKING);
     simulation.restart();
     simulation.hardDrop();
@@ -1103,21 +1103,27 @@ describe('the shadow waits for the player to start', () => {
     for (let step = 0; step < 400; step += 1) {
       simulation.update(50);
     }
+    expect(simulation.shadowTaken).toBe(0);
 
-    expect(simulation.shadowTaken).toBeGreaterThan(0);
+    for (let piece = 1; piece < DEFAULT_TUNING.piecesPerShadow; piece += 1) {
+      simulation.hardDrop();
+    }
+    expect(simulation.shadowTaken).toBe(1);
   });
 });
 
 describe('holding the shadow back while a first memory is still unearned', () => {
+  const placeWhileHeld = (simulation: Simulation) => {
+    for (let piece = 0; piece < DEFAULT_TUNING.piecesPerShadow; piece += 1) {
+      simulation.hardDrop();
+    }
+  };
+
   const stalledWithHold = (held: boolean): Simulation => {
     const simulation = new Simulation(() => [0, 1], THINKING);
     simulation.restart();
     simulation.shadowHeld = held;
-    simulation.hardDrop();
-
-    for (let step = 0; step < 400; step += 1) {
-      simulation.update(50);
-    }
+    placeWhileHeld(simulation);
 
     return simulation;
   };
@@ -1138,13 +1144,11 @@ describe('holding the shadow back while a first memory is still unearned', () =>
     expect(stalledWithHold(false).shadowTaken).toBeGreaterThan(0);
   });
 
-  it('lets the shadow back in the moment the hold is lifted', () => {
+  it('lets the shadow back in once the hold is lifted', () => {
     const simulation = stalledWithHold(true);
     simulation.shadowHeld = false;
 
-    for (let step = 0; step < 400; step += 1) {
-      simulation.update(50);
-    }
+    placeWhileHeld(simulation);
 
     expect(simulation.shadowTaken).toBeGreaterThan(0);
   });

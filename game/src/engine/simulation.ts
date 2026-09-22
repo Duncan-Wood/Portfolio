@@ -68,7 +68,7 @@ export class Simulation {
     return held;
   }
 
-  private stallTimer = 0;
+  private piecesSinceClear = 0;
 
   connectionsMade = 0;
 
@@ -112,16 +112,6 @@ export class Simulation {
       return;
     }
 
-    if (this.shadowHeld) {
-      this.stallTimer = 0;
-    } else {
-      this.stallTimer += delta;
-      if (this.stallTimer >= this.tuning.shadowInterval) {
-        this.stallTimer = 0;
-        this.encroach();
-      }
-    }
-
     if (!this.pair.canFall(this.board)) {
       this.lockTimer += delta;
 
@@ -155,7 +145,7 @@ export class Simulation {
     this.connectionsMade = 0;
     this.chainLength = 0;
     this.deepestChain = 0;
-    this.stallTimer = 0;
+    this.piecesSinceClear = 0;
     this.resolving = false;
     this.settlePending = false;
     this.resolveTimer = 0;
@@ -244,7 +234,7 @@ export class Simulation {
       return;
     }
 
-    this.stallTimer = 0;
+    this.piecesSinceClear = 0;
 
     const connections = link.cellsCleared * (this.chainLength + 1);
 
@@ -285,7 +275,7 @@ export class Simulation {
   }
 
   get stallProgress(): number {
-    return Math.min(this.stallTimer / this.tuning.shadowInterval, 1);
+    return Math.min(this.piecesSinceClear / this.tuning.piecesPerShadow, 1);
   }
 
   private encroach(): void {
@@ -318,7 +308,20 @@ export class Simulation {
       return;
     }
 
+    this.countTowardShadow();
     this.spawnOrTopOut();
+  }
+
+  private countTowardShadow(): void {
+    if (this.shadowHeld || this.outOfPieces) {
+      return;
+    }
+
+    this.piecesSinceClear += 1;
+    if (this.piecesSinceClear >= this.tuning.piecesPerShadow) {
+      this.piecesSinceClear = 0;
+      this.encroach();
+    }
   }
 
   private beginResolving(): void {
