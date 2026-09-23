@@ -39,6 +39,7 @@ import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
+import { VictorySky } from './victory-sky';
 import { ButterflyFlight } from './butterfly-flight';
 import { ChapterTitle } from './chapter-title';
 import { PressTwiceButton } from './press-twice-button';
@@ -1094,7 +1095,7 @@ export class BoardScene extends Scene {
     this.drawFocus();
   }
 
-  private steerFocus(memories: FoundMemories): void {
+  private steerFocus(memories: FoundMemories | VictorySky): void {
     if (Input.Keyboard.JustDown(this.cursors.up)) {
       this.moveFocus(-1);
     }

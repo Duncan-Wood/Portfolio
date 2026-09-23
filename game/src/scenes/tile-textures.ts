@@ -50,6 +50,9 @@ const CHRYSALIS_TEXTURE = 'chrysalis';
 
 export const BUTTERFLY_TEXTURE = 'butterfly';
 
+export const STAR_TEXTURE = 'star';
+const STAR_SIZE = 30;
+
 export function tileTexture(pieceType: number | null): string {
   if (pieceType === null) {
     return EMPTY_TILE_TEXTURE;
@@ -174,6 +177,39 @@ function bakeButterfly(graphics: Phaser.GameObjects.Graphics, size: number): voi
   graphics.fillCircle(middle, span * 0.26, span * 0.06);
 
   graphics.generateTexture(BUTTERFLY_TEXTURE, span, span);
+}
+
+function bakeStar(graphics: Phaser.GameObjects.Graphics): void {
+  const middle = STAR_SIZE / 2;
+
+  graphics.clear();
+
+  for (const [radius, alpha] of [[0.46, 0.12], [0.3, 0.16], [0.18, 0.28]] as const) {
+    graphics.fillStyle(CHRYSALIS_COLOR, alpha);
+    graphics.fillCircle(middle, middle, STAR_SIZE * radius);
+  }
+
+  const spoke = STAR_SIZE * 0.08;
+
+  graphics.fillStyle(0xffffff, 1);
+  for (const reach of [0.46, 0.3] as const) {
+    graphics.fillPoints([
+      new PhaserMath.Vector2(middle, middle - STAR_SIZE * reach),
+      new PhaserMath.Vector2(middle + spoke, middle),
+      new PhaserMath.Vector2(middle, middle + STAR_SIZE * reach),
+      new PhaserMath.Vector2(middle - spoke, middle),
+    ], true);
+    graphics.fillPoints([
+      new PhaserMath.Vector2(middle - STAR_SIZE * reach, middle),
+      new PhaserMath.Vector2(middle, middle - spoke),
+      new PhaserMath.Vector2(middle + STAR_SIZE * reach, middle),
+      new PhaserMath.Vector2(middle, middle + spoke),
+    ], true);
+  }
+
+  graphics.fillCircle(middle, middle, STAR_SIZE * 0.1);
+
+  graphics.generateTexture(STAR_TEXTURE, STAR_SIZE, STAR_SIZE);
 }
 
 function bakeEmpty(graphics: Phaser.GameObjects.Graphics, size: number): void {
@@ -333,6 +369,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
 
   bakeChrysalis(graphics, size);
   bakeButterfly(graphics, size);
+  bakeStar(graphics);
 
   bakeShadow(graphics, size);
   bakeShadowEyes(graphics, size);

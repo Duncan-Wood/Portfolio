@@ -1,17 +1,21 @@
-import { GROUND_COLOR } from '../palette';
+import { Geom } from 'phaser';
 import { REACH_OUT_LINE, RECOVERED_LINE, STILL_CONNECTED } from '../shadow-voice';
-import { type FoundEntry, FoundMemories } from './found-memories';
+import { type FoundEntry } from './found-memories';
+import { VictorySky } from './victory-sky';
 import { PressTwiceButton } from './press-twice-button';
 
-const TITLE_Y = 150;
-const LINE_Y = 205;
-const ROW_Y = 330;
-const ROW_MARGIN = 24;
-const HINT_Y = 452;
-const CONTACT_Y = 540;
-const PLAY_AGAIN_Y = 612;
-const RESET_Y = 684;
-const TALLY_Y = 760;
+const TITLE_Y = 96;
+const LINE_Y = 142;
+const SKY = { left: 54, top: 190, width: 512, height: 292 };
+const STAR_TITLE_Y = 508;
+const HINT_Y = 542;
+const CONTACT_Y = 596;
+const PLAY_AGAIN_Y = 660;
+const RESET_Y = 722;
+const TALLY_Y = 774;
+const GROUND_Y = 842;
+const NIGHT_TOP = 0x0b0518;
+const NIGHT_HORIZON = 0x2a1440;
 
 export interface VictoryLabels {
   hint: string;
@@ -20,12 +24,12 @@ export interface VictoryLabels {
 }
 
 export class VictoryScreen {
-  readonly memories: FoundMemories;
+  readonly memories: VictorySky;
   readonly contactButton: Phaser.GameObjects.Text;
   readonly playAgainButton: Phaser.GameObjects.Text;
   readonly resetButton: PressTwiceButton;
 
-  private readonly scrim: Phaser.GameObjects.Rectangle;
+  private readonly scrim: Phaser.GameObjects.Graphics;
   private readonly title: Phaser.GameObjects.Text;
   private readonly line: Phaser.GameObjects.Text;
   private readonly hint: Phaser.GameObjects.Text;
@@ -43,9 +47,13 @@ export class VictoryScreen {
   ) {
     const centerX = width / 2;
 
-    this.scrim = scene.add.rectangle(centerX, height / 2, width, height, GROUND_COLOR)
-      .setVisible(false)
-      .setInteractive();
+    this.scrim = scene.add.graphics().setVisible(false);
+    this.scrim.fillGradientStyle(NIGHT_TOP, NIGHT_TOP, NIGHT_HORIZON, NIGHT_HORIZON, 1);
+    this.scrim.fillRect(0, 0, width, height);
+    this.scrim.setInteractive(
+      new Geom.Rectangle(0, 0, width, height),
+      Geom.Rectangle.Contains,
+    );
 
     this.title = scene.add.text(centerX, TITLE_Y, STILL_CONNECTED, {
       fontFamily: 'monospace',
@@ -59,7 +67,7 @@ export class VictoryScreen {
       color: '#b07dff',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.memories = new FoundMemories(scene, entries, centerX, ROW_Y, width - ROW_MARGIN * 2);
+    this.memories = new VictorySky(scene, entries, SKY, STAR_TITLE_Y, GROUND_Y, width);
 
     this.hint = scene.add.text(centerX, HINT_Y, labels.hint, {
       fontFamily: 'monospace',
