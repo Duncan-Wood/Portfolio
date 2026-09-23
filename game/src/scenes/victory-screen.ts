@@ -5,7 +5,8 @@ import { VictorySky } from './victory-sky';
 import { PressTwiceButton } from './press-twice-button';
 
 const TITLE_Y = 96;
-const LINE_Y = 142;
+const LINE_Y = 132;
+const LINE_MARGIN = 54;
 const SKY = { left: 54, top: 190, width: 512, height: 292 };
 const STAR_TITLE_Y = 508;
 const HINT_Y = 542;
@@ -65,7 +66,9 @@ export class VictoryScreen {
       fontFamily: 'monospace',
       fontSize: '17px',
       color: '#b07dff',
-    }).setOrigin(0.5, 0.5).setVisible(false);
+      align: 'center',
+      wordWrap: { width: width - LINE_MARGIN * 2 },
+    }).setOrigin(0.5, 0).setVisible(false);
 
     this.memories = new VictorySky(scene, entries, SKY, STAR_TITLE_Y, GROUND_Y, width);
 

@@ -145,8 +145,8 @@ describe('what a finished memory says', () => {
     expect(STILL_CONNECTED.toLowerCase()).toContain('connected');
   });
 
-  it('fits the two lines the ending has room for', () => {
-    expect(RECOVERED_LINE.length).toBeLessThanOrEqual(80);
+  it('fits the three wrapped lines the sky leaves room for', () => {
+    expect(RECOVERED_LINE.length).toBeLessThanOrEqual(150);
   });
 
   it('offers a way to reach a person without turning into a pitch', () => {

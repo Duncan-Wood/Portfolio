@@ -35,7 +35,8 @@ export const SHADOW_OPENING_LINE = 'You stopped here before.';
 
 export const STILL_CONNECTED = 'STILL CONNECTED';
 
-export const RECOVERED_LINE = 'Nothing in a mind connects itself.';
+export const RECOVERED_LINE = 'I’ve made a few connections now, enough to lead me to '
+  + 'discover the next piece, although it is still unknown to me. It could be you.';
 
 export const REACH_OUT_LINE = 'reach out to me';
 
