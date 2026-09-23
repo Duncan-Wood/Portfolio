@@ -14,11 +14,27 @@ const OUT = join(HERE, '..', 'src', 'memory-art.ts');
 const RAMP = ['.', '7', '4', '5', '6', '3', '0', '1', '2'];
 const CONTRAST = ['-normalize', '-sigmoidal-contrast', '4,50%'];
 
+// Transparent art has to land on the board's own empty colour or the ramp reads
+// the alpha as light.
+const EMPTY = '#241038';
+
 // `panelColumns` is the chunky version the sidebar fills in block by block; the
 // blocks have to be big enough to see arriving.
 const PANEL_COLUMNS = 22;
 
 const PICTURES = {
+  'the-crow': {
+    file: 'mcmLogo_250x250.webp',
+    columns: 110,
+    rows: 115,
+    crop: ['-crop', '210x220+20+8', '+repage'],
+  },
+  'the-map': {
+    file: 'ecomap',
+    columns: 110,
+    rows: 110,
+    crop: ['-crop', '100x96+0+0', '+repage'],
+  },
   'the-build': { file: 'puter.jpg', columns: 110, rows: 147 },
   'no-johns': { file: 'gamecube_controller.jpg', columns: 110, rows: 147 },
   'the-kickball': {
@@ -49,7 +65,7 @@ const PICTURES = {
 
 function quantize({ file, columns, rows, crop = [] }) {
   const raw = execFileSync('magick', [
-    join(SOURCES, file), '-auto-orient', ...crop, ...CONTRAST,
+    join(SOURCES, file), '-auto-orient', '-background', EMPTY, '-flatten', ...crop, ...CONTRAST,
     '-resize', `${columns}x${rows}!`, '-colorspace', 'sRGB', '-depth', '8', 'txt:-',
   ], { encoding: 'utf8', maxBuffer: 1 << 26 });
 

@@ -15,6 +15,27 @@ export const CHAPTERS: Chapter[] = [
     title: 'Now',
     nodes: [
       {
+        title: 'Mighty Crow',
+        photo: 'the-crow',
+        body:
+          'A contract I took while I still had the day job. They needed documents '
+          + 'converted, and the data was medical.\n\n'
+          + 'I wrote the service, costed it against the commercial options, and '
+          + 'shipped it with the tests to prove it was safe.\n\n'
+          + 'It runs for a few dollars a month. Nobody else to hand it to, which '
+          + 'turned out to be the appeal.'
+      },
+      {
+        title: 'Seventy Customers',
+        photo: 'the-map',
+        body:
+          'The team that built EcoMap’s first platform left within about six months. '
+          + 'Seventy companies were using it. I was what was left.\n\n'
+          + 'I ran it for two years, then moved every one of them onto what replaced '
+          + 'it and turned it off.\n\n'
+          + 'You learn a system best by being the only one holding it.'
+      },
+      {
         title: 'The Notebook',
         photo: 'the-notebook',
         body:
@@ -108,7 +129,7 @@ export const CHAPTERS: Chapter[] = [
           + 'Freshman year of high school scattered everyone I knew. I spent most of '
           + 'that year alone in front of it. Alone is the wrong word. Dota was on it, '
           + 'and so were people I have known for thirteen years.\n\n'
-          + 'It still runs.'
+          + 'I still play games with friends on it.'
       },
     ],
   },
