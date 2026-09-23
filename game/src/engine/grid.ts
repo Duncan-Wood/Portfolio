@@ -1,7 +1,7 @@
 /*
- *   0..3   │   4..7    │   8    9
- * colours  │  shadow   │  neuron
- *          │ over 0..3 │ dark, lit
+ *   0..3   │   4..7    │   8    9   │    10
+ * colours  │  shadow   │   neuron   │ chrysalis
+ *          │ over 0..3 │ dark, lit  │
  *
  * Read cells with the predicates below, never by comparing to a band constant.
  */
@@ -52,8 +52,18 @@ export function isNeuronLit(pieceType: number): boolean {
   return pieceType === NEURON + 1;
 }
 
+export const CHRYSALIS = NEURON + NEURON_VALUES;
+
+export function chrysalisCell(): number {
+  return CHRYSALIS;
+}
+
+export function isChrysalis(pieceType: number | null): pieceType is number {
+  return pieceType === CHRYSALIS;
+}
+
 export function isAnchored(pieceType: number | null): boolean {
-  return isNeuron(pieceType);
+  return isNeuron(pieceType) || isChrysalis(pieceType);
 }
 
 export function isColour(pieceType: number | null): pieceType is number {

@@ -9,6 +9,7 @@ const PLAYED_KEY = 'connected.played';
 const FRAGMENTS_TOTAL_KEY = 'connected.fragmentsTotal';
 const LOG_KEY = 'connected.log';
 const RESUME_KEY = 'connected.resume';
+const BUTTERFLIES_KEY = 'connected.butterflies';
 const INTRO_SEEN_KEY = 'connected.introSeen';
 const COMPLETIONS_KEY = 'connected.completions';
 
@@ -68,6 +69,24 @@ export function rememberFragment(
   writeStored(FRAGMENTS_TOTAL_KEY, String(total));
 }
 
+export function freedButterflies(): number[] {
+  try {
+    const held: unknown = JSON.parse(readStored(BUTTERFLIES_KEY) ?? '[]');
+    return Array.isArray(held) ? held.filter((chapter) => Number.isInteger(chapter)) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberButterfly(chapterIndex: number): void {
+  const freed = freedButterflies();
+  if (freed.includes(chapterIndex)) {
+    return;
+  }
+
+  writeStored(BUTTERFLIES_KEY, JSON.stringify([...freed, chapterIndex].sort((a, b) => a - b)));
+}
+
 export function rememberBestChain(deepest: number): void {
   if (deepest < 2) {
     return;
@@ -112,7 +131,7 @@ export function rememberCompletion(): void {
 }
 
 export function forgetRun(): void {
-  for (const key of [LOG_KEY, FRAGMENTS_TOTAL_KEY, RESUME_KEY]) {
+  for (const key of [LOG_KEY, FRAGMENTS_TOTAL_KEY, RESUME_KEY, BUTTERFLIES_KEY]) {
     clearStored(key);
   }
 }

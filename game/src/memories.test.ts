@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CHAPTERS, FRAGMENT_COUNT, nodeAt } from './memories';
+import {
+  CHAPTERS,
+  FRAGMENT_COUNT,
+  butterflyIndex,
+  collectableAt,
+  collectionEntries,
+  nodeAt,
+} from './memories';
 import { LOCKS } from './engine/locks';
 
 describe('the memories', () => {
@@ -58,5 +65,28 @@ describe('nodeAt walks the chapters in order', () => {
   it('runs out once every node is found', () => {
     expect(nodeAt(FRAGMENT_COUNT)).toBeNull();
     expect(nodeAt(FRAGMENT_COUNT + 99)).toBeNull();
+  });
+});
+
+describe('the collection a player reads from the pause screen', () => {
+  it('reaches every memory at the index its find was logged under', () => {
+    for (let found = 0; found < FRAGMENT_COUNT; found += 1) {
+      expect(collectableAt(found)).toBe(nodeAt(found)!.node);
+    }
+  });
+
+  it('reaches a chapter butterfly past the end of the memories', () => {
+    CHAPTERS.forEach((chapter, index) => {
+      expect(collectableAt(butterflyIndex(index))).toBe(chapter.butterfly ?? null);
+    });
+  });
+
+  it('has nothing at an index no memory and no butterfly answers to', () => {
+    expect(collectableAt(-1)).toBeNull();
+    expect(collectableAt(butterflyIndex(CHAPTERS.length))).toBeNull();
+  });
+
+  it('lists an entry for every index, so a row can be drawn from it', () => {
+    expect(collectionEntries()).toHaveLength(FRAGMENT_COUNT + CHAPTERS.length);
   });
 });

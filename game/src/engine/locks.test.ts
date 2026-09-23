@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isColour, isNeuron, isShadow } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isChrysalis, isColour, isNeuron, isShadow } from './grid';
+import { chrysalisOn } from './chrysalis';
 import { lightAdjacent, neuronsOn, unlitCount } from './neurons';
 import { Board } from './board';
 import { LOCKS, SEED_ROWS, isSolved, lockFor, seedLock } from './locks';
@@ -225,5 +226,48 @@ describe('lockFor picks the boards for the chapter being played', () => {
 
   it('holds on the first lock if it is ever asked for a nonsense chapter', () => {
     expect(lockFor(-1)).toBe(LOCKS[0]);
+  });
+});
+
+describe('a board that carries a chrysalis', () => {
+  const seeds = [0.2, 0.6, 0.4, 0.8, 0.1, 0.3, 0.55, 0.9];
+
+  it('seeds none unless the run asks for one', () => {
+    const board = new Board();
+    seedLock(board, LOCKS[0], fixed(seeds));
+
+    expect(chrysalisOn(board)).toBeNull();
+  });
+
+  it('seeds exactly one when the run asks', () => {
+    for (const lock of LOCKS) {
+      const board = new Board();
+      seedLock(board, lock, fixed(seeds), true);
+
+      expect(chrysalisOn(board)).not.toBeNull();
+      expect(cellsOn(board).filter((cell) => isChrysalis(cell.piece))).toHaveLength(1);
+    }
+  });
+
+  it('keeps it off the neurons, so freeing it costs a clear of its own', () => {
+    for (const lock of LOCKS) {
+      const board = new Board();
+      seedLock(board, lock, fixed(seeds), true);
+
+      const { column, row } = chrysalisOn(board)!;
+      const touching = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+        .some(([dx, dy]) => isNeuron(board.pieceAt(column + dx, row + dy)));
+
+      expect(touching).toBe(false);
+    }
+  });
+
+  it('still leaves every neuron reachable, so the board stays solvable', () => {
+    for (const lock of LOCKS) {
+      const board = new Board();
+      seedLock(board, lock, fixed(seeds), true);
+
+      expect(unlitCount(board)).toBe(lock.neurons);
+    }
   });
 });

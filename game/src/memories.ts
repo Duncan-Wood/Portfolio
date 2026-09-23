@@ -1,4 +1,4 @@
-interface MemoryNode {
+export interface MemoryNode {
   title: string;
   body: string;
   photo?: string;
@@ -7,6 +7,7 @@ interface MemoryNode {
 export interface Chapter {
   title: string;
   nodes: MemoryNode[];
+  butterfly?: MemoryNode;
 }
 
 export const CHAPTERS: Chapter[] = [
@@ -52,6 +53,16 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     title: 'Florida',
+    butterfly: {
+      title: 'Mise En Place',
+      body:
+        'I graduated into a pandemic. No ceremony, nobody around. So I started a '
+        + 'group and named it after the cooking term: everything in its place before '
+        + 'you begin.\n\n'
+        + 'We met to show each other what we were making. Mine was a script about '
+        + 'Melee that I worked on for two years and never finished.\n\n'
+        + 'The group kept going anyway. That turned out to be the thing I made.'
+    },
     nodes: [
       {
         title: 'No Johns',
@@ -67,6 +78,15 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     title: 'Illinois',
+    butterfly: {
+      title: 'The Speech',
+      body:
+        'Oratorical Declamation. The same speech about white privilege, competition '
+        + 'after competition.\n\n'
+        + 'I lost most of them. I learned what redlining was, and white flight, and '
+        + 'how little I had known.\n\n'
+        + 'Saying a thing out loud enough times is how I found out I meant it.'
+    },
     nodes: [
       {
         title: 'The Hat',
@@ -118,6 +138,31 @@ export const FRAGMENT_COUNT = CHAPTERS.reduce(
   (total, chapter) => total + chapter.nodes.length,
   0,
 );
+
+export function butterflyIndex(chapterIndex: number): number {
+  return FRAGMENT_COUNT + chapterIndex;
+}
+
+export function collectableAt(index: number): MemoryNode | null {
+  if (index < 0) {
+    return null;
+  }
+
+  if (index < FRAGMENT_COUNT) {
+    return nodeAt(index)!.node;
+  }
+
+  return CHAPTERS[index - FRAGMENT_COUNT]?.butterfly ?? null;
+}
+
+export function collectionEntries(): MemoryNode[] {
+  const empty = { title: '', body: '' };
+
+  return [
+    ...CHAPTERS.flatMap((chapter) => chapter.nodes),
+    ...CHAPTERS.map((chapter) => chapter.butterfly ?? empty),
+  ];
+}
 
 export const MEMORY_SIGNATURE = [
   FRAGMENT_COUNT,
