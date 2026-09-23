@@ -31,11 +31,11 @@ export const SEED_ROWS = 3;
 export const LOCKS: readonly Lock[] = [
   {
     objective: 'light every neuron',
-    neurons: 1,
+    neurons: 2,
     shadows: 0,
-    tiles: 13,
+    tiles: 12,
     fallInterval: 750,
-    fillScore: 80,
+    fillScore: 100,
   },
   {
     objective: 'light every neuron',
@@ -47,18 +47,10 @@ export const LOCKS: readonly Lock[] = [
   },
   {
     objective: 'light every neuron',
-    neurons: 3,
-    shadows: 2,
-    tiles: 11,
-    fallInterval: 560,
-    fillScore: 180,
-  },
-  {
-    objective: 'light every neuron',
     neurons: 4,
     shadows: 2,
     tiles: 10,
-    fallInterval: 480,
+    fallInterval: 560,
     fillScore: 220,
   },
   {
@@ -66,13 +58,13 @@ export const LOCKS: readonly Lock[] = [
     neurons: 5,
     shadows: 3,
     tiles: 9,
-    fallInterval: 400,
+    fallInterval: 480,
     fillScore: 280,
   },
 ];
 
-export function lockFor(fragmentsEarned: number): Lock {
-  const index = Math.max(0, Math.min(fragmentsEarned, LOCKS.length - 1));
+export function lockFor(chapterIndex: number): Lock {
+  const index = Math.max(0, Math.min(chapterIndex, LOCKS.length - 1));
   return LOCKS[index];
 }
 

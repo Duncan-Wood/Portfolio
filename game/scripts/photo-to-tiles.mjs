@@ -33,6 +33,12 @@ const PICTURES = {
     rows: 82,
     crop: ['-crop', '2775x2056+105+1104', '+repage'],
   },
+  'the-hat': {
+    file: 'cowboy_hat_portrait.JPG',
+    columns: 110,
+    rows: 48,
+    crop: ['-crop', '1040x455+70+0', '+repage'],
+  },
   'the-notebook': {
     file: 'notebook_and_pen.jpg',
     columns: 110,

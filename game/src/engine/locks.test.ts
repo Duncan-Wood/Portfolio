@@ -3,7 +3,6 @@ import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isColour, isNeuron, isShadow } from '
 import { lightAdjacent, neuronsOn, unlitCount } from './neurons';
 import { Board } from './board';
 import { LOCKS, SEED_ROWS, isSolved, lockFor, seedLock } from './locks';
-import { MEMORIES } from '../memories';
 
 const fixed = (values: number[]) => {
   let index = 0;
@@ -37,11 +36,6 @@ describe('a lock is a board with something to work out', () => {
     for (const lock of LOCKS) {
       expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * SEED_ROWS);
     }
-  });
-
-  it('has a lock for every fragment, so difficulty does not plateau', () => {
-    const fragments = MEMORIES.reduce((total, memory) => total + memory.nodes.length, 0);
-    expect(LOCKS.length).toBeGreaterThanOrEqual(fragments);
   });
 
   it('gives every lock a score that fills the memory picture', () => {
@@ -122,7 +116,7 @@ describe('a lock is a board with something to work out', () => {
 
   it('opens on a lock with nothing opposing the player', () => {
     expect(LOCKS[0].shadows).toBe(0);
-    expect(LOCKS[0].neurons).toBe(1);
+    expect(LOCKS[0].neurons).toBeLessThanOrEqual(2);
   });
 
   it('seeds colour under every shadow, since a shadow possesses a tile', () => {
@@ -217,10 +211,10 @@ describe('the run escalates across the memory it is unlocking', () => {
   });
 });
 
-describe('lockFor picks the board for the fragment being earned', () => {
-  it('walks the locks in order as fragments are earned', () => {
-    for (let earned = 0; earned < LOCKS.length; earned += 1) {
-      expect(lockFor(earned)).toBe(LOCKS[earned]);
+describe('lockFor picks the boards for the chapter being played', () => {
+  it('walks the locks in order as chapters go by', () => {
+    for (let chapter = 0; chapter < LOCKS.length; chapter += 1) {
+      expect(lockFor(chapter)).toBe(LOCKS[chapter]);
     }
   });
 
@@ -229,7 +223,7 @@ describe('lockFor picks the board for the fragment being earned', () => {
     expect(lockFor(LOCKS.length + 99)).toBe(LOCKS[LOCKS.length - 1]);
   });
 
-  it('holds on the first lock if it is ever asked for a nonsense fragment', () => {
+  it('holds on the first lock if it is ever asked for a nonsense chapter', () => {
     expect(lockFor(-1)).toBe(LOCKS[0]);
   });
 });

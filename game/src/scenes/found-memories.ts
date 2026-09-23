@@ -15,6 +15,7 @@ export class FoundMemories {
   readonly pictures: (Phaser.GameObjects.Image | null)[];
 
   private readonly centerX: number;
+  private readonly maxWidth: number;
   private readonly frame: Phaser.GameObjects.Graphics;
   private readonly title: Phaser.GameObjects.Text;
   private readonly entries: readonly FoundEntry[];
@@ -22,9 +23,16 @@ export class FoundMemories {
   private shown: number[] = [];
   private selectedAt = 0;
 
-  constructor(scene: Phaser.Scene, entries: readonly FoundEntry[], centerX: number, rowY: number) {
+  constructor(
+    scene: Phaser.Scene,
+    entries: readonly FoundEntry[],
+    centerX: number,
+    rowY: number,
+    maxWidth: number,
+  ) {
     this.entries = entries;
     this.centerX = centerX;
+    this.maxWidth = maxWidth;
 
     this.frame = scene.add.graphics().setVisible(false);
 
@@ -35,7 +43,6 @@ export class FoundMemories {
       }
 
       const picture = scene.add.image(0, rowY, key).setVisible(false);
-      picture.setScale(Math.min(PICTURE_BOX / picture.width, PICTURE_BOX / picture.height));
       return picture.setInteractive({ useHandCursor: true });
     });
 
@@ -61,10 +68,15 @@ export class FoundMemories {
       return;
     }
 
-    const width = this.shown.length * PICTURE_BOX + (this.shown.length - 1) * PICTURE_GAP;
-    const left = this.centerX - width / 2 + PICTURE_BOX / 2;
+    const box = this.boxFor(this.shown.length);
+    const width = this.shown.length * box + (this.shown.length - 1) * PICTURE_GAP;
+    const left = this.centerX - width / 2 + box / 2;
     this.shown.forEach((index, position) => {
-      this.pictures[index]!.setX(left + position * (PICTURE_BOX + PICTURE_GAP)).setVisible(true);
+      const picture = this.pictures[index]!;
+      picture
+        .setScale(Math.min(box / picture.width, box / picture.height))
+        .setX(left + position * (box + PICTURE_GAP))
+        .setVisible(true);
     });
 
     const at = select === undefined ? -1 : this.shown.indexOf(select);
@@ -88,6 +100,11 @@ export class FoundMemories {
     this.frame.setVisible(false);
     this.title.setVisible(false);
     this.shown = [];
+  }
+
+  private boxFor(count: number): number {
+    const room = (this.maxWidth - (count - 1) * PICTURE_GAP) / count;
+    return Math.min(PICTURE_BOX, room);
   }
 
   private highlight(): void {

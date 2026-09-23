@@ -39,11 +39,12 @@ import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
+import { ChapterTitle } from './chapter-title';
 import { PressTwiceButton } from './press-twice-button';
 import { VictoryScreen } from './victory-screen';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
-import { FRAGMENT_COUNT, MEMORIES } from '../memories';
+import { CHAPTERS, FRAGMENT_COUNT, nodeAt } from '../memories';
 import {
   completions,
   forgetAllProgress,
@@ -141,6 +142,7 @@ const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 const MEMORY_PANEL_TOP = 300;
 
 const FOUND_ROW_Y = CANVAS_HEIGHT / 2 + 160;
+const FOUND_ROW_MARGIN = 24;
 const RESET_Y = CANVAS_HEIGHT / 2 + 290;
 
 
@@ -378,6 +380,8 @@ export class BoardScene extends Scene {
   private boardFrame: Phaser.GameObjects.Graphics;
 
   private memoryPanel: MemoryPanel;
+
+  private chapterTitle: ChapterTitle;
 
   private crashed = false;
 
@@ -681,9 +685,15 @@ export class BoardScene extends Scene {
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
+    this.chapterTitle = new ChapterTitle(
+      this,
+      ORIGIN_X + BOARD_WIDTH / 2,
+      ORIGIN_Y + BOARD_HEIGHT / 3,
+    );
+
     this.victory = new VictoryScreen(
       this,
-      MEMORIES.flatMap((memory) => memory.nodes),
+      CHAPTERS.flatMap((chapter) => chapter.nodes),
       CANVAS_WIDTH,
       CANVAS_HEIGHT,
       { hint: VICTORY_HINT, reset: RESET_PROMPT, resetArmed: RESET_ARMED_PROMPT },
@@ -761,9 +771,10 @@ export class BoardScene extends Scene {
 
     this.foundMemories = new FoundMemories(
       this,
-      MEMORIES.flatMap((memory) => memory.nodes),
+      CHAPTERS.flatMap((chapter) => chapter.nodes),
       CANVAS_WIDTH / 2,
       FOUND_ROW_Y,
+      CANVAS_WIDTH - FOUND_ROW_MARGIN * 2,
     );
     this.foundMemories.pictures.forEach((picture, index) => {
       if (picture !== null) {
@@ -889,7 +900,7 @@ export class BoardScene extends Scene {
       }
     }
 
-    this.releaseObjective();
+    this.openTheBoard();
     this.playShadowArrival();
     this.playCascadeBeat();
     this.playSounds();
@@ -1135,8 +1146,7 @@ export class BoardScene extends Scene {
   }
 
   private openFound(index: number): void {
-    const at = this.locate(index)!;
-    const node = MEMORIES[at.memoryIndex].nodes[at.nodeIndex];
+    const { node } = nodeAt(index)!;
 
     this.readingIndex = index;
     this.focusFrame.setVisible(false);
@@ -1206,6 +1216,7 @@ export class BoardScene extends Scene {
     this.victory.hide();
     this.characterState = characterOn(this.characterState, 'restart');
     this.endingScreen.reset();
+    this.chapterTitle.reset();
     this.memoryPanel.reset();
     if (!keepStory) {
       this.tweens.killAll();
@@ -1311,7 +1322,7 @@ export class BoardScene extends Scene {
     this.tweens.add({ targets: this.objectiveText, alpha: 0, duration: fade });
   }
 
-  private releaseObjective(): void {
+  private openTheBoard(): void {
     if (!this.objectiveHeld || this.storyHolding) {
       return;
     }
@@ -1322,6 +1333,11 @@ export class BoardScene extends Scene {
       alpha: 1,
       duration: 520,
     });
+
+    const at = nodeAt(this.nodesRevealed);
+    if (at !== null && at.nodeIndex === 0) {
+      this.chapterTitle.announce(CHAPTERS[at.chapterIndex].title);
+    }
   }
 
   private readSwipe(): void {
@@ -1445,7 +1461,7 @@ export class BoardScene extends Scene {
   }
 
   private startLock(): void {
-    const lock = lockFor(this.nodesRevealed);
+    const lock = lockFor(this.chapterIndex);
     this.lockSolved = false;
     this.lockEndingIn = 0;
     this.tuning.fallInterval = lock.fallInterval;
@@ -1455,7 +1471,7 @@ export class BoardScene extends Scene {
   }
 
   private refreshObjective(): void {
-    const lock = lockFor(this.nodesRevealed);
+    const lock = lockFor(this.chapterIndex);
     const total = neuronsOn(this.simulation.board).length;
     const lit = total - unlitCount(this.simulation.board);
 
@@ -1467,7 +1483,7 @@ export class BoardScene extends Scene {
       return;
     }
 
-    const lock = lockFor(this.nodesRevealed);
+    const lock = lockFor(this.chapterIndex);
     if (!isSolved(lock, this.simulation.board)) {
       return;
     }
@@ -1810,28 +1826,18 @@ export class BoardScene extends Scene {
       .length;
 
     const fromNeurons = total === 0 ? 0 : lit / total;
-    const fillScore = lockFor(this.nodesRevealed).fillScore;
+    const fillScore = lockFor(this.chapterIndex).fillScore;
     const progress = Math.max(fromNeurons, Math.min(this.simulation.score / fillScore, 1));
 
     this.memoryPanel.showProgress(this.upcomingPhoto(), progress);
   }
 
   private get moreToReach(): boolean {
-    return this.locate(this.nodesRevealed) !== null;
+    return nodeAt(this.nodesRevealed) !== null;
   }
 
-  private locate(total: number): { memoryIndex: number; nodeIndex: number } | null {
-    let remaining = total;
-
-    for (let index = 0; index < MEMORIES.length; index += 1) {
-      const nodes = MEMORIES[index].nodes.length;
-      if (remaining < nodes) {
-        return { memoryIndex: index, nodeIndex: remaining };
-      }
-      remaining -= nodes;
-    }
-
-    return null;
+  private get chapterIndex(): number {
+    return nodeAt(this.nodesRevealed)?.chapterIndex ?? CHAPTERS.length - 1;
   }
 
   private surfaceBankedFragment(): void {
@@ -1850,14 +1856,12 @@ export class BoardScene extends Scene {
   }
 
   private revealNextNode(): void {
-    const at = this.locate(this.nodesRevealed);
+    const at = nodeAt(this.nodesRevealed);
     if (at === null) {
       return;
     }
 
-    const { memoryIndex, nodeIndex } = at;
-    const memory = MEMORIES[memoryIndex];
-    const node = memory.nodes[nodeIndex];
+    const { node } = at;
     const firstFind = foundFragments().length === 0;
     this.nodesRevealed += 1;
     this.simulation.shadowHeld = this.nodesRevealed === 0;
@@ -1923,8 +1927,7 @@ export class BoardScene extends Scene {
   }
 
   private upcomingPhoto(): string | undefined {
-    const at = this.locate(this.nodesRevealed);
-    return at === null ? undefined : MEMORIES[at.memoryIndex].nodes[at.nodeIndex].photo;
+    return nodeAt(this.nodesRevealed)?.node.photo;
   }
 
   private settledPieceAt(column: number, row: number): number | null {
@@ -2384,13 +2387,13 @@ export class BoardScene extends Scene {
   }
 
   private unfinishedBusiness(): UnfinishedBusiness {
-    const at = this.locate(this.nodesRevealed);
+    const at = nodeAt(this.nodesRevealed);
     if (at === null) {
       return { reaching: null, connectionsShort: 0 };
     }
 
     return {
-      reaching: MEMORIES[at.memoryIndex].nodes[at.nodeIndex].title,
+      reaching: at.node.title,
       connectionsShort: Math.max(1, unlitCount(this.simulation.board)),
     };
   }

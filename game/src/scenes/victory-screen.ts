@@ -6,6 +6,7 @@ import { PressTwiceButton } from './press-twice-button';
 const TITLE_Y = 150;
 const LINE_Y = 205;
 const ROW_Y = 330;
+const ROW_MARGIN = 24;
 const HINT_Y = 452;
 const CONTACT_Y = 540;
 const PLAY_AGAIN_Y = 612;
@@ -58,7 +59,7 @@ export class VictoryScreen {
       color: '#b07dff',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.memories = new FoundMemories(scene, entries, centerX, ROW_Y);
+    this.memories = new FoundMemories(scene, entries, centerX, ROW_Y, width - ROW_MARGIN * 2);
 
     this.hint = scene.add.text(centerX, HINT_Y, labels.hint, {
       fontFamily: 'monospace',
