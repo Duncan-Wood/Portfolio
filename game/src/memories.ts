@@ -18,12 +18,13 @@ export const CHAPTERS: Chapter[] = [
         title: 'Mighty Crow',
         photo: 'the-crow',
         body:
-          'A contract I took while I still had the day job. They needed documents '
-          + 'converted, and the data was medical.\n\n'
-          + 'I wrote the service, costed it against the commercial options, and '
-          + 'shipped it with the tests to prove it was safe.\n\n'
-          + 'It runs for a few dollars a month. Nobody else to hand it to, which '
-          + 'turned out to be the appeal.'
+          'Weekend contract work. Every file they held had to open as a PDF, and '
+          + 'the data was medical.\n\n'
+          + 'I built one door for all of it. It reads the first few bytes to tell '
+          + 'what it was handed, and gives back a PDF, with the tests to prove it '
+          + 'was safe.\n\n'
+          + 'I told my boss you could build a whole business on it. A year on, it '
+          + 'still runs for about two dollars a month.'
       },
       {
         title: 'Seventy Customers',
