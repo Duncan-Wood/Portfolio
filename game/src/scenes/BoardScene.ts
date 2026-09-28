@@ -42,6 +42,13 @@ import { FoundMemories } from './found-memories';
 import { VictorySky } from './victory-sky';
 import { ButterflyFlight } from './butterfly-flight';
 import { ChapterTitle } from './chapter-title';
+import { MemoryHandover } from './memory-handover';
+import {
+  advanceHandover,
+  stageLength,
+  stagesBegun,
+  type HandoverStage,
+} from '../handover';
 import { PressTwiceButton } from './press-twice-button';
 import { VictoryScreen } from './victory-screen';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
@@ -109,9 +116,7 @@ const SHADOW_LEAN_DEGREES = 3.2;
 const SHADOW_BREATH = 0.045;
 const SHADOW_ARRIVAL_DURATION = 340;
 
-const HANDOVER_BEHIND_REVEAL = 300;
-const HANDOVER_IN_THE_OPEN = 900;
-const HANDOVER_DIM = 240;
+const THREAD_PULSE = 420;
 
 
 export const TOUCH_PRIMARY = typeof matchMedia === 'function'
@@ -174,6 +179,7 @@ const SIDE_COMMAND_WIDTH = (MEMORY_BOX.width - SIDE_COMMAND_GAP) / 2;
 const SIDE_COMMAND_Y = ORIGIN_Y + BOARD_HEIGHT - 34;
 const CHARACTER_X = MEMORY_BOX.left + MEMORY_BOX.width / 2;
 const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
+const MEMORY_LANDS_AT = { x: CHARACTER_X, y: CHARACTER_BOTTOM - 90 };
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -290,9 +296,11 @@ export class BoardScene extends Scene {
 
   private lockSolved = false;
 
-  private lockEndingIn = 0;
+  private handoverElapsed: number | null = null;
 
   private litNeurons: NeuronSite[] = [];
+
+  private threadSurge: { whole: boolean; progress: number; duration: number } | null = null;
 
   private neuronThread: Phaser.GameObjects.Graphics;
 
@@ -398,6 +406,8 @@ export class BoardScene extends Scene {
 
   private butterflyFlight: ButterflyFlight;
 
+  private memoryHandover: MemoryHandover;
+
   private crashed = false;
 
   private sideCommands: Phaser.GameObjects.Text[] = [];
@@ -468,10 +478,7 @@ export class BoardScene extends Scene {
     this.boardFrame.closePath();
     this.boardFrame.strokePath();
 
-    this.memoryPanel = new MemoryPanel(this, MEMORY_BOX, {
-      x: CHARACTER_X,
-      y: CHARACTER_BOTTOM - 90,
-    });
+    this.memoryPanel = new MemoryPanel(this, MEMORY_BOX, MEMORY_LANDS_AT);
 
     bakeTileTextures(this, CELL_SIZE, GAP);
 
@@ -713,6 +720,13 @@ export class BoardScene extends Scene {
       ORIGIN_Y - CELL_SIZE,
     );
 
+    this.memoryHandover = new MemoryHandover(this, {
+      centerX: ORIGIN_X + BOARD_WIDTH / 2,
+      centerY: ORIGIN_Y + BOARD_HEIGHT / 2,
+      width: BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
+      height: BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
+    }, MEMORY_LANDS_AT);
+
     this.victory = new VictoryScreen(
       this,
       collectionEntries(),
@@ -905,6 +919,7 @@ export class BoardScene extends Scene {
     } else if (this.hitStopRemaining > 0) {
       this.hitStopRemaining -= delta;
     } else if (this.runOver === 'won') {
+    } else if (this.handoverElapsed !== null && !this.simulation.resolving) {
     } else {
       for (let step = this.timestep.stepsFor(delta); step > 0; step -= 1) {
         this.simulation.update(FIXED_STEP);
@@ -929,7 +944,7 @@ export class BoardScene extends Scene {
     this.drawBoard();
     this.checkLock();
     this.handOverSolvedBoard(delta);
-    this.drawNeuronThread();
+    this.drawNeuronThread(delta);
     this.drawThreat();
     this.drawConnections(delta);
     this.surfaceBankedFragment();
@@ -1240,6 +1255,7 @@ export class BoardScene extends Scene {
     this.endingScreen.reset();
     this.chapterTitle.reset();
     this.butterflyFlight.reset();
+    this.memoryHandover.reset();
     this.memoryPanel.reset();
     if (!keepStory) {
       this.tweens.killAll();
@@ -1271,6 +1287,7 @@ export class BoardScene extends Scene {
     for (let index = 0; index < this.cellTiles.length; index += 1) {
       this.restoreCell(index);
     }
+    this.threadSurge = null;
     this.animatedShadowCells.clear();
     this.shadowArrival = null;
     this.spokenShadowLines = [];
@@ -1301,12 +1318,7 @@ export class BoardScene extends Scene {
     this.memoryPanel.startOver(this.upcomingPhoto());
 
     if (this.foundBeat !== null) {
-      this.memoryPanel.showFound(
-        this.foundBeat.photo,
-        this.foundBeat.title,
-        this.foundBeat.hint,
-        () => this.memoryLanded(),
-      );
+      this.memoryPanel.showFound(this.foundBeat.photo, this.foundBeat.title, this.foundBeat.hint);
       this.foundBeat = null;
     }
 
@@ -1330,19 +1342,13 @@ export class BoardScene extends Scene {
     }
     rememberPlayed();
 
-    this.holdObjective(0);
+    this.holdObjective();
   }
 
-  private holdObjective(fade: number): void {
+  private holdObjective(): void {
     this.objectiveHeld = true;
     this.tweens.killTweensOf(this.objectiveText);
-
-    if (fade === 0) {
-      this.objectiveText.setAlpha(0);
-      return;
-    }
-
-    this.tweens.add({ targets: this.objectiveText, alpha: 0, duration: fade });
+    this.objectiveText.setAlpha(0);
   }
 
   private openTheBoard(): void {
@@ -1486,7 +1492,7 @@ export class BoardScene extends Scene {
   private startLock(): void {
     const lock = lockFor(this.chapterIndex);
     this.lockSolved = false;
-    this.lockEndingIn = 0;
+    this.handoverElapsed = null;
     this.tuning.fallInterval = lock.fallInterval;
     seedLock(this.simulation.board, lock, Math.random, this.butterflyWaiting !== undefined);
     this.litNeurons = [];
@@ -1512,14 +1518,22 @@ export class BoardScene extends Scene {
     }
 
     this.lockSolved = true;
+    this.threadSurge = { whole: true, progress: 0, duration: stageLength('settle') };
     this.objectiveText.setText(`${lock.objective}  \u2014  open`);
     this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
 
     this.revealPending = true;
   }
 
-  private drawNeuronThread(): void {
+  private drawNeuronThread(delta: number): void {
     this.neuronThread.clear();
+
+    if (this.threadSurge !== null) {
+      this.threadSurge.progress += delta / this.threadSurge.duration;
+      if (this.threadSurge.progress >= 1) {
+        this.threadSurge = null;
+      }
+    }
 
     const centre = (site: NeuronSite) => ({
       x: centerOfColumn(site.column),
@@ -1536,6 +1550,7 @@ export class BoardScene extends Scene {
         this.neuronThread.lineTo(at.x, at.y);
       }
       this.neuronThread.strokePath();
+      this.drawSurge(this.litNeurons.map(centre));
     }
 
     if (this.litNeurons.length === 0) {
@@ -1571,27 +1586,34 @@ export class BoardScene extends Scene {
       return;
     }
 
-    if (this.lockEndingIn > 0) {
-      this.lockEndingIn -= delta;
-      if (this.lockEndingIn <= 0) {
-        this.lockEndingIn = 0;
-        this.restart(true, this.storyHolding);
-      }
+    if (!this.lockSolved || this.storyHolding) {
       return;
     }
 
-    if (this.lockSolved) {
-      if (this.simulation.resolving || this.revealPending) {
-        return;
-      }
+    const settled = !this.simulation.resolving && !this.revealPending;
+    const before = this.handoverElapsed ?? -1;
+    const elapsed = this.handoverElapsed === null
+      ? 0
+      : advanceHandover(this.handoverElapsed, delta, settled);
+    this.handoverElapsed = elapsed;
 
-      if (this.revealCard.holding) {
-        this.holdObjective(HANDOVER_DIM);
-        this.lockEndingIn = HANDOVER_BEHIND_REVEAL;
-        return;
-      }
+    for (const stage of stagesBegun(before, elapsed)) {
+      this.beginHandoverStage(stage);
+    }
+  }
 
-      this.lockEndingIn = HANDOVER_IN_THE_OPEN;
+  private beginHandoverStage(stage: HandoverStage): void {
+    const found = this.foundBeat;
+
+    if (stage === 'fade') {
+      this.memoryHandover.coverBoard(stageLength('fade'));
+    } else if (stage === 'bloom' && found !== null) {
+      this.memoryHandover.bloom(found.photo, found.title);
+    } else if (stage === 'flight') {
+      this.memoryHandover.fly(stageLength('flight'), () => this.memoryLanded());
+    } else if (stage === 'return') {
+      this.restart(true);
+      this.memoryHandover.uncoverBoard(stageLength('return'));
     }
   }
 
@@ -1816,6 +1838,48 @@ export class BoardScene extends Scene {
     }
   }
 
+  private drawSurge(points: readonly { x: number; y: number }[]): void {
+    const surge = this.threadSurge;
+    if (surge === null) {
+      return;
+    }
+
+    const path = surge.whole ? points : points.slice(-2);
+    const spans = path.slice(1).map((at, index) => Math.hypot(
+      at.x - path[index].x,
+      at.y - path[index].y,
+    ));
+    const total = spans.reduce((sum, span) => sum + span, 0);
+    if (total === 0) {
+      return;
+    }
+
+    let travelled = surge.progress * total;
+    let leg = 0;
+    while (leg < spans.length - 1 && travelled > spans[leg]) {
+      travelled -= spans[leg];
+      leg += 1;
+    }
+
+    const along = Math.min(travelled / spans[leg], 1);
+    const head = {
+      x: path[leg].x + (path[leg + 1].x - path[leg].x) * along,
+      y: path[leg].y + (path[leg + 1].y - path[leg].y) * along,
+    };
+
+    this.neuronThread.lineStyle(5, 0xffffff, 0.9);
+    this.neuronThread.beginPath();
+    this.neuronThread.moveTo(path[0].x, path[0].y);
+    for (let step = 1; step <= leg; step += 1) {
+      this.neuronThread.lineTo(path[step].x, path[step].y);
+    }
+    this.neuronThread.lineTo(head.x, head.y);
+    this.neuronThread.strokePath();
+
+    this.neuronThread.fillStyle(0xffffff, 1);
+    this.neuronThread.fillCircle(head.x, head.y, 7);
+  }
+
   private chargeNetwork(link: ChainLink): void {
     const cleared = new Map<number, number>();
     for (const group of link.groups) {
@@ -1899,7 +1963,7 @@ export class BoardScene extends Scene {
 
     if (!this.moreToReach) {
       this.winTheRun();
-      this.memoryPanel.showFound(node.photo, node.title, hint, () => this.memoryLanded());
+      this.memoryPanel.showFoundFlying(node.photo, node.title, hint, () => this.memoryLanded());
       return;
     }
 
@@ -2061,6 +2125,10 @@ export class BoardScene extends Scene {
         ...nodeVoice(this.litNeurons.length - 1, Math.max(total, 1)),
         pan: panForX(centerOfColumn(site.column)),
       });
+
+      if (this.litNeurons.length > 1) {
+        this.threadSurge = { whole: false, progress: 0, duration: THREAD_PULSE };
+      }
 
       const index = visibleCellIndex(site.column, site.row);
       this.cellTiles[index].setScale(1.35);
