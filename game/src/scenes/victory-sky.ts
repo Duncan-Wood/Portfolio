@@ -8,6 +8,7 @@ const BRIGHT_SCALE = 1;
 const FAINT_SCALE = 0.62;
 const SELECTED_LIFT = 1.25;
 const DIMMED = 0.55;
+const HOVER_REACH = 34;
 
 const DUST_COUNT = 110;
 const DUST_SEED = 1987;
@@ -72,6 +73,11 @@ export class VictorySky {
       .setVisible(false)
       .setInteractive({ useHandCursor: true }));
 
+    // The scrim sits above the stars for input, so hovering has to be worked out here.
+    scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      this.reachFor(pointer.x, pointer.y);
+    });
+
     this.title = scene.add.text(width / 2, titleY, '', {
       fontFamily: 'monospace',
       fontSize: '17px',
@@ -107,6 +113,38 @@ export class VictorySky {
 
     const at = select === undefined ? -1 : this.shown.indexOf(select);
     this.selectedAt = at === -1 ? this.shown.length - 1 : at;
+    this.highlight();
+  }
+
+  private reachFor(x: number, y: number): void {
+    if (!this.showing) {
+      return;
+    }
+
+    let nearest = -1;
+    let closest = HOVER_REACH;
+
+    for (const index of this.shown) {
+      const star = this.pictures[index]!;
+      const distance = Math.hypot(star.x - x, star.y - y);
+      if (distance < closest) {
+        closest = distance;
+        nearest = index;
+      }
+    }
+
+    if (nearest !== -1) {
+      this.pointAt(nearest);
+    }
+  }
+
+  private pointAt(index: number): void {
+    const at = this.shown.indexOf(index);
+    if (at === -1 || at === this.selectedAt) {
+      return;
+    }
+
+    this.selectedAt = at;
     this.highlight();
   }
 

@@ -56,6 +56,10 @@ export class FoundMemories {
       return picture.setInteractive({ useHandCursor: true });
     });
 
+    scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      this.reachFor(pointer.x, pointer.y);
+    });
+
     this.title = scene.add.text(centerX, rowY + PICTURE_BOX / 2 + TITLE_GAP, '', {
       fontFamily: 'monospace',
       fontSize: '17px',
@@ -92,6 +96,25 @@ export class FoundMemories {
 
     const at = select === undefined ? -1 : this.shown.indexOf(select);
     this.selectedAt = at === -1 ? this.shown.length - 1 : at;
+    this.highlight();
+  }
+
+  private reachFor(x: number, y: number): void {
+    if (!this.showing) {
+      return;
+    }
+
+    const under = this.shown.findIndex((index) => {
+      const picture = this.pictures[index]!;
+      return Math.abs(picture.x - x) <= picture.displayWidth / 2
+        && Math.abs(picture.y - y) <= picture.displayHeight / 2;
+    });
+
+    if (under === -1 || under === this.selectedAt) {
+      return;
+    }
+
+    this.selectedAt = under;
     this.highlight();
   }
 
