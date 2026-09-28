@@ -23,12 +23,6 @@ const EMPTY = '#241038';
 const PANEL_COLUMNS = 22;
 
 const PICTURES = {
-  'the-crow': {
-    file: 'mcmLogo_250x250.webp',
-    columns: 110,
-    rows: 115,
-    crop: ['-crop', '210x220+20+8', '+repage'],
-  },
   'the-build': { file: 'puter.jpg', columns: 110, rows: 147 },
   'no-johns': { file: 'gamecube_controller.jpg', columns: 110, rows: 147 },
   'the-kickball': {

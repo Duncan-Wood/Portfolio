@@ -1,6 +1,6 @@
 import { Math as PhaserMath } from 'phaser';
 import { type MemoryGrid } from '../memory-art';
-import { CUSTOMER_MAP_LAND, MEMORY_PICTURES } from '../memory-pictures';
+import { CUSTOMER_MAP_LAND, MEMORY_PICTURES, ONE_DOOR_DOORWAY } from '../memory-pictures';
 import { PIECE_TYPE_COUNT, isChrysalis, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   CHRYSALIS_COLOR,
@@ -315,6 +315,8 @@ export function memoryArtTexture(key: string): string {
 
 export const CUSTOMER_MAP_LAND_TEXTURE = 'customer-map-land';
 
+export const ONE_DOOR_DOORWAY_TEXTURE = 'one-door-doorway';
+
 const MEMORY_ART_WIDTH = 660;
 
 export function memoryArtCell(columns: number): number {
@@ -328,6 +330,18 @@ export function paintMemoryMark(
   y: number,
   cell: number,
 ): void {
+  paintMemoryBlock(graphics, mark, x, y, cell, 1, 1);
+}
+
+export function paintMemoryBlock(
+  graphics: Phaser.GameObjects.Graphics,
+  mark: string,
+  x: number,
+  y: number,
+  cell: number,
+  across: number,
+  down: number,
+): void {
   const code = Number(mark);
   if (mark === '.' || !Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
     return;
@@ -339,10 +353,22 @@ export function paintMemoryMark(
   const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
   const edge = mix(colour, 0x000000, shaded ? 0.8 : 0.62);
 
-  graphics.fillStyle(edge, 1);
-  graphics.fillRect(x, y, cell, cell);
-  graphics.fillStyle(face, 1);
-  graphics.fillRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2);
+  if (inset === 0) {
+    graphics.fillStyle(face, 1);
+    graphics.fillRect(x, y, across * cell, down * cell);
+    return;
+  }
+
+  for (let row = 0; row < down; row += 1) {
+    for (let column = 0; column < across; column += 1) {
+      const left = x + column * cell;
+      const top = y + row * cell;
+      graphics.fillStyle(edge, 1);
+      graphics.fillRect(left, top, cell, cell);
+      graphics.fillStyle(face, 1);
+      graphics.fillRect(left + inset, top + inset, cell - inset * 2, cell - inset * 2);
+    }
+  }
 }
 
 function bakeMemoryArt(
@@ -390,6 +416,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
     bakeMemoryArt(graphics, memoryArtTexture(key), art);
   }
   bakeMemoryArt(graphics, CUSTOMER_MAP_LAND_TEXTURE, CUSTOMER_MAP_LAND);
+  bakeMemoryArt(graphics, ONE_DOOR_DOORWAY_TEXTURE, ONE_DOOR_DOORWAY);
 
   bakeTrace(graphics, gap);
 
