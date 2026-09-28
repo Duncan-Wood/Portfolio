@@ -118,6 +118,16 @@ export class FoundMemories {
     this.highlight();
   }
 
+  select(index: number): void {
+    const at = this.shown.indexOf(index);
+    if (at === -1 || at === this.selectedAt) {
+      return;
+    }
+
+    this.selectedAt = at;
+    this.highlight();
+  }
+
   move(direction: -1 | 1): void {
     if (!this.showing) {
       return;

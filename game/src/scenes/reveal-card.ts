@@ -1,7 +1,5 @@
 import { GROUND_COLOR } from '../palette';
-import { CUSTOMER_MAP_LAND_TEXTURE, TRACE_TEXTURE, memoryArtTexture } from './tile-textures';
-import { CustomerMapBuild } from './customer-map-build';
-import { CUSTOMER_MAP_PICTURE } from '../memory-pictures';
+import { MemoryPicture } from './memory-picture';
 
 const PHOTO_MAX_WIDTH = 368;
 const PHOTO_MAX_HEIGHT = 300;
@@ -26,8 +24,7 @@ export class RevealCard {
   private readonly skipPrompt: string;
 
   private readonly scrim: Phaser.GameObjects.Rectangle;
-  private readonly photo: Phaser.GameObjects.Image;
-  private readonly mapBuild: CustomerMapBuild;
+  private readonly picture: MemoryPicture;
   private readonly title: Phaser.GameObjects.Text;
   private readonly body: Phaser.GameObjects.Text;
   private readonly hint: Phaser.GameObjects.Text;
@@ -49,9 +46,7 @@ export class RevealCard {
       GROUND_COLOR,
     ).setVisible(false);
 
-    this.photo = scene.add.image(area.centerX, 0, TRACE_TEXTURE)
-      .setVisible(false);
-    this.mapBuild = new CustomerMapBuild(scene);
+    this.picture = new MemoryPicture(scene);
 
     this.title = scene.add.text(area.centerX, area.centerY - 70, '', {
       fontFamily: 'monospace',
@@ -87,31 +82,29 @@ export class RevealCard {
     this.skippableIn = REVEAL_SKIP_GRACE;
     this.hint.setText(this.skipPrompt).setVisible(false);
 
-    this.scene.tweens.killTweensOf([this.scrim, this.title, this.body, this.photo, this.mapBuild.graphics]);
+    this.scene.tweens.killTweensOf([this.scrim, this.title, this.body, ...this.picture.parts]);
 
-    this.showPicture(photo);
+    this.picture.show(photo, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT);
     this.title.setText(title).setVisible(title !== '');
     this.body.setText(body).setVisible(true);
 
     this.layOut();
 
-    if (photo === CUSTOMER_MAP_PICTURE && this.photo.visible) {
-      this.mapBuild.play(this.photo);
-    } else {
-      this.mapBuild.stop();
-    }
-
     const scrimAlpha = this.scrim.visible ? this.scrim.alpha : 0;
     this.scrim.setVisible(true).setAlpha(scrimAlpha);
     this.scene.tweens.add({ targets: this.scrim, alpha: 1, duration: 240 });
 
-    for (const part of [this.title, this.body, this.photo, this.mapBuild.graphics]) {
+    for (const part of [this.title, this.body, ...this.picture.parts]) {
       if (!part.visible) {
         continue;
       }
       part.setAlpha(0);
       this.scene.tweens.add({ targets: part, alpha: 1, duration: 340, delay: 160 });
     }
+  }
+
+  advance(delta: number): void {
+    this.picture.advance(delta);
   }
 
   setBodyColor(color: string): void {
@@ -137,7 +130,7 @@ export class RevealCard {
   }
 
   hide(): void {
-    const parts = [this.scrim, this.title, this.body, this.hint, this.photo, this.mapBuild.graphics];
+    const parts = [this.scrim, this.title, this.body, this.hint, ...this.picture.parts];
     this.scene.tweens.killTweensOf(parts);
     this.scene.tweens.add({
       targets: parts,
@@ -147,7 +140,7 @@ export class RevealCard {
         for (const part of parts) {
           part.setVisible(false);
         }
-        this.mapBuild.stop();
+        this.picture.hide();
       },
     });
   }
@@ -162,53 +155,34 @@ export class RevealCard {
   }
 
   reset(): void {
-    const parts = [this.scrim, this.title, this.body, this.hint, this.photo];
+    const parts = [this.scrim, this.title, this.body, this.hint, ...this.picture.parts];
     this.scene.tweens.killTweensOf(parts);
     for (const part of parts) {
       part.setVisible(false).setAlpha(1);
     }
-    this.mapBuild.stop();
+    this.picture.hide();
     this.skippableIn = 0;
     this.isHolding = false;
   }
 
-  private showPicture(picture?: string): void {
-    const key = picture === undefined ? null
-      : picture === CUSTOMER_MAP_PICTURE ? CUSTOMER_MAP_LAND_TEXTURE
-      : memoryArtTexture(picture);
-    if (key === null || !this.scene.textures.exists(key)) {
-      this.photo.setVisible(false);
-      return;
-    }
-
-    const image = this.photo.setTexture(key);
-    const fit = Math.min(
-      PHOTO_MAX_WIDTH / image.width,
-      PHOTO_MAX_HEIGHT / image.height,
-      1,
-    );
-
-    image.setScale(fit).setVisible(true);
-  }
-
   private layOut(): void {
-    const photoHeight = this.photo.visible ? this.photo.displayHeight : 0;
+    const photoHeight = this.picture.height;
     const titleHeight = this.title.visible ? this.title.height : 0;
     const bodyHeight = this.body.height;
     const hintHeight = this.hint.height;
 
-    const parts: { target: Phaser.GameObjects.Components.Transform; height: number }[] = [];
-    if (photoHeight > 0) parts.push({ target: this.photo, height: photoHeight });
-    if (titleHeight > 0) parts.push({ target: this.title, height: titleHeight });
-    parts.push({ target: this.body, height: bodyHeight });
-    parts.push({ target: this.hint, height: hintHeight });
+    const parts: { place: (y: number) => void; height: number }[] = [];
+    if (photoHeight > 0) parts.push({ place: (y) => this.picture.placeAt(this.centerX, y), height: photoHeight });
+    if (titleHeight > 0) parts.push({ place: (y) => this.title.setPosition(this.centerX, y), height: titleHeight });
+    parts.push({ place: (y) => this.body.setPosition(this.centerX, y), height: bodyHeight });
+    parts.push({ place: (y) => this.hint.setPosition(this.centerX, y), height: hintHeight });
 
     const total = parts.reduce((sum, part) => sum + part.height, 0)
       + REVEAL_GAP * (parts.length - 1);
 
     let y = this.centerY - total / 2;
     for (const part of parts) {
-      part.target.setPosition(this.centerX, y + part.height / 2);
+      part.place(y + part.height / 2);
       y += part.height + REVEAL_GAP;
     }
   }

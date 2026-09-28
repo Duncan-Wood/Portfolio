@@ -19,11 +19,9 @@ const PIN_CELLS = MAP_PINS.map((pin) => pinCells(pin, MAP_COLUMNS, MAP_ROWS));
 
 export class CustomerMapBuild {
   readonly graphics: Phaser.GameObjects.Graphics;
-  private readonly scene: Phaser.Scene;
-  private building: Phaser.Tweens.Tween | null = null;
+  private elapsed: number | null = null;
 
   constructor(scene: Phaser.Scene) {
-    this.scene = scene;
     this.graphics = scene.add.graphics().setVisible(false);
   }
 
@@ -32,21 +30,23 @@ export class CustomerMapBuild {
     this.graphics
       .setPosition(over.x - over.displayWidth / 2, over.y - over.displayHeight / 2)
       .setScale(over.scaleX, over.scaleY)
+      .setAlpha(1)
       .setVisible(true);
 
+    this.elapsed = 0;
     this.draw(0);
-    this.building = this.scene.tweens.addCounter({
-      from: 0,
-      to: BUILD_DURATION,
-      duration: BUILD_DURATION,
-      onUpdate: (tween) => this.draw(tween.getValue() ?? BUILD_DURATION),
-      onComplete: () => this.draw(BUILD_DURATION),
-    });
+  }
+
+  advance(delta: number): void {
+    if (this.elapsed === null || this.elapsed >= BUILD_DURATION) {
+      return;
+    }
+    this.elapsed = Math.min(this.elapsed + delta, BUILD_DURATION);
+    this.draw(this.elapsed);
   }
 
   stop(): void {
-    this.building?.remove();
-    this.building = null;
+    this.elapsed = null;
     this.graphics.clear().setVisible(false);
   }
 

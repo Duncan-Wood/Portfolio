@@ -40,6 +40,7 @@ import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
+import { MemoryReader } from './memory-reader';
 import { VictorySky } from './victory-sky';
 import { ButterflyFlight } from './butterfly-flight';
 import { MemoryHandover } from './memory-handover';
@@ -133,6 +134,9 @@ const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume'
 const READ_PROMPT = TOUCH_PRIMARY
   ? 'tap a memory to read it\ntap anywhere else to resume'
   : '\u2190 \u2192  choose     \u2191 \u2193  move     space  pick     esc  resume';
+const READING_PROMPT = TOUCH_PRIMARY
+  ? 'tap another memory, or anywhere to go back'
+  : '\u2190 \u2192  read another     space  back';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
 const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
@@ -167,6 +171,11 @@ const MEMORY_PANEL_TOP = 300;
 const FOUND_ROW_Y = CANVAS_HEIGHT / 2 + 160;
 const FOUND_ROW_MARGIN = 24;
 const RESET_Y = CANVAS_HEIGHT / 2 + 290;
+const READING_HINT_Y = RESET_Y - 30;
+const PAUSE_HINT_Y = CANVAS_HEIGHT / 2 + 46;
+const READER_TOP = 40;
+const READER_BOTTOM = FOUND_ROW_Y - 72;
+const READER_TEXT_WIDTH = 480;
 
 
 const SIDE_COMMAND_GAP = 8;
@@ -349,6 +358,8 @@ export class BoardScene extends Scene {
   private foundMemories: FoundMemories;
 
   private readingIndex: number | null = null;
+
+  private memoryReader: MemoryReader;
 
   private tappedMemory: number | null = null;
 
@@ -807,7 +818,7 @@ export class BoardScene extends Scene {
       color: '#c98cff',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, RESUME_PROMPT, {
+    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, PAUSE_HINT_Y, RESUME_PROMPT, {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#9481aa',
@@ -821,6 +832,13 @@ export class BoardScene extends Scene {
       FOUND_ROW_Y,
       CANVAS_WIDTH - FOUND_ROW_MARGIN * 2,
     );
+    this.memoryReader = new MemoryReader(this, {
+      centerX: CANVAS_WIDTH / 2,
+      top: READER_TOP,
+      bottom: READER_BOTTOM,
+      textWidth: READER_TEXT_WIDTH,
+    });
+
     this.foundMemories.pictures.forEach((picture, index) => {
       if (picture !== null) {
         this.onPress(picture, () => {
@@ -906,6 +924,7 @@ export class BoardScene extends Scene {
     }
 
     if (this.paused) {
+      this.memoryReader.advance(delta);
       this.drawBoard();
       this.drawConnections(0);
       this.drawPair();
@@ -917,6 +936,7 @@ export class BoardScene extends Scene {
     }
 
     this.advanceCharacter(delta);
+    this.revealCard.advance(delta);
 
     if (this.revealCard.holding) {
       if (this.revealCard.waitForSkip(
@@ -992,9 +1012,12 @@ export class BoardScene extends Scene {
       this.resetButton.show();
       this.tweens.pauseAll();
       this.foundMemories.show(this.storyHolding ? [] : this.collected, select);
-      this.pauseHint.setText(this.foundMemories.showing ? READ_PROMPT : RESUME_PROMPT);
+      this.pauseHint
+        .setText(this.foundMemories.showing ? READ_PROMPT : RESUME_PROMPT)
+        .setY(PAUSE_HINT_Y);
       this.startFocus();
     } else {
+      this.stopReadingInPause();
       this.resetButton.hide();
       this.tweens.resumeAll();
       this.foundMemories.hide();
@@ -1074,6 +1097,11 @@ export class BoardScene extends Scene {
   }
 
   private readFromPause(): void {
+    if (this.readingIndex !== null) {
+      this.readWhilePaused();
+      return;
+    }
+
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
     const picked = Input.Keyboard.JustDown(this.hardDropKey)
@@ -1099,6 +1127,39 @@ export class BoardScene extends Scene {
       }
     } else if (tappedAway) {
       this.setPaused(false);
+    }
+  }
+
+  private readWhilePaused(): void {
+    const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
+      || this.resetPressed;
+    this.resetPressed = false;
+    if (resetPressed) {
+      this.closeReading();
+      this.pressReset();
+      return;
+    }
+
+    const tapped = this.tappedMemory;
+    this.tappedMemory = null;
+    const done = Input.Keyboard.JustDown(this.hardDropKey)
+      || Input.Keyboard.JustDown(this.enterKey)
+      || this.touch.takeDrop();
+
+    if (Input.Keyboard.JustDown(this.cursors.left)) {
+      this.foundMemories.move(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.right)) {
+      this.foundMemories.move(1);
+    }
+    if (tapped !== null) {
+      this.foundMemories.select(tapped);
+    }
+
+    if (done && tapped === null) {
+      this.closeReading();
+    } else if (this.foundMemories.selected !== this.readingIndex) {
+      this.openFound(this.foundMemories.selected);
     }
   }
 
@@ -1197,23 +1258,40 @@ export class BoardScene extends Scene {
 
     this.readingIndex = index;
     this.focusFrame.setVisible(false);
-    if (this.victory.active) {
-      this.victory.hideContents();
-    } else {
-      this.setPaused(false);
+
+    if (!this.victory.active) {
+      this.foundMemories.select(index);
+      this.pauseText.setVisible(false);
+      this.pauseHint.setText(READING_PROMPT).setY(READING_HINT_Y);
+      this.memoryReader.show(node.body, node.photo);
+      return;
     }
+
+    this.victory.hideContents();
     this.revealCard.show(node.title, node.body, node.photo);
   }
 
   private closeReading(): void {
     const read = this.readingIndex ?? undefined;
     this.readingIndex = null;
-    this.revealCard.reset();
-    if (this.victory.active) {
-      this.victory.showContents(read);
+
+    if (!this.victory.active) {
+      this.stopReadingInPause();
+      this.pauseText.setVisible(true);
+      this.pauseHint.setText(READ_PROMPT).setY(PAUSE_HINT_Y);
       this.startFocus();
-    } else {
-      this.setPaused(true, read);
+      return;
+    }
+
+    this.revealCard.reset();
+    this.victory.showContents(read);
+    this.startFocus();
+  }
+
+  private stopReadingInPause(): void {
+    this.memoryReader.hide();
+    if (!this.victory.active) {
+      this.readingIndex = null;
     }
   }
 
