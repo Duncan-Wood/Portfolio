@@ -11,7 +11,10 @@ import {
   drawLand,
   drawMap,
   isLand,
+  PIN_DROP_DURATION,
+  PIN_DROP_HEIGHT,
   pinCell,
+  pinDrop,
   pinLandsAt,
   pinLanded,
   threadCells,
@@ -147,10 +150,13 @@ describe('the cells a thread covers', () => {
 });
 
 describe('building the map up', () => {
-  it('starts with only the first pin down', () => {
-    expect(pinLanded(0, 0)).toBe(true);
-    for (let index = 1; index < MAP_PINS.length; index += 1) {
+  it('starts with only the first pin in the air, and nothing down yet', () => {
+    expect(pinDrop(0, 0)).toBe(PIN_DROP_HEIGHT);
+    for (let index = 0; index < MAP_PINS.length; index += 1) {
       expect(pinLanded(index, 0)).toBe(false);
+    }
+    for (let index = 1; index < MAP_PINS.length; index += 1) {
+      expect(pinDrop(index, 0)).toBeNull();
     }
     MAP_THREADS.forEach((_, index) => expect(threadRun(index, 0)).toBe(0));
   });
@@ -196,5 +202,44 @@ describe('building the map up', () => {
   it('takes long enough to watch but finishes while the card is still being read', () => {
     expect(BUILD_DURATION).toBeGreaterThan(1500);
     expect(BUILD_DURATION).toBeLessThan(4000);
+  });
+});
+
+describe('a pin dropping into place', () => {
+  it('is nowhere to be seen until it starts to fall', () => {
+    MAP_PINS.forEach((_, index) => {
+      expect(pinDrop(index, pinLandsAt(index) - PIN_DROP_DURATION - 1)).toBeNull();
+    });
+  });
+
+  it('falls from above its spot and lands exactly on it', () => {
+    MAP_PINS.forEach((_, index) => {
+      const lands = pinLandsAt(index);
+
+      expect(pinDrop(index, lands - PIN_DROP_DURATION)).toBe(PIN_DROP_HEIGHT);
+      expect(pinDrop(index, lands)).toBe(0);
+      expect(pinDrop(index, BUILD_DURATION)).toBe(0);
+    });
+  });
+
+  it('only ever falls downward', () => {
+    MAP_PINS.forEach((_, index) => {
+      const lands = pinLandsAt(index);
+      let above = PIN_DROP_HEIGHT;
+      for (let moment = lands - PIN_DROP_DURATION; moment <= lands + 50; moment += 7) {
+        const height = pinDrop(index, moment)!;
+        expect(height).toBeLessThanOrEqual(above);
+        above = height;
+      }
+    });
+  });
+
+  it('picks up speed as it falls, the way gravity would', () => {
+    const lands = pinLandsAt(0);
+    const halfway = lands - PIN_DROP_DURATION / 2;
+    const firstHalf = PIN_DROP_HEIGHT - pinDrop(0, halfway)!;
+    const secondHalf = pinDrop(0, halfway)!;
+
+    expect(secondHalf).toBeGreaterThan(firstHalf);
   });
 });

@@ -7,7 +7,7 @@ import {
   PIN_MARK,
   THREAD_MARK,
   pinCells,
-  pinLanded,
+  pinDrop,
   threadCells,
   threadRun,
 } from '../customer-map';
@@ -61,11 +61,13 @@ export class CustomerMapBuild {
     });
 
     PIN_CELLS.forEach((cells, index) => {
-      if (!pinLanded(index, elapsed)) {
+      const drop = pinDrop(index, elapsed);
+      if (drop === null) {
         return;
       }
+      const lift = Math.round(drop);
       for (const { column, row } of cells) {
-        paintMemoryMark(this.graphics, PIN_MARK, column * CELL, row * CELL, CELL);
+        paintMemoryMark(this.graphics, PIN_MARK, column * CELL, (row - lift) * CELL, CELL);
       }
     });
   }

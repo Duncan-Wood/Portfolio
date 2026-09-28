@@ -26,6 +26,9 @@ const LARGE_PINS_FROM = 60;
 const PIN_STAGGER = 34;
 const THREAD_RUN = 150;
 
+export const PIN_DROP_HEIGHT = 4;
+export const PIN_DROP_DURATION = 160;
+
 const COASTLINE: readonly MapPoint[] = [
   { x: 0.12, y: 0.30 },
   { x: 0.22, y: 0.16 },
@@ -175,7 +178,7 @@ function landGrid(columns: number, rows: number): string[][] {
   }));
 }
 
-const LANDS_AT: number[] = new Array(MAP_PINS.length).fill(0);
+const LANDS_AT: number[] = new Array(MAP_PINS.length).fill(PIN_DROP_DURATION);
 const THREAD_STARTS: number[] = MAP_THREADS.map(([from, to]) => {
   const starts = Math.max(to * PIN_STAGGER, LANDS_AT[from]);
   LANDS_AT[to] = starts + THREAD_RUN;
@@ -190,6 +193,15 @@ export function pinLandsAt(index: number): number {
 
 export function pinLanded(index: number, elapsed: number): boolean {
   return elapsed >= LANDS_AT[index];
+}
+
+export function pinDrop(index: number, elapsed: number): number | null {
+  const falling = elapsed - (LANDS_AT[index] - PIN_DROP_DURATION);
+  if (falling < 0) {
+    return null;
+  }
+  const progress = Math.min(falling / PIN_DROP_DURATION, 1);
+  return PIN_DROP_HEIGHT * (1 - progress * progress);
 }
 
 export function threadStartsAt(index: number): number {
