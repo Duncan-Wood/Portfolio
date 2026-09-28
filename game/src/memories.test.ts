@@ -8,6 +8,7 @@ import {
   nodeAt,
 } from './memories';
 import { LOCKS } from './engine/locks';
+import { MEMORY_PICTURES } from './memory-pictures';
 
 describe('the memories', () => {
   it('has at least one to pay out', () => {
@@ -36,6 +37,16 @@ describe('the memories', () => {
 
   it('has a fragment count the contact form can divide by', () => {
     expect(FRAGMENT_COUNT).toBeGreaterThan(0);
+  });
+
+  it('has a picture for every memory that names one', () => {
+    for (const chapter of CHAPTERS) {
+      for (const node of chapter.nodes) {
+        if (node.photo !== undefined) {
+          expect(MEMORY_PICTURES[node.photo], node.photo).toBeDefined();
+        }
+      }
+    }
   });
 });
 

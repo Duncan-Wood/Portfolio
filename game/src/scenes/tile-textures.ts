@@ -1,5 +1,6 @@
 import { Math as PhaserMath } from 'phaser';
-import { MEMORY_ART, type MemoryArt } from '../memory-art';
+import { type MemoryArt } from '../memory-art';
+import { MEMORY_PICTURES } from '../memory-pictures';
 import { PIECE_TYPE_COUNT, isChrysalis, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   CHRYSALIS_COLOR,
@@ -374,7 +375,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   bakeShadow(graphics, size);
   bakeShadowEyes(graphics, size);
 
-  for (const [key, art] of Object.entries(MEMORY_ART)) {
+  for (const [key, art] of Object.entries(MEMORY_PICTURES)) {
     bakeMemoryArt(graphics, key, art);
   }
 

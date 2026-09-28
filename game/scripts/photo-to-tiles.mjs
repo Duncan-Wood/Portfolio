@@ -29,12 +29,6 @@ const PICTURES = {
     rows: 115,
     crop: ['-crop', '210x220+20+8', '+repage'],
   },
-  'the-map': {
-    file: 'ecomap',
-    columns: 110,
-    rows: 110,
-    crop: ['-crop', '100x96+0+0', '+repage'],
-  },
   'the-build': { file: 'puter.jpg', columns: 110, rows: 147 },
   'no-johns': { file: 'gamecube_controller.jpg', columns: 110, rows: 147 },
   'the-kickball': {

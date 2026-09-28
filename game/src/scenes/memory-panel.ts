@@ -1,6 +1,7 @@
 import { PIECE_TYPE_COUNT } from '../engine/grid';
 import { TRACE_TEXTURE, memoryArtTexture } from './tile-textures';
-import { MEMORY_ART, type MemoryGrid } from '../memory-art';
+import { type MemoryGrid } from '../memory-art';
+import { MEMORY_PICTURES } from '../memory-pictures';
 import { revealOrder } from '../memory-reveal';
 import { PIECE_COLORS, mix } from '../palette';
 
@@ -236,7 +237,7 @@ export class MemoryPanel {
   }
 
   private choose(photo: string | undefined): MemoryGrid | null {
-    const upcoming = photo === undefined ? undefined : MEMORY_ART[photo];
+    const upcoming = photo === undefined ? undefined : MEMORY_PICTURES[photo];
 
     if (photo === undefined || upcoming === undefined) {
       this.art = null;
