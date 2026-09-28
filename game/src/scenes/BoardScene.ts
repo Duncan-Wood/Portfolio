@@ -41,7 +41,6 @@ import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
 import { VictorySky } from './victory-sky';
 import { ButterflyFlight } from './butterfly-flight';
-import { ChapterTitle } from './chapter-title';
 import { MemoryHandover } from './memory-handover';
 import {
   advanceHandover,
@@ -402,8 +401,6 @@ export class BoardScene extends Scene {
 
   private memoryPanel: MemoryPanel;
 
-  private chapterTitle: ChapterTitle;
-
   private butterflyFlight: ButterflyFlight;
 
   private memoryHandover: MemoryHandover;
@@ -695,7 +692,7 @@ export class BoardScene extends Scene {
       color: '#8ea3b0',
     }).setVisible(this.showFps);
 
-    this.objectiveText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, 12, '', {
+    this.objectiveText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, 34, '', {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#c98cff',
@@ -706,12 +703,6 @@ export class BoardScene extends Scene {
       fontSize: '28px',
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.chapterTitle = new ChapterTitle(
-      this,
-      ORIGIN_X + BOARD_WIDTH / 2,
-      ORIGIN_Y + BOARD_HEIGHT / 3,
-    );
 
     this.butterflyFlight = new ButterflyFlight(
       this,
@@ -1253,7 +1244,6 @@ export class BoardScene extends Scene {
     this.victory.hide();
     this.characterState = characterOn(this.characterState, 'restart');
     this.endingScreen.reset();
-    this.chapterTitle.reset();
     this.butterflyFlight.reset();
     this.memoryHandover.reset();
     this.memoryPanel.reset();
@@ -1362,11 +1352,6 @@ export class BoardScene extends Scene {
       alpha: 1,
       duration: 520,
     });
-
-    const at = nodeAt(this.nodesRevealed);
-    if (at !== null && at.nodeIndex === 0) {
-      this.chapterTitle.announce(CHAPTERS[at.chapterIndex].title);
-    }
   }
 
   private readSwipe(): void {
@@ -1504,7 +1489,11 @@ export class BoardScene extends Scene {
     const total = neuronsOn(this.simulation.board).length;
     const lit = total - unlitCount(this.simulation.board);
 
-    this.objectiveText.setText(`${lock.objective}  \u2014  ${lit} of ${total}`);
+    this.objectiveText.setText(this.whereYouAre(`${lock.objective} \u2014 ${lit} of ${total}`));
+  }
+
+  private whereYouAre(objective: string): string {
+    return `${CHAPTERS[this.chapterIndex].title}  \u00b7  ${objective}`;
   }
 
   private checkLock(): void {
@@ -1519,7 +1508,7 @@ export class BoardScene extends Scene {
 
     this.lockSolved = true;
     this.threadSurge = { whole: true, progress: 0, duration: stageLength('settle') };
-    this.objectiveText.setText(`${lock.objective}  \u2014  open`);
+    this.objectiveText.setText(this.whereYouAre(`${lock.objective} \u2014 open`));
     this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
 
     this.revealPending = true;
