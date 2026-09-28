@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  chrysalisSeen,
   completions,
   forgetAllProgress,
   forgetProgressFromOlderMemories,
@@ -11,6 +12,7 @@ import {
   loggedWith,
   rememberBestChain,
   rememberButterfly,
+  rememberChrysalisSeen,
   rememberCompletion,
   rememberIntroSeen,
   resumePoint,
@@ -389,6 +391,44 @@ describe('finishing the game and playing it again', () => {
     expect(completions()).toBe(1);
     expect(held.get('connected.introSeen')).toBe('true');
     expect(held.get('connected.unlocked')).toBe('true');
+  });
+});
+
+describe('whether a player has met a chrysalis', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('has not met one on a first visit', () => {
+    expect(chrysalisSeen()).toBe(false);
+  });
+
+  it('remembers meeting one, so the hint is spent once', () => {
+    rememberChrysalisSeen();
+
+    expect(chrysalisSeen()).toBe(true);
+  });
+
+  it('keeps knowing about them when the memories start over', () => {
+    rememberChrysalisSeen();
+
+    forgetRun();
+
+    expect(chrysalisSeen()).toBe(true);
   });
 });
 

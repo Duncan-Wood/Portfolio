@@ -12,6 +12,7 @@ const RESUME_KEY = 'connected.resume';
 const BUTTERFLIES_KEY = 'connected.butterflies';
 const INTRO_SEEN_KEY = 'connected.introSeen';
 const COMPLETIONS_KEY = 'connected.completions';
+const CHRYSALIS_SEEN_KEY = 'connected.chrysalisSeen';
 
 export function playedBefore(): boolean {
   return readStored(PLAYED_KEY) === 'true';
@@ -27,6 +28,14 @@ export function introSeen(): boolean {
 
 export function rememberIntroSeen(): void {
   writeStored(INTRO_SEEN_KEY, 'true');
+}
+
+export function chrysalisSeen(): boolean {
+  return readStored(CHRYSALIS_SEEN_KEY) === 'true';
+}
+
+export function rememberChrysalisSeen(): void {
+  writeStored(CHRYSALIS_SEEN_KEY, 'true');
 }
 
 export interface SurfacedFragment {
@@ -138,7 +147,9 @@ export function forgetRun(): void {
 
 export function forgetAllProgress(): void {
   forgetRun();
-  for (const key of [BEST_CHAIN_KEY, PLAYED_KEY, INTRO_SEEN_KEY, COMPLETIONS_KEY]) {
+  for (const key of [
+    BEST_CHAIN_KEY, PLAYED_KEY, INTRO_SEEN_KEY, COMPLETIONS_KEY, CHRYSALIS_SEEN_KEY,
+  ]) {
     clearStored(key);
   }
 }
