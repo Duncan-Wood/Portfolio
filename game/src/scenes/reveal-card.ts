@@ -1,5 +1,7 @@
 import { GROUND_COLOR } from '../palette';
-import { TRACE_TEXTURE, memoryArtTexture } from './tile-textures';
+import { CUSTOMER_MAP_LAND_TEXTURE, TRACE_TEXTURE, memoryArtTexture } from './tile-textures';
+import { CustomerMapBuild } from './customer-map-build';
+import { CUSTOMER_MAP_PICTURE } from '../memory-pictures';
 
 const PHOTO_MAX_WIDTH = 368;
 const PHOTO_MAX_HEIGHT = 300;
@@ -25,6 +27,7 @@ export class RevealCard {
 
   private readonly scrim: Phaser.GameObjects.Rectangle;
   private readonly photo: Phaser.GameObjects.Image;
+  private readonly mapBuild: CustomerMapBuild;
   private readonly title: Phaser.GameObjects.Text;
   private readonly body: Phaser.GameObjects.Text;
   private readonly hint: Phaser.GameObjects.Text;
@@ -48,6 +51,7 @@ export class RevealCard {
 
     this.photo = scene.add.image(area.centerX, 0, TRACE_TEXTURE)
       .setVisible(false);
+    this.mapBuild = new CustomerMapBuild(scene);
 
     this.title = scene.add.text(area.centerX, area.centerY - 70, '', {
       fontFamily: 'monospace',
@@ -83,7 +87,7 @@ export class RevealCard {
     this.skippableIn = REVEAL_SKIP_GRACE;
     this.hint.setText(this.skipPrompt).setVisible(false);
 
-    this.scene.tweens.killTweensOf([this.scrim, this.title, this.body, this.photo]);
+    this.scene.tweens.killTweensOf([this.scrim, this.title, this.body, this.photo, this.mapBuild.graphics]);
 
     this.showPicture(photo);
     this.title.setText(title).setVisible(title !== '');
@@ -91,11 +95,17 @@ export class RevealCard {
 
     this.layOut();
 
+    if (photo === CUSTOMER_MAP_PICTURE && this.photo.visible) {
+      this.mapBuild.play(this.photo);
+    } else {
+      this.mapBuild.stop();
+    }
+
     const scrimAlpha = this.scrim.visible ? this.scrim.alpha : 0;
     this.scrim.setVisible(true).setAlpha(scrimAlpha);
     this.scene.tweens.add({ targets: this.scrim, alpha: 1, duration: 240 });
 
-    for (const part of [this.title, this.body, this.photo]) {
+    for (const part of [this.title, this.body, this.photo, this.mapBuild.graphics]) {
       if (!part.visible) {
         continue;
       }
@@ -127,7 +137,7 @@ export class RevealCard {
   }
 
   hide(): void {
-    const parts = [this.scrim, this.title, this.body, this.hint, this.photo];
+    const parts = [this.scrim, this.title, this.body, this.hint, this.photo, this.mapBuild.graphics];
     this.scene.tweens.killTweensOf(parts);
     this.scene.tweens.add({
       targets: parts,
@@ -137,6 +147,7 @@ export class RevealCard {
         for (const part of parts) {
           part.setVisible(false);
         }
+        this.mapBuild.stop();
       },
     });
   }
@@ -156,12 +167,15 @@ export class RevealCard {
     for (const part of parts) {
       part.setVisible(false).setAlpha(1);
     }
+    this.mapBuild.stop();
     this.skippableIn = 0;
     this.isHolding = false;
   }
 
   private showPicture(picture?: string): void {
-    const key = picture === undefined ? null : memoryArtTexture(picture);
+    const key = picture === undefined ? null
+      : picture === CUSTOMER_MAP_PICTURE ? CUSTOMER_MAP_LAND_TEXTURE
+      : memoryArtTexture(picture);
     if (key === null || !this.scene.textures.exists(key)) {
       this.photo.setVisible(false);
       return;

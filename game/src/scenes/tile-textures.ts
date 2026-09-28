@@ -1,6 +1,6 @@
 import { Math as PhaserMath } from 'phaser';
-import { type MemoryArt } from '../memory-art';
-import { MEMORY_PICTURES } from '../memory-pictures';
+import { type MemoryGrid } from '../memory-art';
+import { CUSTOMER_MAP_LAND, MEMORY_PICTURES } from '../memory-pictures';
 import { PIECE_TYPE_COUNT, isChrysalis, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   CHRYSALIS_COLOR,
@@ -313,15 +313,44 @@ export function memoryArtTexture(key: string): string {
   return `memory-art-${key}`;
 }
 
+export const CUSTOMER_MAP_LAND_TEXTURE = 'customer-map-land';
+
 const MEMORY_ART_WIDTH = 660;
+
+export function memoryArtCell(columns: number): number {
+  return Math.max(3, Math.floor(MEMORY_ART_WIDTH / columns));
+}
+
+export function paintMemoryMark(
+  graphics: Phaser.GameObjects.Graphics,
+  mark: string,
+  x: number,
+  y: number,
+  cell: number,
+): void {
+  const code = Number(mark);
+  if (mark === '.' || !Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
+    return;
+  }
+
+  const inset = cell >= 10 ? 1 : 0;
+  const shaded = code >= PIECE_TYPE_COUNT;
+  const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
+  const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
+  const edge = mix(colour, 0x000000, shaded ? 0.8 : 0.62);
+
+  graphics.fillStyle(edge, 1);
+  graphics.fillRect(x, y, cell, cell);
+  graphics.fillStyle(face, 1);
+  graphics.fillRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2);
+}
 
 function bakeMemoryArt(
   graphics: Phaser.GameObjects.Graphics,
-  key: string,
-  art: MemoryArt,
+  textureKey: string,
+  art: MemoryGrid,
 ): void {
-  const cell = Math.max(3, Math.floor(MEMORY_ART_WIDTH / art.columns));
-  const inset = cell >= 10 ? 1 : 0;
+  const cell = memoryArtCell(art.columns);
 
   graphics.clear();
 
@@ -329,31 +358,13 @@ function bakeMemoryArt(
     const line = art.rows[row];
     for (let column = 0; column < art.columns; column += 1) {
       const mark = line[column];
-      if (mark === undefined || mark === '.') {
-        continue;
+      if (mark !== undefined) {
+        paintMemoryMark(graphics, mark, column * cell, row * cell, cell);
       }
-
-      const code = Number(mark);
-      if (!Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
-        continue;
-      }
-
-      const shaded = code >= PIECE_TYPE_COUNT;
-      const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
-      const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
-      const edge = mix(colour, 0x000000, shaded ? 0.8 : 0.62);
-
-      const x = column * cell;
-      const y = row * cell;
-
-      graphics.fillStyle(edge, 1);
-      graphics.fillRect(x, y, cell, cell);
-      graphics.fillStyle(face, 1);
-      graphics.fillRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2);
     }
   }
 
-  graphics.generateTexture(memoryArtTexture(key), art.columns * cell, art.rows.length * cell);
+  graphics.generateTexture(textureKey, art.columns * cell, art.rows.length * cell);
 }
 
 export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number): void {
@@ -376,8 +387,9 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   bakeShadowEyes(graphics, size);
 
   for (const [key, art] of Object.entries(MEMORY_PICTURES)) {
-    bakeMemoryArt(graphics, key, art);
+    bakeMemoryArt(graphics, memoryArtTexture(key), art);
   }
+  bakeMemoryArt(graphics, CUSTOMER_MAP_LAND_TEXTURE, CUSTOMER_MAP_LAND);
 
   bakeTrace(graphics, gap);
 
