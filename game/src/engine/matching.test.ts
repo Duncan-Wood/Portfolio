@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Board } from './board';
-import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, chrysalisCell, neuronCell } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, neuronCell } from './grid';
 import { type ChainLink, clearStep, findGroups, scoreLink } from './matching';
 
 const resolveChain = (board: Board): ChainLink[] => {
@@ -19,7 +19,7 @@ const scoreChain = (links: ChainLink[]): number =>
   links.reduce((total, link, index) => total + scoreLink(link, index), 0);
 
 const PIECE_LETTERS: Record<string, number> = {
-  R: 0, B: 1, G: 2, Y: 3, N: neuronCell(false), n: neuronCell(true), C: chrysalisCell(),
+  R: 0, B: 1, G: 2, Y: 3, N: neuronCell(false), n: neuronCell(true),
 };
 
 const boardFrom = (...rows: string[]): Board => {
@@ -325,28 +325,5 @@ describe('reaching a neuron', () => {
     const board = boardFrom('n R R R R .');
 
     expect(clearStep(board)?.neuronsLit).toEqual([]);
-  });
-});
-
-describe('a clear beside a chrysalis', () => {
-  it('reports the butterfly it set free', () => {
-    const board = boardFrom(
-      'RRR...',
-      'RC....',
-    );
-
-    const link = clearStep(board)!;
-
-    expect(link.butterfliesFreed).toEqual([{ column: 1, row: ROWS - 1 }]);
-    expect(board.pieceAt(1, ROWS - 1)).toBeNull();
-  });
-
-  it('reports none when the clear never reaches it', () => {
-    const board = boardFrom(
-      'RRRR..',
-      '.....C',
-    );
-
-    expect(clearStep(board)!.butterfliesFreed).toEqual([]);
   });
 });

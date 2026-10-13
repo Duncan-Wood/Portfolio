@@ -1,4 +1,4 @@
-import { BUTTERFLY_TEXTURE, memoryArtTexture } from './tile-textures';
+import { memoryArtTexture } from './tile-textures';
 
 const PICTURE_BOX = 100;
 const PICTURE_GAP = 14;
@@ -11,12 +11,10 @@ export interface FoundEntry {
   photo?: string;
 }
 
-const BUTTERFLY_BOX = 52;
 
 export class FoundMemories {
   readonly pictures: (Phaser.GameObjects.Image | null)[];
 
-  private readonly grown: boolean[];
 
   private readonly centerX: number;
   private readonly maxWidth: number;
@@ -40,14 +38,12 @@ export class FoundMemories {
 
     this.frame = scene.add.graphics().setVisible(false);
 
-    this.grown = entries.map((entry) => entry.photo !== undefined);
-
     this.pictures = entries.map((entry) => {
       if (entry.title === '') {
         return null;
       }
 
-      const key = entry.photo === undefined ? BUTTERFLY_TEXTURE : memoryArtTexture(entry.photo);
+      const key = memoryArtTexture(entry.photo!);
       if (!scene.textures.exists(key)) {
         return null;
       }
@@ -87,9 +83,8 @@ export class FoundMemories {
     const left = this.centerX - width / 2 + box / 2;
     this.shown.forEach((index, position) => {
       const picture = this.pictures[index]!;
-      const fits = this.grown[index] ? box : Math.min(box, BUTTERFLY_BOX);
       picture
-        .setScale(Math.min(fits / picture.width, fits / picture.height))
+        .setScale(Math.min(box / picture.width, box / picture.height))
         .setX(left + position * (box + PICTURE_GAP))
         .setVisible(true);
     });

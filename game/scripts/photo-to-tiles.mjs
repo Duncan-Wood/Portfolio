@@ -51,6 +51,7 @@ const PICTURES = {
     contrast: [],
     afterResize: ['-negate', '-normalize', '-level', '0,40%'],
   },
+  'the-theta': { file: 'theta.jpg', columns: 110, rows: 82 },
   'the-notebook': {
     file: 'notebook_and_pen.jpg',
     columns: 110,

@@ -6,11 +6,9 @@ import {
   forgetRun,
   foundFragments,
   foundIndices,
-  freedButterflies,
   introSeen,
   loggedWith,
   rememberBestChain,
-  rememberButterfly,
   rememberCompletion,
   rememberIntroSeen,
   resumePoint,
@@ -370,56 +368,3 @@ describe('finishing the game and playing it again', () => {
     expect(held.get('connected.introSeen')).toBe('true');
   });
 });
-
-describe('the butterflies a player has set free', () => {
-  const held = new Map<string, string>();
-
-  beforeEach(() => {
-    held.clear();
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem: (key: string) => held.get(key) ?? null,
-        setItem: (key: string, value: string) => held.set(key, value),
-        removeItem: (key: string) => held.delete(key),
-      },
-    });
-  });
-
-  afterEach(() => {
-    Reflect.deleteProperty(globalThis, 'localStorage');
-  });
-
-  it('starts with none free', () => {
-    expect(freedButterflies()).toEqual([]);
-  });
-
-  it('remembers the chapter each one left from', () => {
-    rememberButterfly(3);
-    rememberButterfly(1);
-
-    expect(freedButterflies()).toEqual([1, 3]);
-  });
-
-  it('counts a chapter once however many times it is told', () => {
-    rememberButterfly(2);
-    rememberButterfly(2);
-
-    expect(freedButterflies()).toEqual([2]);
-  });
-
-  it('reads a garbled store as none free rather than throwing', () => {
-    held.set('connected.butterflies', 'not json');
-
-    expect(freedButterflies()).toEqual([]);
-  });
-
-  it('lets them go again when the memories start over', () => {
-    rememberButterfly(0);
-
-    forgetRun();
-
-    expect(freedButterflies()).toEqual([]);
-  });
-});
-

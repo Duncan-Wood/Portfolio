@@ -30,9 +30,7 @@ export const NEURON_COLOR = 0x6d4f96;
 
 export const NEURON_LIT_COLOR = TRACK_LIT_COLOR;
 
-export const CHRYSALIS_COLOR = 0xf2e2c4;
-
-export const CHRYSALIS_THREAD_COLOR = 0x8d7fa8;
+export const STAR_COLOR = 0xf2e2c4;
 
 export const SHADOW_COLOR = 0x0d0714;
 

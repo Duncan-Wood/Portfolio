@@ -1,10 +1,9 @@
 import { Math as PhaserMath } from 'phaser';
 import { type MemoryGrid } from '../memory-art';
 import { MEMORY_PICTURES, ONE_DOOR_DOORWAY } from '../memory-pictures';
-import { PIECE_TYPE_COUNT, isChrysalis, isNeuron, isNeuronLit } from '../engine/grid';
+import { PIECE_TYPE_COUNT, isNeuron, isNeuronLit } from '../engine/grid';
 import {
-  CHRYSALIS_COLOR,
-  CHRYSALIS_THREAD_COLOR,
+  STAR_COLOR,
   EMPTY_COLOR,
   NEURON_LIT_COLOR,
   NEURON_COLOR,
@@ -47,9 +46,6 @@ function tileCornerRadius(size: number): number {
 
 const NEURON_TEXTURE = 'neuron';
 const NEURON_LIT_TEXTURE = 'neuron-lit';
-const CHRYSALIS_TEXTURE = 'chrysalis';
-
-export const BUTTERFLY_TEXTURE = 'butterfly';
 
 export const STAR_TEXTURE = 'star';
 const STAR_SIZE = 30;
@@ -63,9 +59,6 @@ export function tileTexture(pieceType: number | null): string {
     return isNeuronLit(pieceType) ? NEURON_LIT_TEXTURE : NEURON_TEXTURE;
   }
 
-  if (isChrysalis(pieceType)) {
-    return CHRYSALIS_TEXTURE;
-  }
   return `tile-${pieceType}`;
 }
 
@@ -116,77 +109,13 @@ function bakeNeuron(graphics: Phaser.GameObjects.Graphics, size: number, lit: bo
   graphics.generateTexture(lit ? NEURON_LIT_TEXTURE : NEURON_TEXTURE, size, size);
 }
 
-function bakeChrysalis(graphics: Phaser.GameObjects.Graphics, size: number): void {
-  const middle = size / 2;
-  const inset = TILE_INSET;
-  const span = size - inset * 2;
-  const corner = tileCornerRadius(size);
-
-  graphics.clear();
-
-  graphics.fillStyle(mix(EMPTY_COLOR, 0x000000, 0.45), 1);
-  graphics.fillRoundedRect(inset, inset, span, span, corner);
-
-  graphics.lineStyle(Math.max(2, size * 0.035), CHRYSALIS_THREAD_COLOR, 0.9);
-  graphics.beginPath();
-  graphics.moveTo(middle, inset);
-  graphics.lineTo(middle, size * 0.3);
-  graphics.strokePath();
-
-  graphics.fillStyle(mix(CHRYSALIS_COLOR, 0x000000, 0.45), 1);
-  graphics.fillEllipse(middle, size * 0.58, size * 0.42, size * 0.56);
-
-  graphics.fillStyle(CHRYSALIS_COLOR, 1);
-  graphics.fillEllipse(middle - size * 0.03, size * 0.56, size * 0.3, size * 0.48);
-
-  graphics.fillStyle(mix(CHRYSALIS_COLOR, 0x000000, 0.3), 1);
-  for (const at of [0.42, 0.52, 0.62] as const) {
-    graphics.fillRect(middle - size * 0.16, size * at, size * 0.32, Math.max(1, size * 0.02));
-  }
-
-  graphics.lineStyle(2, mix(CHRYSALIS_COLOR, EMPTY_COLOR, 0.5), 0.8);
-  graphics.strokeRoundedRect(inset, inset, span, span, corner);
-
-  graphics.generateTexture(CHRYSALIS_TEXTURE, size, size);
-}
-
-function bakeButterfly(graphics: Phaser.GameObjects.Graphics, size: number): void {
-  const span = Math.round(size * 1.6);
-  const middle = span / 2;
-  const wing = mix(CHRYSALIS_COLOR, TRACK_LIT_COLOR, 0.25);
-
-  graphics.clear();
-
-  for (const side of [-1, 1] as const) {
-    graphics.fillStyle(wing, 1);
-    graphics.fillEllipse(middle + side * span * 0.24, span * 0.34, span * 0.44, span * 0.42);
-    graphics.fillEllipse(middle + side * span * 0.19, span * 0.64, span * 0.34, span * 0.36);
-
-    graphics.fillStyle(mix(wing, 0x000000, 0.35), 1);
-    graphics.fillEllipse(middle + side * span * 0.33, span * 0.28, span * 0.16, span * 0.16);
-    graphics.fillEllipse(middle + side * span * 0.24, span * 0.7, span * 0.12, span * 0.12);
-
-    graphics.lineStyle(Math.max(2, span * 0.018), mix(wing, 0x000000, 0.45), 1);
-    graphics.beginPath();
-    graphics.moveTo(middle, span * 0.24);
-    graphics.lineTo(middle + side * span * 0.2, span * 0.08);
-    graphics.strokePath();
-  }
-
-  graphics.fillStyle(mix(CHRYSALIS_COLOR, 0x000000, 0.62), 1);
-  graphics.fillEllipse(middle, span * 0.5, span * 0.1, span * 0.6);
-  graphics.fillCircle(middle, span * 0.26, span * 0.06);
-
-  graphics.generateTexture(BUTTERFLY_TEXTURE, span, span);
-}
-
 function bakeStar(graphics: Phaser.GameObjects.Graphics): void {
   const middle = STAR_SIZE / 2;
 
   graphics.clear();
 
   for (const [radius, alpha] of [[0.46, 0.12], [0.3, 0.16], [0.18, 0.28]] as const) {
-    graphics.fillStyle(CHRYSALIS_COLOR, alpha);
+    graphics.fillStyle(STAR_COLOR, alpha);
     graphics.fillCircle(middle, middle, STAR_SIZE * radius);
   }
 
@@ -403,8 +332,6 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   bakeNeuron(graphics, size, false);
   bakeNeuron(graphics, size, true);
 
-  bakeChrysalis(graphics, size);
-  bakeButterfly(graphics, size);
   bakeStar(graphics);
 
   bakeShadow(graphics, size);

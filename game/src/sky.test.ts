@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SKY_EDGES, SKY_POINTS, litEdges } from './sky';
-import { CHAPTERS, FRAGMENT_COUNT, butterflyIndex } from './memories';
+import { FRAGMENT_COUNT } from './memories';
 
 describe('the sky', () => {
-  it('has a place for every memory and every butterfly', () => {
-    expect(SKY_POINTS).toHaveLength(FRAGMENT_COUNT + CHAPTERS.length);
+  it('has a place for every memory', () => {
+    expect(SKY_POINTS).toHaveLength(FRAGMENT_COUNT);
   });
 
   it('keeps every star inside the frame it is drawn in', () => {
@@ -20,15 +20,6 @@ describe('the sky', () => {
     const places = new Set(SKY_POINTS.map((point) => `${point.x},${point.y}`));
 
     expect(places.size).toBe(SKY_POINTS.length);
-  });
-
-  it('burns the memories brighter than the butterflies', () => {
-    for (let index = 0; index < FRAGMENT_COUNT; index += 1) {
-      expect(SKY_POINTS[index].bright).toBe(true);
-    }
-    for (let chapter = 0; chapter < CHAPTERS.length; chapter += 1) {
-      expect(SKY_POINTS[butterflyIndex(chapter)].bright).toBe(false);
-    }
   });
 
   it('draws every line between two stars that exist', () => {

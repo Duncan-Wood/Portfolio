@@ -7,21 +7,11 @@ export interface MemoryNode {
 export interface Chapter {
   title: string;
   nodes: MemoryNode[];
-  butterfly?: MemoryNode;
 }
 
 export const CHAPTERS: Chapter[] = [
   {
     title: 'Now',
-    butterfly: {
-      title: 'Theta',
-      body:
-        'I adopted a jumping spider from a former colleague. His name is Theta.\n\n'
-        + 'I built him an enclosure, and he gets fat mealworms, fresh spritzes of water '
-        + 'and as much to climb as I can give him.\n\n'
-        + 'Male jumping spiders do not live long. He is an old man now and slowing '
-        + 'down a lot. He is still here, and I kept him alive.'
-    },
     nodes: [
       {
         title: 'Mighty Crow',
@@ -58,21 +48,20 @@ export const CHAPTERS: Chapter[] = [
           + 'Most of what is in it is unfinished, and I have stopped minding. I keep '
           + 'opening it.'
       },
+      {
+        title: 'Theta',
+        photo: 'the-theta',
+        body:
+          'I adopted a jumping spider from a former colleague. His name is Theta.\n\n'
+          + 'I built him an enclosure, and he gets fat mealworms, fresh spritzes of '
+          + 'water and as much to climb as I can give him.\n\n'
+          + 'Spiders grow by shedding their skin. I bought a macro lens to photograph '
+          + 'him.'
+      },
     ],
   },
   {
     title: 'Washington, DC',
-    butterfly: {
-      title: 'Chinatown',
-      body:
-        'I raised money for trans rights on the street in DC. Some people tried to '
-        + 'ragebait me, or got aggressive and defensive. A coworker was spat on by a '
-        + 'passerby.\n\n'
-        + 'Most people would not talk to us. When they did, they rarely gave. We kept '
-        + 'at it, and it still worked sometimes.\n\n'
-        + 'It was empowering, and I learned what was actually being fought for in my '
-        + 'community.'
-    },
     nodes: [
       {
         title: 'The Kickball',
@@ -99,16 +88,6 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     title: 'Florida',
-    butterfly: {
-      title: 'Mise En Place',
-      body:
-        'I graduated into a pandemic. No ceremony, nobody around. So I started a '
-        + 'group and named it after the cooking term: everything in its place before '
-        + 'you begin.\n\n'
-        + 'We met to show each other what we were making. Mine was a script about '
-        + 'Melee that I worked on for two years and never finished.\n\n'
-        + 'The group kept going anyway. That turned out to be the thing I made.'
-    },
     nodes: [
       {
         title: 'No Johns',
@@ -124,15 +103,6 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     title: 'Illinois',
-    butterfly: {
-      title: 'The Speech',
-      body:
-        'Oratorical Declamation. The same speech about white privilege, competition '
-        + 'after competition.\n\n'
-        + 'I lost most of them. I learned what redlining was, and white flight, and '
-        + 'how little I had known.\n\n'
-        + 'Saying a thing out loud enough times is how I found out I meant it.'
-    },
     nodes: [
       {
         title: 'The Hat',
@@ -187,29 +157,12 @@ export const FRAGMENT_COUNT = CHAPTERS.reduce(
   0,
 );
 
-export function butterflyIndex(chapterIndex: number): number {
-  return FRAGMENT_COUNT + chapterIndex;
-}
-
 export function collectableAt(index: number): MemoryNode | null {
-  if (index < 0) {
-    return null;
-  }
-
-  if (index < FRAGMENT_COUNT) {
-    return nodeAt(index)!.node;
-  }
-
-  return CHAPTERS[index - FRAGMENT_COUNT]?.butterfly ?? null;
+  return nodeAt(index)?.node ?? null;
 }
 
 export function collectionEntries(): MemoryNode[] {
-  const empty = { title: '', body: '' };
-
-  return [
-    ...CHAPTERS.flatMap((chapter) => chapter.nodes),
-    ...CHAPTERS.map((chapter) => chapter.butterfly ?? empty),
-  ];
+  return CHAPTERS.flatMap((chapter) => chapter.nodes);
 }
 
 export const MEMORY_SIGNATURE = [

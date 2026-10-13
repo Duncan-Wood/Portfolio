@@ -1,5 +1,5 @@
 import { SKY_POINTS, litEdges } from '../sky';
-import { CHRYSALIS_COLOR, TRACK_LIT_COLOR, mix } from '../palette';
+import { STAR_COLOR, TRACK_LIT_COLOR, mix } from '../palette';
 import { STAR_TEXTURE } from './tile-textures';
 import { characterTexture } from './character-textures';
 import { type FoundEntry } from './found-memories';
@@ -209,7 +209,7 @@ export class VictorySky {
       this.pictures[index]!
         .setScale(chosen ? scale * SELECTED_LIFT : scale)
         .setAlpha(chosen ? 1 : DIMMED)
-        .setTint(chosen ? 0xffffff : mix(CHRYSALIS_COLOR, 0x000000, 0.1));
+        .setTint(chosen ? 0xffffff : mix(STAR_COLOR, 0x000000, 0.1));
     }
 
     this.title.setText(this.entries[this.selected].title).setVisible(true);

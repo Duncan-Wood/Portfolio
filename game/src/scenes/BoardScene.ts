@@ -5,7 +5,6 @@ import {
   PIECE_TYPE_COUNT,
   ROWS,
   VISIBLE_ROWS,
-  isChrysalis,
   isColour,
   isNeuronLit,
   isShadow,
@@ -42,7 +41,6 @@ import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
 import { MemoryReader } from './memory-reader';
 import { VictorySky } from './victory-sky';
-import { ButterflyFlight } from './butterfly-flight';
 import { MemoryHandover } from './memory-handover';
 import {
   advanceHandover,
@@ -54,26 +52,21 @@ import { PressTwiceButton } from './press-twice-button';
 import { VictoryScreen } from './victory-screen';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
-import type { ChrysalisSite } from '../engine/chrysalis';
 import {
   CHAPTERS,
   FRAGMENT_COUNT,
-  butterflyIndex,
   collectableAt,
   collectionEntries,
-  type MemoryNode,
   nodeAt,
 } from '../memories';
 import {
   completions,
   forgetAllProgress,
-  freedButterflies,
   forgetRun,
   foundFragments,
   introSeen,
   playedBefore,
   rememberBestChain,
-  rememberButterfly,
   rememberCompletion,
   rememberFragment,
   rememberIntroSeen,
@@ -417,7 +410,6 @@ export class BoardScene extends Scene {
 
   private memoryPanel: MemoryPanel;
 
-  private butterflyFlight: ButterflyFlight;
 
   private memoryHandover: MemoryHandover;
 
@@ -723,13 +715,6 @@ export class BoardScene extends Scene {
       fontSize: '28px',
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.butterflyFlight = new ButterflyFlight(
-      this,
-      ORIGIN_X + BOARD_WIDTH / 2,
-      ORIGIN_Y + BOARD_HEIGHT / 5,
-      ORIGIN_Y - CELL_SIZE,
-    );
 
     this.memoryHandover = new MemoryHandover(this, {
       centerX: ORIGIN_X + BOARD_WIDTH / 2,
@@ -1332,7 +1317,6 @@ export class BoardScene extends Scene {
     this.victory.hide();
     this.characterState = characterOn(this.characterState, 'restart');
     this.endingScreen.reset();
-    this.butterflyFlight.reset();
     this.memoryHandover.reset();
     this.memoryPanel.reset();
     if (!keepStory) {
@@ -1565,12 +1549,6 @@ export class BoardScene extends Scene {
           this.cellTiles[index]
             .setScale(1 + beat * 0.045)
             .setAlpha(0.88 + beat * 0.12);
-        } else if (isChrysalis(pieceType)) {
-          this.pulsingCells.add(index);
-          const breath = Math.sin(this.shadowClock / 900 + column);
-          this.cellTiles[index]
-            .setScale(1 + breath * 0.05, 1 - breath * 0.035)
-            .setAngle(breath * 3.5);
         } else if (this.pulsingCells.delete(index) && !possessed) {
           this.cellTiles[index].setScale(1).setAlpha(1).setAngle(0);
         }
@@ -1583,7 +1561,7 @@ export class BoardScene extends Scene {
     this.lockSolved = false;
     this.handoverElapsed = null;
     this.tuning.fallInterval = lock.fallInterval;
-    seedLock(this.simulation.board, lock, Math.random, this.butterflyWaiting !== undefined);
+    seedLock(this.simulation.board, lock, Math.random);
     this.litNeurons = [];
     this.refreshObjective();
   }
@@ -2178,7 +2156,6 @@ export class BoardScene extends Scene {
     const poppedAt = this.popCells(lastBeat.link, lastBeat.connections);
 
     this.reachNeurons(lastBeat.link.neuronsLit);
-    this.releaseButterflies(lastBeat.link.butterfliesFreed);
 
     this.soundBoard.play({
       ...popVoice(this.simulation.chainLength - 1),
@@ -2187,34 +2164,7 @@ export class BoardScene extends Scene {
   }
 
   private get collected(): number[] {
-    return [...foundFragments(), ...freedButterflies().map(butterflyIndex)];
-  }
-
-  private get butterflyWaiting(): MemoryNode | undefined {
-    const at = nodeAt(this.nodesRevealed);
-    if (at === null || freedButterflies().includes(at.chapterIndex)) {
-      return undefined;
-    }
-
-    return CHAPTERS[at.chapterIndex].butterfly;
-  }
-
-  private releaseButterflies(freed: readonly ChrysalisSite[]): void {
-    const butterfly = this.butterflyWaiting;
-    const at = nodeAt(this.nodesRevealed);
-    if (freed.length === 0 || butterfly === undefined || at === null) {
-      return;
-    }
-
-    rememberButterfly(at.chapterIndex);
-    this.characterState = characterOn(this.characterState, 'good');
-
-    const [site] = freed;
-    this.butterflyFlight.release(
-      centerOfColumn(site.column),
-      centerOfRow(site.row),
-      butterfly.title,
-    );
+    return foundFragments();
   }
 
   private reachNeurons(lit: readonly NeuronSite[]): void {

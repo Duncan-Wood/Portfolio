@@ -3,7 +3,6 @@ import {
   FIRST_VISIBLE_ROW,
   PIECE_TYPE_COUNT,
   ROWS,
-  chrysalisCell,
   isColour,
   isNeuron,
   isShadow,
@@ -77,7 +76,6 @@ export function seedLock(
   board: Board,
   lock: Lock,
   random: () => number,
-  withChrysalis = false,
 ): void {
   board.reset();
 
@@ -212,43 +210,5 @@ export function seedLock(
     }
     board.clear(cell.column, cell.row);
     board.place(cell.column, cell.row, (piece + 1) % PIECE_TYPE_COUNT);
-  }
-
-  if (!withChrysalis) {
-    return;
-  }
-
-  const besideNeuron = (column: number, row: number): boolean =>
-    [{ c: 1, r: 0 }, { c: -1, r: 0 }, { c: 0, r: 1 }, { c: 0, r: -1 }]
-      .some((step) => isNeuron(board.pieceAt(column + step.c, row + step.r)));
-
-  let resting: { column: number; row: number } | null = null;
-  let bestScore = -Infinity;
-
-  for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
-    for (let column = 0; column < COLUMNS; column += 1) {
-      if (!isColour(board.pieceAt(column, row)) || besideNeuron(column, row)) {
-        continue;
-      }
-
-      const room = reachable(column, row);
-      if (room < 2) {
-        continue;
-      }
-
-      const apart = neurons.length === 0
-        ? 0
-        : Math.min(...neurons.map((n) => Math.abs(n.column - column) + Math.abs(n.row - row)));
-      const score = apart * 3 + room;
-      if (score > bestScore) {
-        bestScore = score;
-        resting = { column, row };
-      }
-    }
-  }
-
-  if (resting !== null) {
-    board.clear(resting.column, resting.row);
-    board.place(resting.column, resting.row, chrysalisCell());
   }
 }

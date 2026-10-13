@@ -15,10 +15,7 @@ export const SKY_POINTS: readonly SkyPoint[] = [
   { x: 0.66, y: 0.44, bright: true },
   { x: 0.79, y: 0.62, bright: true },
   { x: 0.90, y: 0.34, bright: true },
-  { x: 0.05, y: 0.36, bright: false },
-  { x: 0.38, y: 0.20, bright: false },
-  { x: 0.70, y: 0.16, bright: false },
-  { x: 0.86, y: 0.84, bright: false },
+  { x: 0.05, y: 0.36, bright: true },
 ];
 
 export const SKY_EDGES: readonly SkyEdge[] = [
@@ -30,9 +27,6 @@ export const SKY_EDGES: readonly SkyEdge[] = [
   [5, 6],
   [6, 7],
   [8, 0],
-  [9, 3],
-  [10, 5],
-  [11, 6],
 ];
 
 export function litEdges(found: readonly number[]): SkyEdge[] {

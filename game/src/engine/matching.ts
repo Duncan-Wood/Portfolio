@@ -1,6 +1,5 @@
 import { Board } from './board';
 import { lightAdjacent, type NeuronSite } from './neurons';
-import { freeAdjacent, type ChrysalisSite } from './chrysalis';
 import {
   COLUMNS,
   FIRST_VISIBLE_ROW,
@@ -38,7 +37,6 @@ export interface ChainLink {
   cellsCleared: number;
   shadowPurified: ShadowHit[];
   neuronsLit: NeuronSite[];
-  butterfliesFreed: ChrysalisSite[];
 }
 
 export function findGroups(board: Board): Group[] {
@@ -81,9 +79,8 @@ export function clearStep(board: Board): ChainLink | null {
 
   const cleared = groups.flatMap((group) => group.cells);
   const neuronsLit = lightAdjacent(board, cleared);
-  const butterfliesFreed = freeAdjacent(board, cleared);
 
-  return { groups, cellsCleared, shadowPurified: purified, neuronsLit, butterfliesFreed };
+  return { groups, cellsCleared, shadowPurified: purified, neuronsLit };
 }
 
 function purifyShadow(board: Board, groups: Group[]): ShadowHit[] {

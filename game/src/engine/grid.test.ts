@@ -6,9 +6,7 @@ import {
   PIECE_TYPE_COUNT,
   ROWS,
   VISIBLE_ROWS,
-  chrysalisCell,
   isAnchored,
-  isChrysalis,
   isColour,
   isNeuron,
   isNeuronLit,
@@ -77,26 +75,5 @@ describe('the neuron', () => {
     expect(isAnchored(0)).toBe(false);
     expect(isAnchored(shadowCell(0))).toBe(false);
     expect(isAnchored(null)).toBe(false);
-  });
-});
-
-describe('a chrysalis', () => {
-  it('is its own kind of cell, not a colour, a shadow or a neuron', () => {
-    expect(isChrysalis(chrysalisCell())).toBe(true);
-    expect(isChrysalis(0)).toBe(false);
-    expect(isChrysalis(shadowCell(0))).toBe(false);
-    expect(isChrysalis(neuronCell(false))).toBe(false);
-    expect(isChrysalis(neuronCell(true))).toBe(false);
-    expect(isChrysalis(null)).toBe(false);
-  });
-
-  it('is not mistaken for a neuron or a colour by the other predicates', () => {
-    expect(isNeuron(chrysalisCell())).toBe(false);
-    expect(isColour(chrysalisCell())).toBe(false);
-    expect(isShadow(chrysalisCell())).toBe(false);
-  });
-
-  it('stays where it is put, like a neuron', () => {
-    expect(isAnchored(chrysalisCell())).toBe(true);
   });
 });

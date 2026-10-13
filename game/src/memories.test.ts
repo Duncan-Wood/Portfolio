@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   CHAPTERS,
   FRAGMENT_COUNT,
-  butterflyIndex,
   collectableAt,
   collectionEntries,
   nodeAt,
@@ -39,12 +38,11 @@ describe('the memories', () => {
     expect(FRAGMENT_COUNT).toBeGreaterThan(0);
   });
 
-  it('has a picture for every memory that names one', () => {
+  it('has a picture for every memory, since the found row drops one without', () => {
     for (const chapter of CHAPTERS) {
       for (const node of chapter.nodes) {
-        if (node.photo !== undefined) {
-          expect(MEMORY_PICTURES[node.photo], node.photo).toBeDefined();
-        }
+        expect(node.photo, node.title).toBeDefined();
+        expect(MEMORY_PICTURES[node.photo!], node.photo).toBeDefined();
       }
     }
   });
@@ -86,18 +84,12 @@ describe('the collection a player reads from the pause screen', () => {
     }
   });
 
-  it('reaches a chapter butterfly past the end of the memories', () => {
-    CHAPTERS.forEach((chapter, index) => {
-      expect(collectableAt(butterflyIndex(index))).toBe(chapter.butterfly ?? null);
-    });
-  });
-
-  it('has nothing at an index no memory and no butterfly answers to', () => {
+  it('has nothing at an index no memory answers to', () => {
     expect(collectableAt(-1)).toBeNull();
-    expect(collectableAt(butterflyIndex(CHAPTERS.length))).toBeNull();
+    expect(collectableAt(FRAGMENT_COUNT)).toBeNull();
   });
 
   it('lists an entry for every index, so a row can be drawn from it', () => {
-    expect(collectionEntries()).toHaveLength(FRAGMENT_COUNT + CHAPTERS.length);
+    expect(collectionEntries()).toHaveLength(FRAGMENT_COUNT);
   });
 });
