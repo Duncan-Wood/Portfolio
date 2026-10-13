@@ -25,7 +25,7 @@ export const CHAPTERS: Chapter[] = [
     nodes: [
       {
         title: 'Mighty Crow',
-        photo: 'the-bills',
+        photo: 'the-door',
         body:
           'Weekend contract work. Every file they held had to open as a PDF, and '
           + 'the data was medical.\n\n'

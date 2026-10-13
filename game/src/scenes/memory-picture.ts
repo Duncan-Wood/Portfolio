@@ -1,10 +1,10 @@
 import {
-  COST_BARS_BASE_TEXTURE,
+  ONE_DOOR_DOORWAY_TEXTURE,
   TRACE_TEXTURE,
   memoryArtTexture,
 } from './tile-textures';
-import { CostBarsRise } from './cost-bars-rise';
-import { COST_BARS_PICTURE } from '../memory-pictures';
+import { OneDoorStream } from './one-door-stream';
+import { ONE_DOOR_PICTURE } from '../memory-pictures';
 
 interface PictureAnimation {
   readonly graphics: Phaser.GameObjects.Graphics;
@@ -21,7 +21,7 @@ export class MemoryPicture {
   constructor(scene: Phaser.Scene) {
     this.image = scene.add.image(0, 0, TRACE_TEXTURE).setVisible(false);
     this.animations = {
-      [COST_BARS_PICTURE]: { texture: COST_BARS_BASE_TEXTURE, animation: new CostBarsRise(scene) },
+      [ONE_DOOR_PICTURE]: { texture: ONE_DOOR_DOORWAY_TEXTURE, animation: new OneDoorStream(scene) },
     };
   }
 

@@ -51,14 +51,6 @@ const PICTURES = {
     contrast: [],
     afterResize: ['-negate', '-normalize', '-level', '0,40%'],
   },
-  'the-bills': {
-    file: 'mighty_crow_costs.png',
-    columns: 110,
-    rows: 26,
-    crop: ['-crop', '2340x543+60+868', '+repage'],
-    contrast: [],
-    afterResize: ['-normalize'],
-  },
   'the-notebook': {
     file: 'notebook_and_pen.jpg',
     columns: 110,
