@@ -2,7 +2,7 @@ import { clearStored, readStored, writeStored } from './storage';
 
 const MEMORIES_KEY = 'connected.memories';
 const BEST_CHAIN_KEY = 'connected.bestChain';
-// PLAYED_KEY, FRAGMENTS_TOTAL_KEY, LOG_KEY and BEST_CHAIN_KEY are also read by
+// PLAYED_KEY, FRAGMENTS_TOTAL_KEY and LOG_KEY are also read by
 // src/game-progress.js, a separate bundle; renaming one here silently empties the
 // contact form's prefill.
 const PLAYED_KEY = 'connected.played';

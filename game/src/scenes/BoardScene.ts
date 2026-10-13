@@ -1048,7 +1048,7 @@ export class BoardScene extends Scene {
   }
 
   private showVictory(): void {
-    this.victory.show(this.collected, completions());
+    this.victory.show(this.collected);
     this.startFocus();
   }
 

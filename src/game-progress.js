@@ -2,9 +2,8 @@
 const LOG_KEY = "connected.log";
 const FRAGMENTS_TOTAL_KEY = "connected.fragmentsTotal";
 const PLAYED_KEY = "connected.played";
-const BEST_CHAIN_KEY = "connected.bestChain";
 
-export function draftFrom(log, total, played, bestChain) {
+export function draftFrom(log, total, played) {
   if (!played) {
     return "";
   }
@@ -20,9 +19,7 @@ export function draftFrom(log, total, played, bestChain) {
     ? "Still connected."
     : `I got as far as ${surfaced[surfaced.length - 1].title}.`;
 
-  const chain = bestChain >= 2 ? ` Best chain: ${bestChain}.` : "";
-
-  return `${opening}${chain}\n\n`;
+  return `${opening}\n\n`;
 }
 
 export function gameProgressPrefill() {
@@ -30,8 +27,7 @@ export function gameProgressPrefill() {
     return draftFrom(
       JSON.parse(localStorage.getItem(LOG_KEY) ?? "[]"),
       Number(localStorage.getItem(FRAGMENTS_TOTAL_KEY)),
-      localStorage.getItem(PLAYED_KEY) === "true",
-      Number(localStorage.getItem(BEST_CHAIN_KEY))
+      localStorage.getItem(PLAYED_KEY) === "true"
     );
   } catch {
     // A browser set to block site data throws here rather than returning null.

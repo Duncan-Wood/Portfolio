@@ -14,7 +14,6 @@ const HINT_Y = 542;
 const CONTACT_Y = 596;
 const PLAY_AGAIN_Y = 660;
 const RESET_Y = 722;
-const TALLY_Y = 774;
 const GROUND_Y = 842;
 const NIGHT_TOP = 0x0b0518;
 const NIGHT_HORIZON = 0x2a1440;
@@ -35,7 +34,6 @@ export class VictoryScreen {
   private readonly title: Phaser.GameObjects.Text;
   private readonly line: Phaser.GameObjects.Text;
   private readonly hint: Phaser.GameObjects.Text;
-  private readonly tally: Phaser.GameObjects.Text;
 
   private isActive = false;
   private found: readonly number[] = [];
@@ -103,12 +101,6 @@ export class VictoryScreen {
       .setInteractive({ useHandCursor: true });
 
     this.resetButton = new PressTwiceButton(scene, centerX, RESET_Y, labels.reset, labels.resetArmed);
-
-    this.tally = scene.add.text(centerX, TALLY_Y, '', {
-      fontFamily: 'monospace',
-      fontSize: '14px',
-      color: '#9481aa',
-    }).setOrigin(0.5, 0.5).setVisible(false);
   }
 
   get active(): boolean {
@@ -124,16 +116,15 @@ export class VictoryScreen {
     ];
   }
 
-  show(found: readonly number[], completions: number): void {
+  show(found: readonly number[]): void {
     this.isActive = true;
     this.found = found;
     this.scrim.setVisible(true);
-    this.tally.setText(completions === 1 ? 'completed once' : `completed ${completions} times`);
     this.showContents();
   }
 
   showContents(select?: number): void {
-    for (const part of [this.title, this.line, this.hint, this.contactButton, this.playAgainButton, this.tally]) {
+    for (const part of [this.title, this.line, this.hint, this.contactButton, this.playAgainButton]) {
       part.setVisible(true);
     }
     this.memories.show(this.found, select);
@@ -141,7 +132,7 @@ export class VictoryScreen {
   }
 
   hideContents(): void {
-    for (const part of [this.title, this.line, this.hint, this.contactButton, this.playAgainButton, this.tally]) {
+    for (const part of [this.title, this.line, this.hint, this.contactButton, this.playAgainButton]) {
       part.setVisible(false);
     }
     this.memories.hide();
