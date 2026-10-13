@@ -227,6 +227,7 @@ export class Simulation {
   }
 
   get threatenedCell(): GroupCell | null {
+    const justLanded = new Set(this.lastLanded.map((cell) => cell.column * ROWS + cell.row));
     let chosenColumn = -1;
     let chosenRow = -1;
     let fewest = Number.POSITIVE_INFINITY;
@@ -236,7 +237,7 @@ export class Simulation {
       let topmost = -1;
 
       for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
-        if (isColour(this.board.pieceAt(column, row))) {
+        if (isColour(this.board.pieceAt(column, row)) && !justLanded.has(column * ROWS + row)) {
           tiles += 1;
           if (topmost === -1) {
             topmost = row;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COLUMNS,
   PIECE_TYPE_COUNT,
   ROWS,
   SHADOW,
@@ -116,6 +117,33 @@ describe('what the shadow is reaching for', () => {
 
     expect(target).not.toBeNull();
     expect(game.board.pieceAt(target!.column, target!.row)).toBe(RED);
+  });
+
+  it('never names a cell the last piece just landed on', () => {
+    const game = simulation();
+    const standing = game.pair.cells().map((cell) => cell.column);
+    for (let column = 0; column < COLUMNS; column += 1) {
+      if (!standing.includes(column)) {
+        game.board.place(column, ROWS - 1, RED);
+        game.board.place(column, ROWS - 2, BLUE);
+        game.board.place(column, ROWS - 3, RED);
+      }
+    }
+
+    game.hardDrop();
+
+    const target = game.threatenedCell;
+    expect(target).not.toBeNull();
+    const fresh = game.lastLanded.map((cell) => `${cell.column},${cell.row}`);
+    expect(fresh).not.toContain(`${target!.column},${target!.row}`);
+  });
+
+  it('names nothing when the only tiles on the board were just landed', () => {
+    const game = simulation();
+
+    game.hardDrop();
+
+    expect(game.threatenedCell).toBeNull();
   });
 
   it('reports how close the next arrival is, from nothing to one', () => {
