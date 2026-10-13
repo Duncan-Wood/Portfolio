@@ -46,25 +46,6 @@
         width: 100%;
       }
 
-      #controls {
-        flex: none;
-        align-self: center;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 4px 18px;
-        padding: 10px 12px 0;
-        font-family: monospace;
-        font-size: 12px;
-        line-height: 1;
-        color: #9481aa;
-      }
-
-      #controls b {
-        font-weight: normal;
-        color: #9d86b8;
-      }
-
       #to-standard,
       #to-contact {
         flex: none;
@@ -85,10 +66,6 @@
       }
 
       @media (pointer: coarse) {
-        #controls {
-          display: none;
-        }
-
         #to-standard {
           order: -1;
           align-self: flex-start;
@@ -135,14 +112,6 @@
   </head>
   <body>
     <div id="game-container"></div>
-    <div id="controls">
-      <span><b>&larr;&rarr;</b> move</span>
-      <span><b>&uarr;</b> rotate</span>
-      <span><b>&darr;</b> faster</span>
-      <span><b>space</b> drop</span>
-      <span><b>esc</b> pause</span>
-      <span><b>r</b> restart</span>
-    </div>
     <a id="to-contact" href="/#contact">reach out to me</a>
     <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
     <script type="module" src="/src/main.ts"></script>
