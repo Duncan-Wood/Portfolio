@@ -1,6 +1,6 @@
 import { Math as PhaserMath } from 'phaser';
 import { type MemoryGrid } from '../memory-art';
-import { MEMORY_PICTURES, ONE_DOOR_DOORWAY } from '../memory-pictures';
+import { COST_BARS_BASE, MEMORY_PICTURES } from '../memory-pictures';
 import { PIECE_TYPE_COUNT, isChrysalis, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   CHRYSALIS_COLOR,
@@ -313,7 +313,7 @@ export function memoryArtTexture(key: string): string {
   return `memory-art-${key}`;
 }
 
-export const ONE_DOOR_DOORWAY_TEXTURE = 'one-door-doorway';
+export const COST_BARS_BASE_TEXTURE = 'cost-bars-base';
 
 const MEMORY_ART_WIDTH = 660;
 
@@ -413,7 +413,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   for (const [key, art] of Object.entries(MEMORY_PICTURES)) {
     bakeMemoryArt(graphics, memoryArtTexture(key), art);
   }
-  bakeMemoryArt(graphics, ONE_DOOR_DOORWAY_TEXTURE, ONE_DOOR_DOORWAY);
+  bakeMemoryArt(graphics, COST_BARS_BASE_TEXTURE, COST_BARS_BASE);
 
   bakeTrace(graphics, gap);
 

@@ -1,9 +1,10 @@
-import { DOOR_COLUMNS, STILL_MOMENT, STREAM_LOOP, doorwayScene } from '../one-door';
+import { STILL_MOMENT, BAR_LOOP, barsRising } from '../cost-bars';
+import { COST_BARS, COST_BARS_BASE } from '../memory-pictures';
 import { memoryArtCell, paintMemoryBlock } from './tile-textures';
 
-const CELL = memoryArtCell(DOOR_COLUMNS);
+const CELL = memoryArtCell(COST_BARS_BASE.columns);
 
-export class OneDoorStream {
+export class CostBarsRise {
   readonly graphics: Phaser.GameObjects.Graphics;
   private elapsed: number | null = null;
 
@@ -26,7 +27,7 @@ export class OneDoorStream {
     if (this.elapsed === null) {
       return;
     }
-    this.elapsed = (this.elapsed + delta) % STREAM_LOOP;
+    this.elapsed = (this.elapsed + delta) % BAR_LOOP;
     this.draw();
   }
 
@@ -37,7 +38,7 @@ export class OneDoorStream {
 
   private draw(): void {
     this.graphics.clear();
-    for (const shape of doorwayScene(this.elapsed!)) {
+    for (const shape of barsRising(COST_BARS, this.elapsed!)) {
       paintMemoryBlock(
         this.graphics,
         shape.mark,

@@ -1,14 +1,12 @@
-import { DOOR_COLUMNS, DOOR_ROWS, STILL_MOMENT, drawDoor, drawDoorway } from './one-door';
+import { findBars } from './cost-bars';
 import { MEMORY_ART, type MemoryArt, type MemoryGrid } from './memory-art';
 
-export const ONE_DOOR_PICTURE = 'the-door';
+export const COST_BARS_PICTURE = 'the-bills';
 
-export const ONE_DOOR_DOORWAY: MemoryGrid = drawDoorway(DOOR_COLUMNS, DOOR_ROWS);
+const COST_CHART = findBars(MEMORY_ART[COST_BARS_PICTURE]);
 
-export const MEMORY_PICTURES: Readonly<Record<string, MemoryArt>> = {
-  ...MEMORY_ART,
-  [ONE_DOOR_PICTURE]: {
-    ...drawDoor(DOOR_COLUMNS, DOOR_ROWS, STILL_MOMENT),
-    panel: drawDoor(22, 13, STILL_MOMENT),
-  },
-};
+export const COST_BARS = COST_CHART.bars;
+
+export const COST_BARS_BASE: MemoryGrid = COST_CHART.base;
+
+export const MEMORY_PICTURES: Readonly<Record<string, MemoryArt>> = MEMORY_ART;
