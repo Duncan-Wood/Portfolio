@@ -14,9 +14,9 @@ describe("draftFrom", () => {
     expect(draftFrom([], 5, true)).toBe("I played Connected.\n\n");
   });
 
-  it("answers the losing screen when they surfaced every fragment", () => {
+  it("greets the author when they surfaced every fragment", () => {
     expect(draftFrom([build, johns], 2, true)).toBe(
-      "Still connected.\n\n"
+      "I made it to the end. Hi.\n\n"
     );
   });
 

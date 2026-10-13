@@ -16,7 +16,7 @@ export function draftFrom(log, total, played) {
 
   const finished = surfaced.length >= total;
   const opening = finished
-    ? "Still connected."
+    ? "I made it to the end. Hi."
     : `I got as far as ${surfaced[surfaced.length - 1].title}.`;
 
   return `${opening}\n\n`;
