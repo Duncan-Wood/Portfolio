@@ -43,6 +43,14 @@ const PICTURES = {
     rows: 48,
     crop: ['-crop', '1040x455+70+0', '+repage'],
   },
+  'the-table': {
+    file: 'update_detector.png',
+    columns: 110,
+    rows: 49,
+    crop: ['-crop', '1449x641+63+478', '+repage'],
+    contrast: [],
+    afterResize: ['-negate', '-normalize', '-level', '0,40%'],
+  },
   'the-notebook': {
     file: 'notebook_and_pen.jpg',
     columns: 110,
@@ -51,10 +59,10 @@ const PICTURES = {
   },
 };
 
-function quantize({ file, columns, rows, crop = [] }) {
+function quantize({ file, columns, rows, crop = [], contrast = CONTRAST, afterResize = [] }) {
   const raw = execFileSync('magick', [
-    join(SOURCES, file), '-auto-orient', '-background', EMPTY, '-flatten', ...crop, ...CONTRAST,
-    '-resize', `${columns}x${rows}!`, '-colorspace', 'sRGB', '-depth', '8', 'txt:-',
+    join(SOURCES, file), '-auto-orient', '-background', EMPTY, '-flatten', ...crop, ...contrast,
+    '-resize', `${columns}x${rows}!`, ...afterResize, '-colorspace', 'sRGB', '-depth', '8', 'txt:-',
   ], { encoding: 'utf8', maxBuffer: 1 << 26 });
 
   const grid = Array.from({ length: rows }, () => new Array(columns).fill('.'));

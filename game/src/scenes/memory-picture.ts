@@ -1,12 +1,10 @@
 import {
-  CUSTOMER_MAP_LAND_TEXTURE,
   ONE_DOOR_DOORWAY_TEXTURE,
   TRACE_TEXTURE,
   memoryArtTexture,
 } from './tile-textures';
-import { CustomerMapBuild } from './customer-map-build';
 import { OneDoorStream } from './one-door-stream';
-import { CUSTOMER_MAP_PICTURE, ONE_DOOR_PICTURE } from '../memory-pictures';
+import { ONE_DOOR_PICTURE } from '../memory-pictures';
 
 interface PictureAnimation {
   readonly graphics: Phaser.GameObjects.Graphics;
@@ -23,7 +21,6 @@ export class MemoryPicture {
   constructor(scene: Phaser.Scene) {
     this.image = scene.add.image(0, 0, TRACE_TEXTURE).setVisible(false);
     this.animations = {
-      [CUSTOMER_MAP_PICTURE]: { texture: CUSTOMER_MAP_LAND_TEXTURE, animation: new CustomerMapBuild(scene) },
       [ONE_DOOR_PICTURE]: { texture: ONE_DOOR_DOORWAY_TEXTURE, animation: new OneDoorStream(scene) },
     };
   }

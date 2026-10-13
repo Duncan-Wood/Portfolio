@@ -36,14 +36,17 @@ export const CHAPTERS: Chapter[] = [
           + 'still runs for about two dollars a month.'
       },
       {
-        title: 'Seventy Customers',
-        photo: 'the-map',
+        title: 'Update Detector',
+        photo: 'the-table',
         body:
-          'The team that built EcoMap’s first platform left within about six months. '
-          + 'Seventy companies were using it. I was what was left.\n\n'
-          + 'I ran it for two years, then moved every one of them onto what replaced '
-          + 'it and turned it off.\n\n'
-          + 'You learn a system best by being the only one holding it.'
+          'A crawler proposed changes to our asset records, and nobody could check '
+          + 'them before they went in. About a month into the job, I was asked to '
+          + 'build the checking tool.\n\n'
+          + 'I started from an empty repo. A table of proposed changes: open a row, '
+          + 'see the old value next to the machine’s guess, then accept, reject or '
+          + 'edit. I kept the guess next to every correction.\n\n'
+          + 'I was the lead developer. The data team used it daily, and I kept '
+          + 'improving it for more than a year.'
       },
       {
         title: 'The Notebook',
