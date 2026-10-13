@@ -54,7 +54,7 @@ export class MemoryHandover {
 
   coverBoard(duration: number): void {
     this.cover.setVisible(true).setAlpha(0);
-    this.scene.tweens.add({ targets: this.cover, alpha: 1, duration });
+    this.scene.tweens.add({ targets: this.cover, alpha: 1, duration, ease: 'Sine.easeInOut' });
   }
 
   uncoverBoard(duration: number): void {
@@ -63,6 +63,7 @@ export class MemoryHandover {
       targets: this.cover,
       alpha: 0,
       duration,
+      ease: 'Sine.easeInOut',
       onComplete: () => this.cover.setVisible(false),
     });
   }
@@ -117,7 +118,7 @@ export class MemoryHandover {
       displayWidth: LANDED_WIDTH,
       displayHeight: LANDED_WIDTH * aspect,
       duration,
-      ease: 'Quad.easeIn',
+      ease: 'Sine.easeInOut',
       onComplete: () => {
         this.picture.setVisible(false);
         onLanded();

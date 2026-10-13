@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HANDOVER_TIMELINE,
   advanceHandover,
+  stageLength,
   stageStart,
   stagesBegun,
   type HandoverStage,
@@ -58,5 +59,15 @@ describe('the handover after a solved board', () => {
     const held = advanceHandover(0, 5000, false);
 
     expect(advanceHandover(held, 16, true)).toBeGreaterThanOrEqual(stageStart('fade'));
+  });
+});
+
+describe('how gently the board gives way to a memory', () => {
+  it('dims the board slowly enough to read as fading, not as vanishing', () => {
+    expect(stageLength('fade')).toBeGreaterThanOrEqual(500);
+  });
+
+  it('brings the next board back no faster than the last one left', () => {
+    expect(stageLength('return')).toBeGreaterThanOrEqual(stageLength('fade'));
   });
 });

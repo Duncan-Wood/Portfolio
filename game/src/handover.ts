@@ -2,10 +2,10 @@ export type HandoverStage = 'settle' | 'fade' | 'bloom' | 'flight' | 'return';
 
 export const HANDOVER_TIMELINE: readonly { stage: HandoverStage; lasts: number }[] = [
   { stage: 'settle', lasts: 700 },
-  { stage: 'fade', lasts: 280 },
+  { stage: 'fade', lasts: 520 },
   { stage: 'bloom', lasts: 720 },
   { stage: 'flight', lasts: 560 },
-  { stage: 'return', lasts: 360 },
+  { stage: 'return', lasts: 520 },
 ];
 
 export function stageStart(stage: HandoverStage): number {

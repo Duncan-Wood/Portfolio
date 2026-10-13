@@ -54,7 +54,7 @@ import { PressTwiceButton } from './press-twice-button';
 import { VictoryScreen } from './victory-screen';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
-import { chrysalisOn, type ChrysalisSite } from '../engine/chrysalis';
+import type { ChrysalisSite } from '../engine/chrysalis';
 import {
   CHAPTERS,
   FRAGMENT_COUNT,
@@ -65,7 +65,6 @@ import {
   nodeAt,
 } from '../memories';
 import {
-  chrysalisSeen,
   completions,
   forgetAllProgress,
   freedButterflies,
@@ -75,7 +74,6 @@ import {
   playedBefore,
   rememberBestChain,
   rememberButterfly,
-  rememberChrysalisSeen,
   rememberCompletion,
   rememberFragment,
   rememberIntroSeen,
@@ -120,9 +118,6 @@ const SHADOW_BREATH = 0.045;
 const SHADOW_ARRIVAL_DURATION = 340;
 
 const THREAD_PULSE = 420;
-const WAITING_HINT = 'something is waiting';
-const WAITING_HINT_FADE = 520;
-const WAITING_HINT_HOLD = 3400;
 
 
 export const TOUCH_PRIMARY = typeof matchMedia === 'function'
@@ -316,9 +311,7 @@ export class BoardScene extends Scene {
 
   private threadSurge: { whole: boolean; progress: number; duration: number } | null = null;
 
-  private waitingHint: Phaser.GameObjects.Text;
 
-  private chrysalisToPointOut = false;
 
   private neuronThread: Phaser.GameObjects.Graphics;
 
@@ -725,14 +718,6 @@ export class BoardScene extends Scene {
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.waitingHint = this.add.text(0, 0, WAITING_HINT, {
-      fontFamily: 'monospace',
-      fontSize: '15px',
-      color: '#f2e2c4',
-      backgroundColor: '#221038',
-      padding: { x: 8, y: 4 },
-    }).setOrigin(0.5, 1).setVisible(false);
-
     this.butterflyFlight = new ButterflyFlight(
       this,
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -967,7 +952,6 @@ export class BoardScene extends Scene {
     }
 
     this.openTheBoard();
-    this.pointOutTheChrysalis();
     this.playShadowArrival();
     this.playCascadeBeat();
     this.playSounds();
@@ -1375,7 +1359,6 @@ export class BoardScene extends Scene {
       this.restoreCell(index);
     }
     this.threadSurge = null;
-    this.dismissWaitingHint();
     this.animatedShadowCells.clear();
     this.shadowArrival = null;
     this.spokenShadowLines = [];
@@ -1584,7 +1567,6 @@ export class BoardScene extends Scene {
     this.handoverElapsed = null;
     this.tuning.fallInterval = lock.fallInterval;
     seedLock(this.simulation.board, lock, Math.random, this.butterflyWaiting !== undefined);
-    this.chrysalisToPointOut = !chrysalisSeen() && chrysalisOn(this.simulation.board) !== null;
     this.litNeurons = [];
     this.refreshObjective();
   }
@@ -1700,7 +1682,6 @@ export class BoardScene extends Scene {
     const found = this.foundBeat;
 
     if (stage === 'fade') {
-      this.dismissWaitingHint();
       this.memoryHandover.coverBoard(stageLength('fade'));
     } else if (stage === 'bloom' && found !== null) {
       this.memoryHandover.bloom(found.photo, found.title);
@@ -2180,43 +2161,6 @@ export class BoardScene extends Scene {
     return [...foundFragments(), ...freedButterflies().map(butterflyIndex)];
   }
 
-  private pointOutTheChrysalis(): void {
-    const resting = chrysalisOn(this.simulation.board);
-    if (
-      !this.chrysalisToPointOut || resting === null
-      || this.storyHolding || this.paused || this.runOver !== null
-    ) {
-      return;
-    }
-
-    this.chrysalisToPointOut = false;
-    rememberChrysalisSeen();
-    const halfWidth = this.waitingHint.width / 2;
-    this.waitingHint
-      .setPosition(
-        Math.min(
-          Math.max(centerOfColumn(resting.column), ORIGIN_X + halfWidth),
-          ORIGIN_X + BOARD_WIDTH - halfWidth,
-        ),
-        Math.max(centerOfRow(resting.row) - CELL_SIZE * 0.7, ORIGIN_Y + 30),
-      )
-      .setVisible(true)
-      .setAlpha(0);
-    this.tweens.add({
-      targets: this.waitingHint,
-      alpha: 1,
-      duration: WAITING_HINT_FADE,
-      hold: WAITING_HINT_HOLD,
-      yoyo: true,
-      onComplete: () => this.waitingHint.setVisible(false),
-    });
-  }
-
-  private dismissWaitingHint(): void {
-    this.tweens.killTweensOf(this.waitingHint);
-    this.waitingHint.setVisible(false);
-  }
-
   private get butterflyWaiting(): MemoryNode | undefined {
     const at = nodeAt(this.nodesRevealed);
     if (at === null || freedButterflies().includes(at.chapterIndex)) {
@@ -2234,7 +2178,6 @@ export class BoardScene extends Scene {
     }
 
     rememberButterfly(at.chapterIndex);
-    this.dismissWaitingHint();
     this.characterState = characterOn(this.characterState, 'good');
 
     const [site] = freed;
