@@ -1,5 +1,6 @@
 import { Geom } from 'phaser';
-import { REACH_OUT_LINE, RECOVERED_LINE, STILL_CONNECTED } from '../shadow-voice';
+import { REACH_OUT_LINE, STILL_CONNECTED } from '../shadow-voice';
+import { closingFromQuery } from '../closing-candidates';
 import { type FoundEntry } from './found-memories';
 import { VictorySky } from './victory-sky';
 import { PressTwiceButton } from './press-twice-button';
@@ -62,7 +63,7 @@ export class VictoryScreen {
       color: '#e8eef2',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.line = scene.add.text(centerX, LINE_Y, RECOVERED_LINE, {
+    this.line = scene.add.text(centerX, LINE_Y, closingFromQuery(window.location.search), {
       fontFamily: 'monospace',
       fontSize: '17px',
       color: '#b07dff',

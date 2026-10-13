@@ -13,6 +13,15 @@ export interface Chapter {
 export const CHAPTERS: Chapter[] = [
   {
     title: 'Now',
+    butterfly: {
+      title: 'Theta',
+      body:
+        'I adopted a jumping spider from a former colleague. His name is Theta.\n\n'
+        + 'I built him an enclosure, and he gets fat mealworms, fresh spritzes of water '
+        + 'and as much to climb as I can give him.\n\n'
+        + 'Male jumping spiders do not live long. He is an old man now and slowing '
+        + 'down a lot. He is still here, and I kept him alive.'
+    },
     nodes: [
       {
         title: 'Mighty Crow',
@@ -50,6 +59,17 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     title: 'Washington, DC',
+    butterfly: {
+      title: 'Chinatown',
+      body:
+        'I raised money for trans rights on the street in DC. Some people tried to '
+        + 'ragebait me, or got aggressive and defensive. A coworker was spat on by a '
+        + 'passerby.\n\n'
+        + 'Most people would not talk to us. When they did, they rarely gave. We kept '
+        + 'at it, and it still worked sometimes.\n\n'
+        + 'It was empowering, and I learned what was actually being fought for in my '
+        + 'community.'
+    },
     nodes: [
       {
         title: 'The Kickball',
@@ -58,8 +78,9 @@ export const CHAPTERS: Chapter[] = [
           'I moved to DC three years ago and knew nobody. Someone invited me to '
           + 'Sunday kickball. Stonewall.\n\n'
           + 'I was not good at it. Nobody was. That turned out to be the point.\n\n'
-          + 'My original team asked me to captain two seasons running, and then a FRAY '
-          + 'League team asked too. Three years ago I did not know a single person here.'
+          + 'Now I captain a FRAY League team on Thursday nights. I was nervous about '
+          + 'it. We are undefeated so far, and we shut out the former champions. I made '
+          + 'the team a lineup app that draws each inning’s field.'
       },
       {
         title: 'The Laptop',
@@ -130,7 +151,9 @@ export const CHAPTERS: Chapter[] = [
           + 'Freshman year of high school scattered everyone I knew. I spent most of '
           + 'that year alone in front of it. Alone is the wrong word. Dota was on it, '
           + 'and so were people I have known for thirteen years.\n\n'
-          + 'I still play games with friends on it.'
+          + 'I have swapped its parts out several times since, and liked it every '
+          + 'time. It taught me that if I start with a plan and follow it to the end, '
+          + 'I can finish what I set out to do. Engineering started there for me.'
       },
     ],
   },
