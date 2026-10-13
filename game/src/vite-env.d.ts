@@ -8,7 +8,6 @@ declare global {
   const __BUILD_ID__: string;
 
   interface ImportMetaEnv {
-    readonly VITE_GAME_CODE?: string;
     readonly VITE_SENTRY_DSN?: string;
   }
 

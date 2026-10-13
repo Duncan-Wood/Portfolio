@@ -215,7 +215,6 @@ describe('progress left behind by an older set of memories', () => {
     held.set('connected.fragmentsTotal', '5');
     held.set('connected.resume', '3');
     held.set('connected.played', 'true');
-    held.set('connected.unlocked', 'true');
   }
 
   it('drops a log written against memories that have since changed', () => {
@@ -227,15 +226,6 @@ describe('progress left behind by an older set of memories', () => {
     expect(held.has('connected.log')).toBe(false);
     expect(held.has('connected.fragmentsTotal')).toBe(false);
     expect(held.has('connected.resume')).toBe(false);
-  });
-
-  it('leaves the gate open, so a deploy does not ask friends for the code again', () => {
-    playedThrough();
-    held.set('connected.memories', 'old signature');
-
-    forgetProgressFromOlderMemories('new signature');
-
-    expect(held.get('connected.unlocked')).toBe('true');
   });
 
   it('keeps the intro dismissed, since new memories do not change how to play', () => {
@@ -303,7 +293,6 @@ describe('a player starting over', () => {
     held.set('connected.played', 'true');
     held.set('connected.introSeen', 'true');
     held.set('connected.completions', '2');
-    held.set('connected.unlocked', 'true');
   }
 
   it('forgets everything a run left behind, so the next visit is a first visit', () => {
@@ -322,14 +311,6 @@ describe('a player starting over', () => {
     ]) {
       expect(held.has(key)).toBe(false);
     }
-  });
-
-  it('keeps the gate open, so starting over does not ask for the code again', () => {
-    playedThrough();
-
-    forgetAllProgress();
-
-    expect(held.get('connected.unlocked')).toBe('true');
   });
 });
 
@@ -381,7 +362,6 @@ describe('finishing the game and playing it again', () => {
     held.set('connected.resume', '3');
     held.set('connected.introSeen', 'true');
     held.set('connected.played', 'true');
-    held.set('connected.unlocked', 'true');
     rememberCompletion();
 
     forgetRun();
@@ -390,7 +370,6 @@ describe('finishing the game and playing it again', () => {
     expect(held.has('connected.resume')).toBe(false);
     expect(completions()).toBe(1);
     expect(held.get('connected.introSeen')).toBe('true');
-    expect(held.get('connected.unlocked')).toBe('true');
   });
 });
 
