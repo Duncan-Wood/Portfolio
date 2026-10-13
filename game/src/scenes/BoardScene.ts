@@ -128,7 +128,7 @@ const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
 const READ_PROMPT = TOUCH_PRIMARY
   ? 'tap a memory to read it\ntap anywhere else to resume'
-  : '\u2190 \u2192  choose     \u2191 \u2193  move     space  pick     esc  resume';
+  : '\u2190 \u2192  choose     \u2191 \u2193  move     enter  read     space  resume';
 const READING_PROMPT = TOUCH_PRIMARY
   ? 'tap another memory, or anywhere to go back'
   : '\u2190 \u2192  read another     space  back';
@@ -1088,8 +1088,8 @@ export class BoardScene extends Scene {
 
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
-    const picked = Input.Keyboard.JustDown(this.hardDropKey)
-      || Input.Keyboard.JustDown(this.enterKey);
+    const picked = Input.Keyboard.JustDown(this.enterKey);
+    const resumed = Input.Keyboard.JustDown(this.hardDropKey);
     const tappedAway = this.touch.takeDrop();
     const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
       || this.resetPressed;
@@ -1109,7 +1109,7 @@ export class BoardScene extends Scene {
       if (!this.pressFocused()) {
         this.setPaused(false);
       }
-    } else if (tappedAway) {
+    } else if (resumed || tappedAway) {
       this.setPaused(false);
     }
   }
