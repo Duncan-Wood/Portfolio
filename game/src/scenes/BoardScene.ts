@@ -84,6 +84,7 @@ import {
 } from '../progress';
 import { type IntroControls, introCards } from '../intro';
 import {
+  OVERTHINKING_LINE,
   SHADOW_OPENING_LINE,
   closingLine,
   shadowLine,
@@ -91,6 +92,7 @@ import {
 } from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
+import { Overthinking } from '../overthinking';
 import { SwipeControls } from '../input/swipe-controls';
 import { TouchControls } from '../input/touch-controls';
 import { SoundBoard } from '../audio/sound-board';
@@ -445,6 +447,10 @@ export class BoardScene extends Scene {
   private shownToppedOut = false;
 
   private soundedPiecesLocked = 0;
+
+  private judgedPiecesLocked = 0;
+
+  private readonly overthinking = new Overthinking();
 
   private chainAwaitingFlourish = 0;
 
@@ -952,6 +958,7 @@ export class BoardScene extends Scene {
     }
 
     this.openTheBoard();
+    this.judgePlacedPiece();
     this.playShadowArrival();
     this.playCascadeBeat();
     this.playSounds();
@@ -1370,6 +1377,8 @@ export class BoardScene extends Scene {
 
     this.shownBeats = this.simulation.beatsPlayed;
     this.soundedPiecesLocked = this.simulation.piecesLocked;
+    this.judgedPiecesLocked = this.simulation.piecesLocked;
+    this.overthinking.newBoard();
     this.slamDistance = null;
     this.shownChain = -1;
     this.shownPivotType = -1;
@@ -1438,10 +1447,12 @@ export class BoardScene extends Scene {
   private readSwipe(): void {
     for (let action = this.swipe.take(); action !== null; action = this.swipe.take()) {
       if (action === 'rotate') {
+        this.overthinking.decided();
         this.simulation.rotate();
       } else if (action === 'drop') {
         this.dropTheHardWay();
       } else {
+        this.overthinking.decided();
         this.shift(action === 'left' ? -1 : 1);
       }
     }
@@ -1459,6 +1470,7 @@ export class BoardScene extends Scene {
     this.readSwipe();
 
     if (Input.Keyboard.JustDown(this.cursors.up)) {
+      this.overthinking.decided();
       this.simulation.rotate();
     }
 
@@ -1476,7 +1488,12 @@ export class BoardScene extends Scene {
         newPiece,
         delta,
       },
-      (direction) => this.shift(direction),
+      (direction, fresh) => {
+        if (fresh) {
+          this.overthinking.decided();
+        }
+        return this.shift(direction);
+      },
     );
   }
 
@@ -1791,6 +1808,7 @@ export class BoardScene extends Scene {
       this.simulation.shadowOnBoard,
       this.arrivalsSinceShadowSpoke,
       this.spokenShadowLines,
+      this.overthinking.due,
     );
 
     this.arrivalsSinceShadowSpoke += 1;
@@ -1800,6 +1818,9 @@ export class BoardScene extends Scene {
 
     this.arrivalsSinceShadowSpoke = 0;
     this.spokenShadowLines.push(line);
+    if (line === OVERTHINKING_LINE) {
+      this.overthinking.told();
+    }
 
     this.tweens.killTweensOf(this.shadowSpeech);
     this.shadowSpeech.setText(line).setAlpha(0).setVisible(true);
@@ -1824,6 +1845,14 @@ export class BoardScene extends Scene {
       .setAlpha(1);
     this.shadowBodies[index].setVisible(false);
     this.shadowEyes[index].setVisible(false);
+  }
+
+  private judgePlacedPiece(): void {
+    if (this.simulation.piecesLocked === this.judgedPiecesLocked) {
+      return;
+    }
+    this.judgedPiecesLocked = this.simulation.piecesLocked;
+    this.overthinking.placed();
   }
 
   private playShadowArrival(): void {

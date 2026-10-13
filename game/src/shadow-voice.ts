@@ -27,6 +27,8 @@ export const SHADOW_LINES: readonly (readonly string[])[] = [
   ],
 ];
 
+export const OVERTHINKING_LINE = 'You’re overthinking it.';
+
 export const CONNECTION_LOST = 'CONNECTION LOST';
 
 export const SHADOW_CLOSING_LINE = 'That is usually where it stops.';
@@ -65,7 +67,12 @@ export function shadowLine(
   cellsHeld: number,
   arrivalsSinceSpoken: number,
   spoken: readonly string[],
+  overthinking = false,
 ): string | null {
+  if (overthinking && !spoken.includes(OVERTHINKING_LINE)) {
+    return OVERTHINKING_LINE;
+  }
+
   if (arrivalsSinceSpoken < ARRIVALS_BETWEEN_LINES) {
     return null;
   }
