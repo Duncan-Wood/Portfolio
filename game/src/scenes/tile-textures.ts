@@ -1,6 +1,6 @@
 import { Math as PhaserMath } from 'phaser';
 import { type MemoryGrid } from '../memory-art';
-import { MEMORY_PICTURES, ONE_DOOR_DOORWAY } from '../memory-pictures';
+import { MEMORY_PICTURES, ONE_DOOR_DOORWAY, REVIEW_BASE } from '../memory-pictures';
 import { PIECE_TYPE_COUNT, isNeuron, isNeuronLit } from '../engine/grid';
 import {
   STAR_COLOR,
@@ -244,6 +244,8 @@ export function memoryArtTexture(key: string): string {
 
 export const ONE_DOOR_DOORWAY_TEXTURE = 'one-door-doorway';
 
+export const REVIEW_BASE_TEXTURE = 'review-base';
+
 const MEMORY_ART_WIDTH = 660;
 
 export function memoryArtCell(columns: number): number {
@@ -341,6 +343,7 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
     bakeMemoryArt(graphics, memoryArtTexture(key), art);
   }
   bakeMemoryArt(graphics, ONE_DOOR_DOORWAY_TEXTURE, ONE_DOOR_DOORWAY);
+  bakeMemoryArt(graphics, REVIEW_BASE_TEXTURE, REVIEW_BASE);
 
   bakeTrace(graphics, gap);
 

@@ -43,14 +43,6 @@ const PICTURES = {
     rows: 48,
     crop: ['-crop', '1040x455+70+0', '+repage'],
   },
-  'the-table': {
-    file: 'update_detector.png',
-    columns: 110,
-    rows: 49,
-    crop: ['-crop', '1449x641+63+478', '+repage'],
-    contrast: [],
-    afterResize: ['-negate', '-normalize', '-level', '0,40%'],
-  },
   'the-theta': { file: 'theta.jpg', columns: 110, rows: 82 },
   'the-notebook': {
     file: 'notebook_and_pen.jpg',

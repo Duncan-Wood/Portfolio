@@ -27,7 +27,7 @@ export const CHAPTERS: Chapter[] = [
       },
       {
         title: 'Update Detector',
-        photo: 'the-table',
+        photo: 'the-review',
         body:
           'A crawler proposed changes to our asset records, and nobody could check '
           + 'them before they went in. About a month into the job, I was asked to '
