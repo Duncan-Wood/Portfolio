@@ -588,18 +588,6 @@ export class BoardScene extends Scene {
       );
     }
 
-    this.runReadouts.push(this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y - 46, 'NEXT', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#8ea3b0',
-    }).setOrigin(0.5, 0.5));
-
-    this.add.text(PREVIEW_CENTER_X, MEMORY_PANEL_TOP - 40, 'MEMORY', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#9481aa',
-    }).setOrigin(0.5, 0.5);
-
     if (TOUCH_PRIMARY) {
       this.sideCommands = (['pause', 'restart'] as const).map((action, index) => {
         const command = this.add
@@ -1565,11 +1553,10 @@ export class BoardScene extends Scene {
   }
 
   private refreshObjective(): void {
-    const lock = lockFor(this.chapterIndex);
     const total = neuronsOn(this.simulation.board).length;
     const lit = total - unlitCount(this.simulation.board);
 
-    this.objectiveText.setText(this.whereYouAre(`${lock.objective} \u2014 ${lit} of ${total}`));
+    this.objectiveText.setText(this.whereYouAre(`${lit} of ${total}`));
   }
 
   private whereYouAre(objective: string): string {
@@ -1588,7 +1575,7 @@ export class BoardScene extends Scene {
 
     this.lockSolved = true;
     this.threadSurge = { whole: true, progress: 0, duration: stageLength('settle') };
-    this.objectiveText.setText(this.whereYouAre(`${lock.objective} \u2014 open`));
+    this.objectiveText.setText(this.whereYouAre('open'));
     this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
 
     this.revealPending = true;
@@ -2453,7 +2440,7 @@ export class BoardScene extends Scene {
   private refreshChain(): void {
     const { resolving, chainLength } = this.simulation;
 
-    const showing = resolving && chainLength >= 2 && !this.storyHolding;
+    const showing = resolving && chainLength >= 3 && !this.storyHolding;
 
     this.chainText.setVisible(showing);
     if (showing && chainLength !== this.shownChain) {
