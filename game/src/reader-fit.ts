@@ -4,7 +4,7 @@ export const READER_BOTTOM = 538;
 export const READER_TEXT_WIDTH = 480;
 export const READER_PICTURE_MAX_WIDTH = 368;
 export const READER_PICTURE_MAX_HEIGHT = 200;
-export const READER_PICTURE_MIN_HEIGHT = 120;
+export const READER_PICTURE_MIN_HEIGHT = 160;
 export const READER_PICTURE_GAP = 22;
 
 export const READER_OVERHANG = 32;
