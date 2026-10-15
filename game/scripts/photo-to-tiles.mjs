@@ -43,7 +43,12 @@ const PICTURES = {
     rows: 48,
     crop: ['-crop', '1040x455+70+0', '+repage'],
   },
-  'the-theta': { file: 'theta.jpg', columns: 110, rows: 82 },
+  'the-theta': {
+    file: 'theta.jpg',
+    columns: 110,
+    rows: 97,
+    crop: ['-crop', '2600x2300+100+700', '+repage'],
+  },
   'the-notebook': {
     file: 'notebook_and_pen.jpg',
     columns: 110,
