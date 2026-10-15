@@ -69,7 +69,7 @@ export const CHAPTERS: Chapter[] = [
           + 'Sunday kickball. Stonewall.\n\n'
           + 'I was not good at it. Nobody was. That turned out to be the point.\n\n'
           + 'Now I captain a FRAY League team on Thursday nights. I was nervous about '
-          + 'it. We are undefeated so far, and we shut out the former champions. I made '
+          + 'it. We shut out the former champions. I made '
           + 'the team a lineup app that draws each inning’s field.'
       },
       {
