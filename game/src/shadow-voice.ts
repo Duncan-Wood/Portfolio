@@ -37,8 +37,9 @@ export const SHADOW_OPENING_LINE = 'You stopped here before.';
 
 export const STILL_CONNECTED = 'STILL CONNECTED';
 
-export const RECOVERED_LINE = 'I’ve made a few connections now, enough to lead me to '
-  + 'discover the next piece, although it is still unknown to me. It could be you.';
+export const RECOVERED_LINE = 'Connecting with people has moved my life more than '
+  + 'anything I’ve built. I don’t know where it goes next, and I’d like to hear '
+  + 'what you’re working on.';
 
 export const REACH_OUT_LINE = 'reach out to me';
 
