@@ -8,6 +8,7 @@ import {
   STILL_CONNECTED,
   SHADOW_LINES,
   closingLine,
+  OVERTHINKING_LINE,
   RECOVERED_LINE,
   shadowLine,
 } from './shadow-voice';
@@ -145,13 +146,31 @@ describe('what a finished memory says', () => {
     expect(STILL_CONNECTED.toLowerCase()).toContain('connected');
   });
 
-  it('fits the two lines the ending has room for', () => {
-    expect(RECOVERED_LINE.length).toBeLessThanOrEqual(80);
+  it('fits the three wrapped lines the sky leaves room for', () => {
+    expect(RECOVERED_LINE.length).toBeLessThanOrEqual(150);
   });
 
   it('offers a way to reach a person without turning into a pitch', () => {
     expect(REACH_OUT_LINE.length).toBeLessThanOrEqual(32);
     expect(REACH_OUT_LINE.toLowerCase())
       .not.toMatch(/hire|resume|cv|recruit|opportunit|available for/);
+  });
+});
+
+describe('when the player is overthinking', () => {
+  it('says so at its very next arrival, without waiting its usual turn', () => {
+    expect(shadowLine(1, 0, NEVER_SPOKEN, true)).toBe(OVERTHINKING_LINE);
+  });
+
+  it('says it over whatever it would have said instead', () => {
+    expect(shadowLine(20, ENOUGH, NEVER_SPOKEN, true)).toBe(OVERTHINKING_LINE);
+  });
+
+  it('does not say it twice on one board', () => {
+    expect(shadowLine(1, 0, [OVERTHINKING_LINE], true)).toBeNull();
+  });
+
+  it('keeps it out of its usual lines', () => {
+    expect(everyLine).not.toContain(OVERTHINKING_LINE);
   });
 });

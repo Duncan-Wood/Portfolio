@@ -29,46 +29,66 @@ import {
   SHADOW_EYES_TEXTURE,
   TRACE_TEXTURE,
   bakeTileTextures,
-  memoryArtTexture,
   SHADOW_BODY_TEXTURE,
   tileTexture,
 } from './tile-textures';
-import { CRASHED, CRASH_LINE } from '../crash';
 import { reportCrash } from '../crash-reporter';
-import { MEMORY_ART, type MemoryGrid } from '../memory-art';
 import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
 import { bakeCharacterStandIn, characterTexture } from './character-textures';
-import { revealOrder } from '../memory-reveal';
+import { RevealCard } from './reveal-card';
+import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
+import { EndingScreen } from './ending-screen';
+import { FoundMemories } from './found-memories';
+import { MemoryReader } from './memory-reader';
+import { VictorySky } from './victory-sky';
+import { MemoryHandover } from './memory-handover';
+import {
+  advanceHandover,
+  stageLength,
+  stagesBegun,
+  type HandoverStage,
+} from '../handover';
+import { PressTwiceButton } from './press-twice-button';
+import { VictoryScreen } from './victory-screen';
 import { isSolved, lockFor, seedLock } from '../engine/locks';
 import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
-import { FRAGMENT_COUNT, MEMORIES } from '../memories';
 import {
+  CHAPTERS,
+  FRAGMENT_COUNT,
+  collectableAt,
+  collectionEntries,
+  nodeAt,
+} from '../memories';
+import {
+  completions,
+  forgetAllProgress,
+  forgetRun,
+  foundFragments,
   introSeen,
   playedBefore,
-  rememberBestChain,
+  rememberCompletion,
   rememberFragment,
   rememberIntroSeen,
   rememberPlayed,
   rememberResume,
   resumeAt,
+  runFinished,
 } from '../progress';
 import { type IntroControls, introCards } from '../intro';
 import {
-  CONNECTION_LOST,
-  REACH_OUT_LINE,
-  SHADOW_CLOSING_LINE,
+  OVERTHINKING_LINE,
   SHADOW_OPENING_LINE,
-  STILL_CONNECTED,
   closingLine,
-  RECOVERED_LINE,
   shadowLine,
   type UnfinishedBusiness,
 } from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
 import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
+import { Overthinking } from '../overthinking';
 import { SwipeControls } from '../input/swipe-controls';
 import { TouchControls } from '../input/touch-controls';
 import { SoundBoard } from '../audio/sound-board';
+import { READER_BOTTOM, READER_TEXT_WIDTH, READER_TOP } from '../reader-fit';
 import {
   chainVoices,
   hardDropVoice,
@@ -92,24 +112,27 @@ const SHADOW_LEAN_DEGREES = 3.2;
 const SHADOW_BREATH = 0.045;
 const SHADOW_ARRIVAL_DURATION = 340;
 
-const PHOTO_MAX_WIDTH = 368;
-const PHOTO_MAX_HEIGHT = 300;
-const REVEAL_GAP = 26;
-
-const REVEAL_SKIP_GRACE = 420;
-
-const HANDOVER_BEHIND_REVEAL = 300;
-const HANDOVER_IN_THE_OPEN = 900;
-const HANDOVER_DIM = 240;
-const OUT_OF_PIECES_PAUSE = 2600;
+const THREAD_PULSE = 420;
 
 
 export const TOUCH_PRIMARY = typeof matchMedia === 'function'
   && matchMedia('(pointer: coarse)').matches;
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
+const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
+const READ_PROMPT = TOUCH_PRIMARY
+  ? 'tap a memory to read it\ntap anywhere else to resume'
+  : '\u2190 \u2192  choose     \u2191 \u2193  move     enter  read     space  resume';
+const READING_PROMPT = TOUCH_PRIMARY
+  ? 'tap another memory, or anywhere to go back'
+  : '\u2190 \u2192  read another     space  back';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
+const RESET_PROMPT = 'reset progress';
+const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
+const VICTORY_HINT = TOUCH_PRIMARY
+  ? 'tap a memory to read it'
+  : '\u2190 \u2192  choose     \u2191 \u2193  move     space  pick';
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
@@ -132,17 +155,17 @@ const ORIGIN_X = 40;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE + (VISIBLE_ROWS - 1) * GAP;
 const ORIGIN_Y = (CANVAS_HEIGHT - BOARD_HEIGHT) / 2;
 
-const CONTACT_OFFER_Y = CANVAS_HEIGHT / 2 + 84;
-const CHAIN_NOTE_Y = CANVAS_HEIGHT / 2 + 172;
-const HINT_ALONE_Y = CANVAS_HEIGHT / 2 + 84;
-const HINT_BELOW_OFFER_Y = CANVAS_HEIGHT / 2 + 132;
 
 const MEMORY_PANEL_TOP = 300;
 
-const SIDE_COMMAND_GAP = 8;
+const FOUND_ROW_Y = CANVAS_HEIGHT / 2 + 160;
+const FOUND_ROW_MARGIN = 24;
+const RESET_Y = CANVAS_HEIGHT / 2 + 290;
+const READING_HINT_Y = RESET_Y - 30;
+const PAUSE_HINT_Y = CANVAS_HEIGHT / 2 + 46;
 
-const MEMORY_PICTURE_DARKEN = 0.88;
-const MEMORY_PICTURE_FILL_MS = 620;
+
+const SIDE_COMMAND_GAP = 8;
 
 const MEMORY_BOX = {
   left: ORIGIN_X + BOARD_WIDTH + 14,
@@ -151,10 +174,13 @@ const MEMORY_BOX = {
   height: 300,
 };
 
+const SHERIFF_COUNT_Y = MEMORY_BOX.top + MEMORY_BOX.height + 12;
+
 const SIDE_COMMAND_WIDTH = (MEMORY_BOX.width - SIDE_COMMAND_GAP) / 2;
 const SIDE_COMMAND_Y = ORIGIN_Y + BOARD_HEIGHT - 34;
 const CHARACTER_X = MEMORY_BOX.left + MEMORY_BOX.width / 2;
 const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
+const MEMORY_LANDS_AT = { x: CHARACTER_X, y: CHARACTER_BOTTOM - 90 };
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -162,7 +188,6 @@ const PREVIEW_TOP_Y = ORIGIN_Y + 72;
 
 const BOARD_FRAME_MARGIN = 15;
 
-const REVEAL_BODY_COLOR = '#e8eef2';
 const BOARD_FRAME_CHAMFER = 20;
 
 function boardFrameCorners(): { x: number; y: number }[] {
@@ -272,11 +297,13 @@ export class BoardScene extends Scene {
 
   private lockSolved = false;
 
-  private lockEndingIn = 0;
-
-  private shownPiecesRemaining = -1;
+  private handoverElapsed: number | null = null;
 
   private litNeurons: NeuronSite[] = [];
+
+  private threadSurge: { whole: boolean; progress: number; duration: number } | null = null;
+
+
 
   private neuronThread: Phaser.GameObjects.Graphics;
 
@@ -286,22 +313,11 @@ export class BoardScene extends Scene {
 
   private staticStrength = 0;
 
-  private gameOverText: Phaser.GameObjects.Text;
-
-  private gameOverLine: Phaser.GameObjects.Text;
-
-  private gameOverHint: Phaser.GameObjects.Text;
-
-  private contactOffer: Phaser.GameObjects.Text;
+  private endingScreen: EndingScreen;
   private previewTiles: Phaser.GameObjects.Image[];
-
-  private piecesText: Phaser.GameObjects.Text;
 
   private shownPivotType = -1;
 
-  private shownPreviewShowing = true;
-
-  private chainNote!: Phaser.GameObjects.Text;
   private shownSatelliteType = -1;
   private shownChain = -1;
   private nextFpsRefresh = 0;
@@ -324,6 +340,30 @@ export class BoardScene extends Scene {
   private pauseText: Phaser.GameObjects.Text;
   private pauseHint: Phaser.GameObjects.Text;
 
+  private foundMemories: FoundMemories;
+
+  private readingIndex: number | null = null;
+
+  private memoryReader: MemoryReader;
+
+  private tappedMemory: number | null = null;
+
+  private resetButton: PressTwiceButton;
+
+  private resetKeys: Phaser.Input.Keyboard.Key[];
+
+  private resetPressed = false;
+
+  private victory: VictoryScreen;
+
+  private playAgainPressed = false;
+
+  private focusRow = -1;
+
+  private focusFrame: Phaser.GameObjects.Graphics;
+
+  private enterKey: Phaser.Input.Keyboard.Key;
+
   private popTiles: Phaser.GameObjects.Image[];
   private fallTiles: Phaser.GameObjects.Image[];
 
@@ -334,8 +374,6 @@ export class BoardScene extends Scene {
   private animatedShadowCells = new Set<number>();
 
   private pulsingCells = new Set<number>();
-
-  private revealPhoto: Phaser.GameObjects.Image;
 
   private shadowArrival: { cellIndex: number; age: number } | null = null;
 
@@ -359,52 +397,34 @@ export class BoardScene extends Scene {
 
   private shownCharacterTexture = characterTexture('idle', 0);
 
-  private chainCarriedFromEarlierBoards = 0;
-
-  private shadowGroundHeld = 0;
-
   private runReadouts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
 
   private objectiveHeld = false;
 
   private boardFrame: Phaser.GameObjects.Graphics;
 
-  private memoryPanel: Phaser.GameObjects.Graphics;
+  private memoryPanel: MemoryPanel;
 
-  private panelRank: number[] = [];
 
-  private panelArt: MemoryGrid | null = null;
-
-  private panelKey: string | null = null;
-
-  private shownPanelCells = 0;
-
-  private shownPanelProgress = -1;
+  private memoryHandover: MemoryHandover;
 
   private crashed = false;
 
   private sideCommands: Phaser.GameObjects.Text[] = [];
 
-  private panelFill: Phaser.Tweens.Tween | null = null;
-
   private nodesRevealed = 0;
 
-  private revealHolding = false;
+  private foundBeat: { photo?: string; title: string; hint: string | null } | null = null;
+
+  private sheriffCount: Phaser.GameObjects.Text;
 
   private revealPending = false;
 
   private lastRevealPiece = -1;
 
-  private revealScrim: Phaser.GameObjects.Rectangle;
-  private revealTitle: Phaser.GameObjects.Text;
-
-  private revealHint: Phaser.GameObjects.Text;
-
-  private revealSkippableIn = 0;
+  private revealCard: RevealCard;
 
   private introCardShowing: number | null = null;
-
-  private revealBody: Phaser.GameObjects.Text;
 
   private cellsBeingFilled = new Set<number>();
 
@@ -414,6 +434,10 @@ export class BoardScene extends Scene {
   private shownToppedOut = false;
 
   private soundedPiecesLocked = 0;
+
+  private judgedPiecesLocked = 0;
+
+  private readonly overthinking = new Overthinking();
 
   private chainAwaitingFlourish = 0;
 
@@ -458,7 +482,7 @@ export class BoardScene extends Scene {
     this.boardFrame.closePath();
     this.boardFrame.strokePath();
 
-    this.memoryPanel = this.add.graphics();
+    this.memoryPanel = new MemoryPanel(this, MEMORY_BOX, MEMORY_LANDS_AT);
 
     bakeTileTextures(this, CELL_SIZE, GAP);
 
@@ -561,30 +585,6 @@ export class BoardScene extends Scene {
       );
     }
 
-    this.runReadouts.push(this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y - 46, 'NEXT', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#8ea3b0',
-    }).setOrigin(0.5, 0.5));
-
-    this.runReadouts.push(this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 88, 'PIECES', {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#7a5f96',
-    }).setOrigin(0.5, 0.5));
-
-    this.piecesText = this.add.text(PREVIEW_CENTER_X, PREVIEW_TOP_Y + 112, '', {
-      fontFamily: 'monospace',
-      fontSize: '32px',
-      color: '#e9dcff',
-    }).setOrigin(0.5, 0.5);
-
-    this.add.text(PREVIEW_CENTER_X, MEMORY_PANEL_TOP - 40, 'MEMORY', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#6b5a80',
-    }).setOrigin(0.5, 0.5);
-
     if (TOUCH_PRIMARY) {
       this.sideCommands = (['pause', 'restart'] as const).map((action, index) => {
         const command = this.add
@@ -612,6 +612,12 @@ export class BoardScene extends Scene {
     this.character = this.add.image(CHARACTER_X, CHARACTER_BOTTOM, characterTexture('idle', 0))
       .setOrigin(0.5, 1);
 
+    this.sheriffCount = this.add.text(CHARACTER_X, SHERIFF_COUNT_Y, '', {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#9481aa',
+    }).setOrigin(0.5, 0.5);
+
     this.previewTiles = [
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y + PREVIEW_CELL + GAP, tileTexture(null)),
       this.add.image(PREVIEW_CENTER_X, PREVIEW_TOP_Y, tileTexture(null)),
@@ -624,6 +630,9 @@ export class BoardScene extends Scene {
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
+    this.enterKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ENTER);
+    this.resetKeys = [Input.Keyboard.KeyCodes.BACKSPACE, Input.Keyboard.KeyCodes.DELETE]
+      .map((code) => this.input.keyboard!.addKey(code));
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
@@ -636,8 +645,10 @@ export class BoardScene extends Scene {
           return;
         }
 
-        if (over.includes(this.contactOffer)
-          || this.sideCommands.some((command) => over.includes(command))) {
+        if (this.victory.pressables.some((target) => over.includes(target))
+          || this.sideCommands.some((command) => over.includes(command))
+          || this.foundMemories.pictures.some((picture) => picture !== null && over.includes(picture))
+          || over.includes(this.resetButton.text)) {
           return;
         }
 
@@ -676,7 +687,7 @@ export class BoardScene extends Scene {
       color: '#8ea3b0',
     }).setVisible(this.showFps);
 
-    this.objectiveText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, 12, '', {
+    this.objectiveText = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, 34, '', {
       fontFamily: 'monospace',
       fontSize: '15px',
       color: '#c98cff',
@@ -688,85 +699,44 @@ export class BoardScene extends Scene {
       color: '#ffc914',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.revealScrim = this.add.rectangle(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2,
-      BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
-      BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
-      GROUND_COLOR,
-    ).setVisible(false);
+    this.memoryHandover = new MemoryHandover(this, {
+      centerX: ORIGIN_X + BOARD_WIDTH / 2,
+      centerY: ORIGIN_Y + BOARD_HEIGHT / 2,
+      width: BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
+      height: BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
+    }, MEMORY_LANDS_AT);
 
-    this.revealPhoto = this.add.image(ORIGIN_X + BOARD_WIDTH / 2, 0, TRACE_TEXTURE)
-      .setVisible(false);
-
-    this.revealTitle = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 - 70, '', {
-      fontFamily: 'monospace',
-      fontSize: '26px',
-      color: '#c98cff',
-      align: 'center',
-      wordWrap: { width: BOARD_WIDTH - 40 },
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.revealBody = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 10, '', {
-      fontFamily: 'monospace',
-      fontSize: '17px',
-      color: REVEAL_BODY_COLOR,
-      align: 'center',
-      wordWrap: { width: BOARD_WIDTH - 56 },
-      lineSpacing: 7,
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.revealHint = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, CANVAS_HEIGHT / 2 + 96, SKIP_PROMPT, {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#6b5a80',
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.gameOverHint = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      HINT_ALONE_Y,
-      RESTART_PROMPT,
-      {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#8ea3b0',
-        backgroundColor: '#221038',
-        padding: { x: 10, y: 5 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.chainNote = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CHAIN_NOTE_Y,
-      '',
-      {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffc914',
-        backgroundColor: '#221038',
-        padding: { x: 10, y: 5 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.contactOffer = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CONTACT_OFFER_Y,
-      REACH_OUT_LINE,
-      {
-        fontFamily: 'monospace',
-        fontSize: '19px',
-        color: '#221038',
-        backgroundColor: '#c98cff',
-        padding: { x: 18, y: 10 },
-      },
-    )
-      .setOrigin(0.5, 0.5)
-      .setVisible(false)
-      .setInteractive({ useHandCursor: true });
-
-    this.onPress(this.contactOffer, () => {
+    this.victory = new VictoryScreen(
+      this,
+      collectionEntries(),
+      CANVAS_WIDTH,
+      CANVAS_HEIGHT,
+      { hint: VICTORY_HINT, reset: RESET_PROMPT, resetArmed: RESET_ARMED_PROMPT },
+    );
+    this.victory.memories.pictures.forEach((picture, index) => {
+      if (picture !== null) {
+        this.onPress(picture, () => {
+          this.tappedMemory = index;
+        });
+      }
+    });
+    this.onPress(this.victory.contactButton, () => {
       window.location.href = '/#contact';
     });
+    this.onPress(this.victory.playAgainButton, () => {
+      this.playAgainPressed = true;
+    });
+    this.onPress(this.victory.resetButton.text, () => {
+      this.resetPressed = true;
+    });
+
+    this.revealCard = new RevealCard(this, {
+      centerX: ORIGIN_X + BOARD_WIDTH / 2,
+      centerY: CANVAS_HEIGHT / 2,
+      coverWidth: BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
+      coverHeight: BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
+      textWidth: BOARD_WIDTH,
+    }, SKIP_PROMPT);
 
     this.staticOverlay = this.add.tileSprite(
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -776,33 +746,12 @@ export class BoardScene extends Scene {
       STATIC_TEXTURE,
     ).setVisible(false).setBlendMode(BlendModes.ADD);
 
-    this.gameOverText = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2 - 18,
-      CONNECTION_LOST,
-      {
-        fontFamily: 'monospace',
-        fontSize: '40px',
-        color: '#e8eef2',
-        backgroundColor: '#221038',
-        padding: { x: 16, y: 10 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
+    this.endingScreen = new EndingScreen(this, {
+      centerX: ORIGIN_X + BOARD_WIDTH / 2,
+      centerY: CANVAS_HEIGHT / 2,
+      textWidth: BOARD_WIDTH,
+    }, RESTART_PROMPT);
 
-    this.gameOverLine = this.add.text(
-      ORIGIN_X + BOARD_WIDTH / 2,
-      CANVAS_HEIGHT / 2 + 34,
-      SHADOW_CLOSING_LINE,
-      {
-        fontFamily: 'monospace',
-        fontSize: '17px',
-        color: '#b07dff',
-        backgroundColor: '#221038',
-        padding: { x: 12, y: 6 },
-        align: 'center',
-        wordWrap: { width: BOARD_WIDTH - 24 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
 
     this.shadowSpeech = this.add.text(ORIGIN_X + BOARD_WIDTH / 2, ORIGIN_Y + BOARD_HEIGHT * 0.28, '', {
       fontFamily: 'monospace',
@@ -828,11 +777,47 @@ export class BoardScene extends Scene {
       color: '#c98cff',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 46, RESUME_PROMPT, {
+    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, PAUSE_HINT_Y, RESUME_PROMPT, {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#6b5a80',
+      color: '#9481aa',
+      align: 'center',
     }).setOrigin(0.5, 0.5).setVisible(false);
+
+    this.foundMemories = new FoundMemories(
+      this,
+      collectionEntries(),
+      CANVAS_WIDTH / 2,
+      FOUND_ROW_Y,
+      CANVAS_WIDTH - FOUND_ROW_MARGIN * 2,
+    );
+    this.memoryReader = new MemoryReader(this, {
+      centerX: CANVAS_WIDTH / 2,
+      top: READER_TOP,
+      bottom: READER_BOTTOM,
+      textWidth: READER_TEXT_WIDTH,
+    });
+
+    this.foundMemories.pictures.forEach((picture, index) => {
+      if (picture !== null) {
+        this.onPress(picture, () => {
+          this.tappedMemory = index;
+        });
+      }
+    });
+
+    this.resetButton = new PressTwiceButton(
+      this,
+      CANVAS_WIDTH / 2,
+      RESET_Y,
+      RESET_PROMPT,
+      RESET_ARMED_PROMPT,
+    );
+    this.onPress(this.resetButton.text, () => {
+      this.resetPressed = true;
+    });
+
+    this.focusFrame = this.add.graphics().setVisible(false);
 
     this.resetShownState();
   }
@@ -858,35 +843,37 @@ export class BoardScene extends Scene {
     reportCrash(error);
 
     this.setPaused(false);
-    this.revealHolding = false;
 
-    this.gameOverText.setText(CRASHED).setVisible(true).setAlpha(1);
-    this.gameOverLine.setText(CRASH_LINE).setVisible(true).setAlpha(1);
-    this.gameOverHint.setY(HINT_ALONE_Y).setVisible(true).setAlpha(1);
-    this.revealScrim.setVisible(true).setAlpha(1);
+    this.endingScreen.showCrash();
+    this.revealCard.coverBoard();
   }
 
   private recoverFromCrash(): void {
     this.crashed = false;
-    this.gameOverText.setVisible(false);
-    this.gameOverLine.setVisible(false);
-    this.revealScrim.setVisible(false);
+    this.endingScreen.hideCrash();
+    this.revealCard.uncoverBoard();
     this.restart(this.moreToReach);
   }
 
   private step(time: number, delta: number): void {
     if (Input.Keyboard.JustDown(this.pauseKey) || this.touch.takePause()) {
-      this.setPaused(!this.paused);
+      if (this.readingIndex !== null) {
+        this.closeReading();
+      } else if (!this.victory.active) {
+        this.setPaused(!this.paused);
+      }
     }
 
     // `JustDown` consumes the press, so the `paused` test must come first.
-    if (this.paused && (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop())) {
-      this.setPaused(false);
+    if (this.paused) {
+      this.readFromPause();
+    } else if (this.victory.active && this.readingIndex === null) {
+      this.readFromVictory();
     }
 
-    if (Input.Keyboard.JustDown(this.restartKey)
-      || this.touch.takeRestart()
-      || (this.runOver !== null && this.touch.takeDrop())) {
+    const restartPressed = Input.Keyboard.JustDown(this.restartKey) || this.touch.takeRestart();
+    if (!this.victory.active
+      && (restartPressed || (this.runOver === 'topped-out' && this.touch.takeDrop()))) {
       this.restart(this.moreToReach);
     }
 
@@ -896,6 +883,7 @@ export class BoardScene extends Scene {
     }
 
     if (this.paused) {
+      this.memoryReader.advance(delta);
       this.drawBoard();
       this.drawConnections(0);
       this.drawPair();
@@ -907,21 +895,19 @@ export class BoardScene extends Scene {
     }
 
     this.advanceCharacter(delta);
+    this.revealCard.advance(delta);
 
-    if (this.revealHolding) {
-      if (this.revealSkippableIn > 0) {
-        this.revealSkippableIn -= delta;
-        if (this.revealSkippableIn <= 0) {
-          this.revealHint.setVisible(true).setAlpha(0);
-          this.tweens.add({ targets: this.revealHint, alpha: 1, duration: 260 });
-        }
-      } else if (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop()) {
-        this.revealHolding = false;
+    if (this.revealCard.holding) {
+      if (this.revealCard.waitForSkip(
+        delta,
+        () => Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop(),
+      )) {
         this.advanceReveal();
       }
     } else if (this.hitStopRemaining > 0) {
       this.hitStopRemaining -= delta;
     } else if (this.runOver === 'won') {
+    } else if (this.handoverElapsed !== null && !this.simulation.resolving) {
     } else {
       for (let step = this.timestep.stepsFor(delta); step > 0; step -= 1) {
         this.simulation.update(FIXED_STEP);
@@ -939,14 +925,15 @@ export class BoardScene extends Scene {
       }
     }
 
-    this.releaseObjective();
+    this.openTheBoard();
+    this.judgePlacedPiece();
     this.playShadowArrival();
     this.playCascadeBeat();
     this.playSounds();
     this.drawBoard();
     this.checkLock();
-    this.refreshPieces(delta);
-    this.drawNeuronThread();
+    this.handOverSolvedBoard(delta);
+    this.drawNeuronThread(delta);
     this.drawThreat();
     this.drawConnections(delta);
     this.surfaceBankedFragment();
@@ -969,7 +956,7 @@ export class BoardScene extends Scene {
     this.staticOverlay.setAlpha(this.staticStrength * (0.1 + Math.random() * 0.14));
   }
 
-  private setPaused(paused: boolean): void {
+  private setPaused(paused: boolean, select?: number): void {
     if (paused === this.paused) {
       return;
     }
@@ -981,19 +968,294 @@ export class BoardScene extends Scene {
     this.pauseHint.setVisible(paused);
 
     if (paused) {
+      this.resetButton.show();
       this.tweens.pauseAll();
+      this.foundMemories.show(this.storyHolding ? [] : this.collected, select);
+      this.pauseHint
+        .setText(this.foundMemories.showing ? READ_PROMPT : RESUME_PROMPT)
+        .setY(PAUSE_HINT_Y);
+      this.startFocus();
     } else {
+      this.stopReadingInPause();
+      this.resetButton.hide();
       this.tweens.resumeAll();
+      this.foundMemories.hide();
+      this.focusRow = -1;
+      this.drawFocus();
     }
   }
 
-  private get deepestChainThisRun(): number {
-    return Math.max(this.chainCarriedFromEarlierBoards, this.simulation.deepestChain);
+  private pressReset(): void {
+    if (this.resetButton.press(this.time.now)) {
+      this.startOver();
+    }
+  }
+
+  private startOver(): void {
+    this.foundBeat = null;
+    forgetAllProgress();
+    this.restart();
+  }
+
+  private playAgain(): void {
+    this.foundBeat = null;
+    forgetRun();
+    this.restart();
+  }
+
+  private memoryLanded(): void {
+    const found = foundFragments().length;
+
+    this.characterState = characterOn(this.characterState, 'good');
+    this.soundBoard.play(nodeVoice(Math.max(found - 1, 0), FRAGMENT_COUNT));
+    this.refreshSheriffCount();
+  }
+
+  private refreshSheriffCount(): void {
+    this.sheriffCount.setText(`${foundFragments().length} / ${FRAGMENT_COUNT}`);
+  }
+
+  private showVictory(): void {
+    this.victory.show(this.collected);
+    this.startFocus();
+  }
+
+  private readFromVictory(): void {
+    const tapped = this.tappedMemory;
+    this.tappedMemory = null;
+    const picked = Input.Keyboard.JustDown(this.hardDropKey)
+      || Input.Keyboard.JustDown(this.enterKey);
+    const playAgainPressed = this.playAgainPressed;
+    this.playAgainPressed = false;
+    const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
+      || this.resetPressed;
+    this.resetPressed = false;
+    this.touch.takeDrop();
+
+    if (resetPressed) {
+      this.pressVictoryReset();
+      return;
+    }
+
+    this.victory.resetButton.expire(this.time.now);
+    this.steerFocus(this.victory.memories);
+
+    if (tapped !== null) {
+      this.openFound(tapped);
+    } else if (playAgainPressed) {
+      this.playAgain();
+    } else if (picked) {
+      this.pressFocused();
+    }
+  }
+
+  private pressVictoryReset(): void {
+    if (this.victory.resetButton.press(this.time.now)) {
+      this.startOver();
+    }
+  }
+
+  private readFromPause(): void {
+    if (this.readingIndex !== null) {
+      this.readWhilePaused();
+      return;
+    }
+
+    const tapped = this.tappedMemory;
+    this.tappedMemory = null;
+    const picked = Input.Keyboard.JustDown(this.enterKey);
+    const resumed = Input.Keyboard.JustDown(this.hardDropKey);
+    const tappedAway = this.touch.takeDrop();
+    const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
+      || this.resetPressed;
+    this.resetPressed = false;
+
+    if (resetPressed) {
+      this.pressReset();
+      return;
+    }
+
+    this.resetButton.expire(this.time.now);
+    this.steerFocus(this.foundMemories);
+
+    if (tapped !== null) {
+      this.openFound(tapped);
+    } else if (picked) {
+      if (!this.pressFocused()) {
+        this.setPaused(false);
+      }
+    } else if (resumed || tappedAway) {
+      this.setPaused(false);
+    }
+  }
+
+  private readWhilePaused(): void {
+    const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
+      || this.resetPressed;
+    this.resetPressed = false;
+    if (resetPressed) {
+      this.closeReading();
+      this.pressReset();
+      return;
+    }
+
+    const tapped = this.tappedMemory;
+    this.tappedMemory = null;
+    const done = Input.Keyboard.JustDown(this.hardDropKey)
+      || Input.Keyboard.JustDown(this.enterKey)
+      || this.touch.takeDrop();
+
+    if (Input.Keyboard.JustDown(this.cursors.left)) {
+      this.foundMemories.move(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.right)) {
+      this.foundMemories.move(1);
+    }
+    if (tapped !== null) {
+      this.foundMemories.select(tapped);
+    }
+
+    if (done && tapped === null) {
+      this.closeReading();
+    } else if (this.foundMemories.selected !== this.readingIndex) {
+      this.openFound(this.foundMemories.selected);
+    }
+  }
+
+  private focusRows(): (Phaser.GameObjects.Text | null)[] {
+    if (this.victory.active) {
+      return [
+        null,
+        this.victory.contactButton,
+        this.victory.playAgainButton,
+        this.victory.resetButton.text,
+      ];
+    }
+
+    return this.foundMemories.showing ? [null, this.resetButton.text] : [this.resetButton.text];
+  }
+
+  private startFocus(): void {
+    this.focusRow = this.focusRows()[0] === null ? 0 : -1;
+    this.drawFocus();
+  }
+
+  private steerFocus(memories: FoundMemories | VictorySky): void {
+    if (Input.Keyboard.JustDown(this.cursors.up)) {
+      this.moveFocus(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.down)) {
+      this.moveFocus(1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.left)) {
+      memories.move(-1);
+    }
+    if (Input.Keyboard.JustDown(this.cursors.right)) {
+      memories.move(1);
+    }
+  }
+
+  private moveFocus(direction: -1 | 1): void {
+    const rows = this.focusRows();
+    const first = rows[0] === null ? 0 : -1;
+
+    this.focusRow = Math.max(first, Math.min(rows.length - 1, this.focusRow + direction));
+    this.drawFocus();
+  }
+
+  private drawFocus(): void {
+    const button = this.focusRows()[this.focusRow];
+    this.focusFrame.clear().setVisible(false);
+
+    if (this.focusRow < 0 || button === null || button === undefined) {
+      return;
+    }
+
+    this.focusFrame
+      .lineStyle(2, 0xc98cff, 1)
+      .strokeRect(
+        button.x - button.width / 2 - 5,
+        button.y - button.height / 2 - 5,
+        button.width + 10,
+        button.height + 10,
+      )
+      .setVisible(true);
+  }
+
+  private pressFocused(): boolean {
+    const rows = this.focusRows();
+    const button = rows[this.focusRow];
+
+    if (this.focusRow < 0 || button === undefined) {
+      return false;
+    }
+
+    if (button === null) {
+      const memories = this.victory.active ? this.victory.memories : this.foundMemories;
+      if (!memories.showing) {
+        return false;
+      }
+      this.openFound(memories.selected);
+      return true;
+    }
+
+    if (button === this.victory.contactButton) {
+      window.location.href = '/#contact';
+    } else if (button === this.victory.playAgainButton) {
+      this.playAgain();
+    } else if (button === this.victory.resetButton.text) {
+      this.pressVictoryReset();
+    } else {
+      this.pressReset();
+    }
+
+    return true;
+  }
+
+  private openFound(index: number): void {
+    const node = collectableAt(index)!;
+
+    this.readingIndex = index;
+    this.focusFrame.setVisible(false);
+
+    if (!this.victory.active) {
+      this.foundMemories.select(index);
+      this.pauseText.setVisible(false);
+      this.pauseHint.setText(READING_PROMPT).setY(READING_HINT_Y);
+      this.memoryReader.show(node.body, node.photo);
+      return;
+    }
+
+    this.victory.hideContents();
+    this.revealCard.show(node.title, node.body, node.photo);
+  }
+
+  private closeReading(): void {
+    const read = this.readingIndex ?? undefined;
+    this.readingIndex = null;
+
+    if (!this.victory.active) {
+      this.stopReadingInPause();
+      this.pauseText.setVisible(true);
+      this.pauseHint.setText(READ_PROMPT).setY(PAUSE_HINT_Y);
+      this.startFocus();
+      return;
+    }
+
+    this.revealCard.reset();
+    this.victory.showContents(read);
+    this.startFocus();
+  }
+
+  private stopReadingInPause(): void {
+    this.memoryReader.hide();
+    if (!this.victory.active) {
+      this.readingIndex = null;
+    }
   }
 
   private restart(keepMemory = false, keepStory = false): void {
     this.setPaused(false);
-    this.chainCarriedFromEarlierBoards = keepMemory ? this.deepestChainThisRun : 0;
     this.simulation.restart();
 
     this.lastPiecesSpawned = -1;
@@ -1020,6 +1282,7 @@ export class BoardScene extends Scene {
     }
 
     this.startLock();
+    this.simulation.shadowHeld = this.nodesRevealed === 0;
 
     for (const slot of this.connections) {
       slot.lit = 0;
@@ -1029,20 +1292,11 @@ export class BoardScene extends Scene {
     }
 
     this.runOver = null;
+    this.victory.hide();
     this.characterState = characterOn(this.characterState, 'restart');
-    this.tweens.killTweensOf([
-      this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer, this.chainNote,
-      this.memoryPanel,
-    ]);
-    this.contactOffer.setVisible(false);
-    this.gameOverText.setVisible(false);
-    this.gameOverLine.setVisible(false);
-    this.gameOverHint.setVisible(false);
-    this.chainNote.setVisible(false);
-    this.memoryPanel.setAlpha(1);
-    this.panelKey = null;
-    this.shownPanelCells = 0;
-    this.shownPanelProgress = -1;
+    this.endingScreen.reset();
+    this.memoryHandover.reset();
+    this.memoryPanel.reset();
     if (!keepStory) {
       this.tweens.killAll();
     }
@@ -1056,21 +1310,15 @@ export class BoardScene extends Scene {
     }
 
     if (!keepStory) {
-      this.tweens.killTweensOf([
-        this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
-      ]);
-      for (const part of [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint]) {
-        part.setVisible(false).setAlpha(1);
-      }
-      this.revealSkippableIn = 0;
+      this.revealCard.reset();
     }
     if (!keepStory) {
       this.objectiveHeld = false;
       this.tweens.killTweensOf([
-        this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
+        this.objectiveText, ...this.runReadouts, ...this.previewTiles,
       ]);
       for (const part of [
-        this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles,
+        this.objectiveText, ...this.runReadouts, ...this.previewTiles,
       ]) {
         part.setAlpha(1);
       }
@@ -1079,6 +1327,7 @@ export class BoardScene extends Scene {
     for (let index = 0; index < this.cellTiles.length; index += 1) {
       this.restoreCell(index);
     }
+    this.threadSurge = null;
     this.animatedShadowCells.clear();
     this.shadowArrival = null;
     this.spokenShadowLines = [];
@@ -1090,6 +1339,8 @@ export class BoardScene extends Scene {
 
     this.shownBeats = this.simulation.beatsPlayed;
     this.soundedPiecesLocked = this.simulation.piecesLocked;
+    this.judgedPiecesLocked = this.simulation.piecesLocked;
+    this.overthinking.newBoard();
     this.slamDistance = null;
     this.shownChain = -1;
     this.shownPivotType = -1;
@@ -1100,12 +1351,18 @@ export class BoardScene extends Scene {
     this.nextScorePopup = 0;
 
     if (!keepStory) {
-      this.revealHolding = false;
       this.revealPending = false;
       this.introCardShowing = null;
+      this.readingIndex = null;
     }
     this.lastRevealPiece = -1;
-    this.redrawMemoryPanel(0);
+    this.refreshSheriffCount();
+    this.memoryPanel.startOver(this.upcomingPhoto());
+
+    if (this.foundBeat !== null) {
+      this.memoryPanel.showFound(this.foundBeat.photo, this.foundBeat.title, this.foundBeat.hint);
+      this.foundBeat = null;
+    }
 
     if (!keepMemory) {
       this.openTheRun();
@@ -1113,40 +1370,37 @@ export class BoardScene extends Scene {
   }
 
   private openTheRun(): void {
-    if (!introSeen()) {
-      this.showIntroCard(0);
-    } else if (playedBefore()) {
-      this.showReveal('', SHADOW_OPENING_LINE);
-      this.revealBody.setColor('#b07dff');
-    }
-    rememberPlayed();
-
-    this.holdObjective(0);
-  }
-
-  private holdObjective(fade: number): void {
-    const held = [this.objectiveText, this.piecesText];
-    this.objectiveHeld = true;
-    this.tweens.killTweensOf(held);
-
-    if (fade === 0) {
-      for (const part of held) {
-        part.setAlpha(0);
-      }
+    if (runFinished(FRAGMENT_COUNT)) {
+      this.runOver = 'won';
+      this.showVictory();
       return;
     }
 
-    this.tweens.add({ targets: held, alpha: 0, duration: fade });
+    if (!introSeen()) {
+      this.showIntroCard(0);
+    } else if (playedBefore() && completions() === 0) {
+      this.revealCard.show('', SHADOW_OPENING_LINE);
+      this.revealCard.setBodyColor('#b07dff');
+    }
+    rememberPlayed();
+
+    this.holdObjective();
   }
 
-  private releaseObjective(): void {
+  private holdObjective(): void {
+    this.objectiveHeld = true;
+    this.tweens.killTweensOf(this.objectiveText);
+    this.objectiveText.setAlpha(0);
+  }
+
+  private openTheBoard(): void {
     if (!this.objectiveHeld || this.storyHolding) {
       return;
     }
 
     this.objectiveHeld = false;
     this.tweens.add({
-      targets: [this.objectiveText, this.piecesText],
+      targets: this.objectiveText,
       alpha: 1,
       duration: 520,
     });
@@ -1155,10 +1409,12 @@ export class BoardScene extends Scene {
   private readSwipe(): void {
     for (let action = this.swipe.take(); action !== null; action = this.swipe.take()) {
       if (action === 'rotate') {
+        this.overthinking.decided();
         this.simulation.rotate();
       } else if (action === 'drop') {
         this.dropTheHardWay();
       } else {
+        this.overthinking.decided();
         this.shift(action === 'left' ? -1 : 1);
       }
     }
@@ -1176,6 +1432,7 @@ export class BoardScene extends Scene {
     this.readSwipe();
 
     if (Input.Keyboard.JustDown(this.cursors.up)) {
+      this.overthinking.decided();
       this.simulation.rotate();
     }
 
@@ -1193,7 +1450,12 @@ export class BoardScene extends Scene {
         newPiece,
         delta,
       },
-      (direction) => this.shift(direction),
+      (direction, fresh) => {
+        if (fresh) {
+          this.overthinking.decided();
+        }
+        return this.shift(direction);
+      },
     );
   }
 
@@ -1213,7 +1475,7 @@ export class BoardScene extends Scene {
 
   // Phaser fires pointerup on whatever the finger is over, not on what it
   // pressed, so a drag that ends on a control would trigger it.
-  private onPress<T extends Phaser.GameObjects.Text>(target: T, run: () => void): T {
+  private onPress<T extends Phaser.GameObjects.GameObject>(target: T, run: () => void): T {
     let armed = false;
 
     target.on('pointerdown', () => {
@@ -1234,7 +1496,7 @@ export class BoardScene extends Scene {
   }
 
   private get betweenPlay(): boolean {
-    return this.paused || this.revealHolding || this.runOver !== null || this.crashed;
+    return this.paused || this.revealCard.holding || this.runOver !== null || this.crashed;
   }
 
   private shift(direction: HorizontalDirection): boolean {
@@ -1266,29 +1528,31 @@ export class BoardScene extends Scene {
             .setScale(1 + beat * 0.045)
             .setAlpha(0.88 + beat * 0.12);
         } else if (this.pulsingCells.delete(index) && !possessed) {
-          this.cellTiles[index].setScale(1).setAlpha(1);
+          this.cellTiles[index].setScale(1).setAlpha(1).setAngle(0);
         }
       }
     }
   }
 
   private startLock(): void {
-    const lock = lockFor(this.nodesRevealed);
+    const lock = lockFor(this.chapterIndex);
     this.lockSolved = false;
-    this.lockEndingIn = 0;
-    this.simulation.pieceBudget = lock.pieces;
+    this.handoverElapsed = null;
+    this.tuning.fallInterval = lock.fallInterval;
     seedLock(this.simulation.board, lock, Math.random);
-    this.shownPiecesRemaining = -1;
     this.litNeurons = [];
     this.refreshObjective();
   }
 
   private refreshObjective(): void {
-    const lock = lockFor(this.nodesRevealed);
     const total = neuronsOn(this.simulation.board).length;
     const lit = total - unlitCount(this.simulation.board);
 
-    this.objectiveText.setText(`${lock.objective}  \u2014  ${lit} of ${total}`);
+    this.objectiveText.setText(this.whereYouAre(`${lit} of ${total}`));
+  }
+
+  private whereYouAre(objective: string): string {
+    return `${CHAPTERS[this.chapterIndex].title}  \u00b7  ${objective}`;
   }
 
   private checkLock(): void {
@@ -1296,20 +1560,28 @@ export class BoardScene extends Scene {
       return;
     }
 
-    const lock = lockFor(this.nodesRevealed);
+    const lock = lockFor(this.chapterIndex);
     if (!isSolved(lock, this.simulation.board)) {
       return;
     }
 
     this.lockSolved = true;
-    this.objectiveText.setText(`${lock.objective}  \u2014  open`);
+    this.threadSurge = { whole: true, progress: 0, duration: stageLength('settle') };
+    this.objectiveText.setText(this.whereYouAre('open'));
     this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
 
     this.revealPending = true;
   }
 
-  private drawNeuronThread(): void {
+  private drawNeuronThread(delta: number): void {
     this.neuronThread.clear();
+
+    if (this.threadSurge !== null) {
+      this.threadSurge.progress += delta / this.threadSurge.duration;
+      if (this.threadSurge.progress >= 1) {
+        this.threadSurge = null;
+      }
+    }
 
     const centre = (site: NeuronSite) => ({
       x: centerOfColumn(site.column),
@@ -1326,6 +1598,7 @@ export class BoardScene extends Scene {
         this.neuronThread.lineTo(at.x, at.y);
       }
       this.neuronThread.strokePath();
+      this.drawSurge(this.litNeurons.map(centre));
     }
 
     if (this.litNeurons.length === 0) {
@@ -1356,67 +1629,40 @@ export class BoardScene extends Scene {
     }
   }
 
-  private refreshPieces(delta: number): void {
+  private handOverSolvedBoard(delta: number): void {
     if (this.runOver === 'won') {
       return;
     }
 
-    const remaining = this.simulation.piecesRemaining;
-    if (remaining !== this.shownPiecesRemaining) {
-      this.shownPiecesRemaining = remaining;
-      this.piecesText.setText(Number.isFinite(remaining) ? `${remaining}` : '');
-      this.piecesText.setColor(remaining <= 2 ? '#e4572e' : '#e9dcff');
-    }
-
-    if (this.lockEndingIn > 0) {
-      this.lockEndingIn -= delta;
-      if (this.lockEndingIn <= 0) {
-        this.lockEndingIn = 0;
-        this.restart(true, this.storyHolding);
-        this.simulation.shadowTaken = this.shadowGroundHeld;
-        this.shadowGroundHeld = 0;
-      }
+    if (!this.lockSolved || this.storyHolding) {
       return;
     }
 
-    if (this.lockSolved) {
-      if (this.simulation.resolving || this.revealPending) {
-        return;
-      }
+    const settled = !this.simulation.resolving && !this.revealPending;
+    const before = this.handoverElapsed ?? -1;
+    const elapsed = this.handoverElapsed === null
+      ? 0
+      : advanceHandover(this.handoverElapsed, delta, settled);
+    this.handoverElapsed = elapsed;
 
-      if (this.revealHolding) {
-        this.holdObjective(HANDOVER_DIM);
-        this.lockEndingIn = HANDOVER_BEHIND_REVEAL;
-        return;
-      }
-
-      this.lockEndingIn = HANDOVER_IN_THE_OPEN;
-      return;
+    for (const stage of stagesBegun(before, elapsed)) {
+      this.beginHandoverStage(stage);
     }
-
-    if (!this.simulation.outOfPieces || this.simulation.resolving || this.storyHolding) {
-      return;
-    }
-
-    this.reseedAfterRunningOut();
   }
 
-  // The shadow keeps what it took; only `startLock` reseeds the board itself.
-  private reseedAfterRunningOut(): void {
-    this.lockEndingIn = OUT_OF_PIECES_PAUSE;
-    this.shadowGroundHeld = this.simulation.shadowTaken;
-    this.objectiveText.setText('out of pieces').setAlpha(1);
-    this.soundBoard.play(connectionLostVoice(0));
+  private beginHandoverStage(stage: HandoverStage): void {
+    const found = this.foundBeat;
 
-    this.staticOverlay.setVisible(true).setAlpha(0);
-    this.tweens.addCounter({
-      from: 1,
-      to: 0,
-      duration: OUT_OF_PIECES_PAUSE,
-      onUpdate: (tween) => {
-        this.staticStrength = tween.getValue() ?? 0;
-      },
-    });
+    if (stage === 'fade') {
+      this.memoryHandover.coverBoard(stageLength('fade'));
+    } else if (stage === 'bloom' && found !== null) {
+      this.memoryHandover.bloom(found.photo, found.title);
+    } else if (stage === 'flight') {
+      this.memoryHandover.fly(stageLength('flight'), () => this.memoryLanded());
+    } else if (stage === 'return') {
+      this.restart(true);
+      this.memoryHandover.uncoverBoard(stageLength('return'));
+    }
   }
 
   private drawThreat(): void {
@@ -1517,6 +1763,7 @@ export class BoardScene extends Scene {
       this.simulation.shadowOnBoard,
       this.arrivalsSinceShadowSpoke,
       this.spokenShadowLines,
+      this.overthinking.due,
     );
 
     this.arrivalsSinceShadowSpoke += 1;
@@ -1526,6 +1773,9 @@ export class BoardScene extends Scene {
 
     this.arrivalsSinceShadowSpoke = 0;
     this.spokenShadowLines.push(line);
+    if (line === OVERTHINKING_LINE) {
+      this.overthinking.told();
+    }
 
     this.tweens.killTweensOf(this.shadowSpeech);
     this.shadowSpeech.setText(line).setAlpha(0).setVisible(true);
@@ -1550,6 +1800,14 @@ export class BoardScene extends Scene {
       .setAlpha(1);
     this.shadowBodies[index].setVisible(false);
     this.shadowEyes[index].setVisible(false);
+  }
+
+  private judgePlacedPiece(): void {
+    if (this.simulation.piecesLocked === this.judgedPiecesLocked) {
+      return;
+    }
+    this.judgedPiecesLocked = this.simulation.piecesLocked;
+    this.overthinking.placed();
   }
 
   private playShadowArrival(): void {
@@ -1640,6 +1898,48 @@ export class BoardScene extends Scene {
     }
   }
 
+  private drawSurge(points: readonly { x: number; y: number }[]): void {
+    const surge = this.threadSurge;
+    if (surge === null) {
+      return;
+    }
+
+    const path = surge.whole ? points : points.slice(-2);
+    const spans = path.slice(1).map((at, index) => Math.hypot(
+      at.x - path[index].x,
+      at.y - path[index].y,
+    ));
+    const total = spans.reduce((sum, span) => sum + span, 0);
+    if (total === 0) {
+      return;
+    }
+
+    let travelled = surge.progress * total;
+    let leg = 0;
+    while (leg < spans.length - 1 && travelled > spans[leg]) {
+      travelled -= spans[leg];
+      leg += 1;
+    }
+
+    const along = Math.min(travelled / spans[leg], 1);
+    const head = {
+      x: path[leg].x + (path[leg + 1].x - path[leg].x) * along,
+      y: path[leg].y + (path[leg + 1].y - path[leg].y) * along,
+    };
+
+    this.neuronThread.lineStyle(5, 0xffffff, 0.9);
+    this.neuronThread.beginPath();
+    this.neuronThread.moveTo(path[0].x, path[0].y);
+    for (let step = 1; step <= leg; step += 1) {
+      this.neuronThread.lineTo(path[step].x, path[step].y);
+    }
+    this.neuronThread.lineTo(head.x, head.y);
+    this.neuronThread.strokePath();
+
+    this.neuronThread.fillStyle(0xffffff, 1);
+    this.neuronThread.fillCircle(head.x, head.y, 7);
+  }
+
   private chargeNetwork(link: ChainLink): void {
     const cleared = new Map<number, number>();
     for (const group of link.groups) {
@@ -1662,7 +1962,7 @@ export class BoardScene extends Scene {
   }
 
   private drawProgress(): void {
-    if (this.storyHolding) {
+    if (this.storyHolding || this.foundBeat !== null) {
       return;
     }
 
@@ -1673,32 +1973,18 @@ export class BoardScene extends Scene {
       .length;
 
     const fromNeurons = total === 0 ? 0 : lit / total;
-    const fillScore = lockFor(this.nodesRevealed).fillScore;
+    const fillScore = lockFor(this.chapterIndex).fillScore;
     const progress = Math.max(fromNeurons, Math.min(this.simulation.score / fillScore, 1));
 
-    if (progress !== this.shownPanelProgress) {
-      this.shownPanelProgress = progress;
-      this.redrawMemoryPanel(progress);
-    }
-
+    this.memoryPanel.showProgress(this.upcomingPhoto(), progress);
   }
 
   private get moreToReach(): boolean {
-    return this.locate(this.nodesRevealed) !== null;
+    return nodeAt(this.nodesRevealed) !== null;
   }
 
-  private locate(total: number): { memoryIndex: number; nodeIndex: number } | null {
-    let remaining = total;
-
-    for (let index = 0; index < MEMORIES.length; index += 1) {
-      const nodes = MEMORIES[index].nodes.length;
-      if (remaining < nodes) {
-        return { memoryIndex: index, nodeIndex: remaining };
-      }
-      remaining -= nodes;
-    }
-
-    return null;
+  private get chapterIndex(): number {
+    return nodeAt(this.nodesRevealed)?.chapterIndex ?? CHAPTERS.length - 1;
   }
 
   private surfaceBankedFragment(): void {
@@ -1717,15 +2003,15 @@ export class BoardScene extends Scene {
   }
 
   private revealNextNode(): void {
-    const at = this.locate(this.nodesRevealed);
+    const at = nodeAt(this.nodesRevealed);
     if (at === null) {
       return;
     }
 
-    const { memoryIndex, nodeIndex } = at;
-    const memory = MEMORIES[memoryIndex];
-    const node = memory.nodes[nodeIndex];
+    const { node } = at;
+    const firstFind = foundFragments().length === 0;
     this.nodesRevealed += 1;
+    this.simulation.shadowHeld = this.nodesRevealed === 0;
     rememberFragment(
       this.nodesRevealed - 1,
       { title: node.title },
@@ -1733,10 +2019,15 @@ export class BoardScene extends Scene {
     );
     rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
 
-    this.shownPanelProgress = -1;
-    this.redrawMemoryPanel(0);
+    const hint = firstFind ? FOUND_HINT : null;
 
-    this.showReveal(node.title, node.body, node.photo);
+    if (!this.moreToReach) {
+      this.winTheRun();
+      this.memoryPanel.showFoundFlying(node.photo, node.title, hint, () => this.memoryLanded());
+      return;
+    }
+
+    this.foundBeat = { photo: node.photo, title: node.title, hint };
   }
 
   private holdFor(text: string, floor: number): number {
@@ -1754,10 +2045,15 @@ export class BoardScene extends Scene {
   }
 
   private get storyHolding(): boolean {
-    return this.revealHolding;
+    return this.revealCard.holding;
   }
 
   private advanceReveal(): void {
+    if (this.readingIndex !== null) {
+      this.closeReading();
+      return;
+    }
+
     if (this.introCardShowing !== null) {
       const next = this.introCardShowing + 1;
       if (next < introCards(INTRO_CONTROLS).length) {
@@ -1768,208 +2064,17 @@ export class BoardScene extends Scene {
       rememberIntroSeen();
     }
 
-    this.hideReveal();
-    this.endRunIfNothingLeft(700);
+    this.revealCard.hide();
   }
 
   private showIntroCard(index: number): void {
     const card = introCards(INTRO_CONTROLS)[index];
     this.introCardShowing = index;
-    this.showReveal(card.title, card.body);
+    this.revealCard.show(card.title, card.body);
   }
 
-  private endRunIfNothingLeft(after: number): void {
-    if (this.locate(this.nodesRevealed) !== null) {
-      return;
-    }
-
-    this.time.delayedCall(after, () => {
-      if (this.runOver !== null || this.storyHolding) {
-        return;
-      }
-      this.winTheRun();
-    });
-  }
-
-  private showRevealPicture(picture?: string): void {
-    const key = picture === undefined ? null : memoryArtTexture(picture);
-    if (key === null || !this.textures.exists(key)) {
-      this.revealPhoto.setVisible(false);
-      return;
-    }
-
-    const image = this.revealPhoto.setTexture(key);
-    const fit = Math.min(
-      PHOTO_MAX_WIDTH / image.width,
-      PHOTO_MAX_HEIGHT / image.height,
-      1,
-    );
-
-    image.setScale(fit).setVisible(true);
-  }
-
-  // Fixed offsets cannot hold a body whose length varies; the card is a stack.
-  private layOutReveal(): void {
-    const centerX = ORIGIN_X + BOARD_WIDTH / 2;
-    const photoHeight = this.revealPhoto.visible ? this.revealPhoto.displayHeight : 0;
-    const titleHeight = this.revealTitle.visible ? this.revealTitle.height : 0;
-    const bodyHeight = this.revealBody.height;
-    const hintHeight = this.revealHint.height;
-
-    const parts: { target: Phaser.GameObjects.Components.Transform; height: number }[] = [];
-    if (photoHeight > 0) parts.push({ target: this.revealPhoto, height: photoHeight });
-    if (titleHeight > 0) parts.push({ target: this.revealTitle, height: titleHeight });
-    parts.push({ target: this.revealBody, height: bodyHeight });
-    parts.push({ target: this.revealHint, height: hintHeight });
-
-    const total = parts.reduce((sum, part) => sum + part.height, 0)
-      + REVEAL_GAP * (parts.length - 1);
-
-    let y = CANVAS_HEIGHT / 2 - total / 2;
-    for (const part of parts) {
-      part.target.setPosition(centerX, y + part.height / 2);
-      y += part.height + REVEAL_GAP;
-    }
-  }
-
-  private showReveal(title: string, body: string, photo?: string): void {
-    this.revealBody.setColor(REVEAL_BODY_COLOR);
-    this.revealHolding = true;
-    this.revealSkippableIn = REVEAL_SKIP_GRACE;
-    this.revealHint.setText(SKIP_PROMPT).setVisible(false);
-
-    this.tweens.killTweensOf([this.revealScrim, this.revealTitle, this.revealBody, this.revealPhoto]);
-
-    this.showRevealPicture(photo);
-    this.revealTitle.setText(title).setVisible(title !== '');
-    this.revealBody.setText(body).setVisible(true);
-
-    this.layOutReveal();
-
-    const scrimAlpha = this.revealScrim.visible ? this.revealScrim.alpha : 0;
-    this.revealScrim.setVisible(true).setAlpha(scrimAlpha);
-    this.tweens.add({ targets: this.revealScrim, alpha: 1, duration: 240 });
-
-    for (const part of [this.revealTitle, this.revealBody, this.revealPhoto]) {
-      if (!part.visible) {
-        continue;
-      }
-      part.setAlpha(0);
-      this.tweens.add({ targets: part, alpha: 1, duration: 340, delay: 160 });
-    }
-  }
-
-  private hideReveal(): void {
-    const parts = [this.revealScrim, this.revealTitle, this.revealBody, this.revealHint,
-      this.revealPhoto];
-    this.tweens.killTweensOf(parts);
-    this.tweens.add({
-      targets: parts,
-      alpha: 0,
-      duration: 280,
-      onComplete: () => {
-        for (const part of parts) {
-          part.setVisible(false);
-        }
-      },
-    });
-  }
-
-  private upcomingArt(): { key: string; art: MemoryGrid } | null {
-    const at = this.locate(this.nodesRevealed);
-    if (at === null) {
-      return null;
-    }
-
-    const photo = MEMORIES[at.memoryIndex].nodes[at.nodeIndex].photo;
-    const art = photo === undefined ? undefined : MEMORY_ART[photo];
-
-    return art === undefined ? null : { key: photo as string, art: art.panel };
-  }
-
-  private redrawMemoryPanel(progress: number): void {
-    const upcoming = this.upcomingArt();
-
-    if (upcoming === null) {
-      this.panelArt = null;
-      this.panelKey = null;
-      this.memoryPanel.clear();
-      return;
-    }
-
-    const { key, art } = upcoming;
-    const cells = art.columns * art.rows.length;
-
-    if (key !== this.panelKey) {
-      this.panelKey = key;
-      this.panelArt = art;
-      this.panelRank = [];
-      revealOrder(art.columns, art.rows.length)
-        .forEach((cell, rank) => { this.panelRank[cell] = rank; });
-      this.shownPanelCells = 0;
-    }
-
-    const target = Math.round(Math.max(0, Math.min(progress, 1)) * cells);
-
-    this.panelFill?.remove();
-    this.panelFill = this.tweens.addCounter({
-      from: this.shownPanelCells,
-      to: target,
-      duration: MEMORY_PICTURE_FILL_MS,
-      ease: 'Cubic.easeOut',
-      onUpdate: (tween) => {
-        this.shownPanelCells = tween.getValue() ?? target;
-        this.drawMemoryPicture();
-      },
-      onComplete: () => {
-        this.shownPanelCells = target;
-        this.drawMemoryPicture();
-      },
-    });
-
-    this.drawMemoryPicture();
-  }
-
-  private drawMemoryPicture(): void {
-    const art = this.panelArt;
-    if (art === null) {
-      return;
-    }
-
-    const size = Math.min(MEMORY_BOX.width / art.columns, MEMORY_BOX.height / art.rows.length);
-    const left = MEMORY_BOX.left + (MEMORY_BOX.width - size * art.columns) / 2;
-    const top = MEMORY_BOX.top + (MEMORY_BOX.height - size * art.rows.length) / 2;
-    const reached = this.shownPanelCells;
-
-    this.memoryPanel.clear();
-
-    for (let row = 0; row < art.rows.length; row += 1) {
-      const line = art.rows[row];
-      for (let column = 0; column < art.columns; column += 1) {
-        const mark = line[column];
-        if (mark === undefined || mark === '.') {
-          continue;
-        }
-
-        const code = Number(mark);
-        if (!Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
-          continue;
-        }
-
-        const shaded = code >= PIECE_TYPE_COUNT;
-        const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
-        const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
-        const lit = this.panelRank[row * art.columns + column] < reached;
-
-        this.memoryPanel.fillStyle(lit ? face : mix(face, 0x000000, MEMORY_PICTURE_DARKEN), 1);
-        this.memoryPanel.fillRect(
-          left + column * size,
-          top + row * size,
-          Math.max(1, size - 1),
-          Math.max(1, size - 1),
-        );
-      }
-    }
+  private upcomingPhoto(): string | undefined {
+    return nodeAt(this.nodesRevealed)?.node.photo;
   }
 
   private settledPieceAt(column: number, row: number): number | null {
@@ -2035,6 +2140,10 @@ export class BoardScene extends Scene {
     });
   }
 
+  private get collected(): number[] {
+    return foundFragments();
+  }
+
   private reachNeurons(lit: readonly NeuronSite[]): void {
     const total = neuronsOn(this.simulation.board).length;
 
@@ -2048,6 +2157,10 @@ export class BoardScene extends Scene {
         ...nodeVoice(this.litNeurons.length - 1, Math.max(total, 1)),
         pan: panForX(centerOfColumn(site.column)),
       });
+
+      if (this.litNeurons.length > 1) {
+        this.threadSurge = { whole: false, progress: 0, duration: THREAD_PULSE };
+      }
 
       const index = visibleCellIndex(site.column, site.row);
       this.cellTiles[index].setScale(1.35);
@@ -2305,18 +2418,6 @@ export class BoardScene extends Scene {
   }
 
   private drawPreview(): void {
-    const showing = this.simulation.hasNextPiece;
-    if (showing !== this.shownPreviewShowing) {
-      this.shownPreviewShowing = showing;
-      for (const tile of this.previewTiles) {
-        tile.setVisible(showing);
-      }
-    }
-
-    if (!showing) {
-      return;
-    }
-
     const [pivotType, satelliteType] = this.simulation.upcoming;
     if (pivotType === this.shownPivotType && satelliteType === this.shownSatelliteType) {
       return;
@@ -2328,20 +2429,10 @@ export class BoardScene extends Scene {
     this.previewTiles[1].setTexture(tileTexture(satelliteType));
   }
 
-  private chainNoteIfEarned(): Phaser.GameObjects.Text[] {
-    const deepest = this.deepestChainThisRun;
-    if (deepest < 2) {
-      return [];
-    }
-
-    this.chainNote.setText(`BEST CHAIN  ${deepest}`);
-    return [this.chainNote];
-  }
-
   private refreshChain(): void {
     const { resolving, chainLength } = this.simulation;
 
-    const showing = resolving && chainLength >= 2 && !this.storyHolding;
+    const showing = resolving && chainLength >= 3 && !this.storyHolding;
 
     this.chainText.setVisible(showing);
     if (showing && chainLength !== this.shownChain) {
@@ -2351,17 +2442,14 @@ export class BoardScene extends Scene {
   }
 
   private refreshGameOver(): void {
-    if (this.runOver === null || this.storyHolding) {
-      this.gameOverText.setVisible(false);
-      this.gameOverLine.setVisible(false);
-      this.gameOverHint.setVisible(false);
-      this.contactOffer.setVisible(false);
-      this.chainNote.setVisible(false);
+    if (this.runOver === null || this.storyHolding || this.paused) {
+      this.endingScreen.hide();
+    } else {
+      this.endingScreen.restore();
     }
   }
 
   private loseTheBoard(): void {
-    rememberBestChain(this.deepestChainThisRun);
     this.characterState = characterOn(this.characterState, 'lost');
 
     const lit = this.connections.filter((slot) => slot.trace.visible);
@@ -2397,38 +2485,23 @@ export class BoardScene extends Scene {
 
     const settled = lit.length * 45 + 320;
 
-    this.tweens.add({
-      targets: this.memoryPanel,
-      alpha: 0.15,
-      duration: 700,
-      delay: settled * 0.4,
-    });
+    this.memoryPanel.fadeTo(0.15, 700, settled * 0.4);
 
     this.time.delayedCall(settled, () => {
       if (this.runOver === null) {
         return;
       }
-      this.gameOverLine.setText(closingLine(this.unfinishedBusiness()));
-      this.gameOverHint.setY(HINT_ALONE_Y);
-
-      const ending = [
-        this.gameOverText, this.gameOverLine, this.gameOverHint,
-        ...this.chainNoteIfEarned(),
-      ];
-      for (const text of ending) {
-        text.setVisible(true).setAlpha(0);
-        this.tweens.add({ targets: text, alpha: 1, duration: 420 });
-      }
+      this.endingScreen.showLost(closingLine(this.unfinishedBusiness()));
     });
   }
 
   private winTheRun(): void {
     this.runOver = 'won';
-    rememberBestChain(this.deepestChainThisRun);
+    rememberCompletion();
     this.characterState = characterOn(this.characterState, 'won');
 
     this.tweens.add({
-      targets: [this.objectiveText, this.piecesText, ...this.runReadouts, ...this.previewTiles],
+      targets: [this.objectiveText, ...this.runReadouts, ...this.previewTiles],
       alpha: 0,
       duration: 420,
     });
@@ -2453,41 +2526,27 @@ export class BoardScene extends Scene {
       });
     });
 
-    this.tweens.add({
-      targets: this.memoryPanel,
-      alpha: 1,
-      duration: 900,
-    });
+    this.memoryPanel.fadeTo(1, 900);
 
-    const settled = built.length * 60 + 520;
+    const settled = Math.max(built.length * 60 + 520, FOUND_FLIGHT_END_MS + 400);
 
     this.time.delayedCall(settled, () => {
       if (this.runOver !== 'won') {
         return;
       }
 
-      this.gameOverHint.setY(HINT_BELOW_OFFER_Y);
-      this.gameOverText.setText(STILL_CONNECTED);
-      this.gameOverLine.setText(RECOVERED_LINE);
-
-      for (const text of [
-        this.gameOverText, this.gameOverLine, this.gameOverHint, this.contactOffer,
-        ...this.chainNoteIfEarned(),
-      ]) {
-        text.setVisible(true).setAlpha(0);
-        this.tweens.add({ targets: text, alpha: 1, duration: 420 });
-      }
+      this.showVictory();
     });
   }
 
   private unfinishedBusiness(): UnfinishedBusiness {
-    const at = this.locate(this.nodesRevealed);
+    const at = nodeAt(this.nodesRevealed);
     if (at === null) {
       return { reaching: null, connectionsShort: 0 };
     }
 
     return {
-      reaching: MEMORIES[at.memoryIndex].nodes[at.nodeIndex].title,
+      reaching: at.node.title,
       connectionsShort: Math.max(1, unlitCount(this.simulation.board)),
     };
   }

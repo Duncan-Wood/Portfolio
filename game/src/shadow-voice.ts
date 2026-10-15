@@ -27,6 +27,8 @@ export const SHADOW_LINES: readonly (readonly string[])[] = [
   ],
 ];
 
+export const OVERTHINKING_LINE = 'You’re overthinking it.';
+
 export const CONNECTION_LOST = 'CONNECTION LOST';
 
 export const SHADOW_CLOSING_LINE = 'That is usually where it stops.';
@@ -35,7 +37,9 @@ export const SHADOW_OPENING_LINE = 'You stopped here before.';
 
 export const STILL_CONNECTED = 'STILL CONNECTED';
 
-export const RECOVERED_LINE = 'Nothing in a mind connects itself.';
+export const RECOVERED_LINE = 'Connecting with people has moved my life more than '
+  + 'anything I’ve built. I don’t know where it goes next, and I’d like to hear '
+  + 'what you’re working on.';
 
 export const REACH_OUT_LINE = 'reach out to me';
 
@@ -64,7 +68,12 @@ export function shadowLine(
   cellsHeld: number,
   arrivalsSinceSpoken: number,
   spoken: readonly string[],
+  overthinking = false,
 ): string | null {
+  if (overthinking && !spoken.includes(OVERTHINKING_LINE)) {
+    return OVERTHINKING_LINE;
+  }
+
   if (arrivalsSinceSpoken < ARRIVALS_BETWEEN_LINES) {
     return null;
   }

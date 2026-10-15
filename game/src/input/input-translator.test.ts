@@ -168,3 +168,35 @@ describe('holding a direction across a lock', () => {
     expect(shifts).toEqual([-1]);
   });
 });
+
+describe('telling a fresh press from a held one', () => {
+  it('marks the first shift of a press as fresh and every repeat as not', () => {
+    const translator = new InputTranslator(TUNING);
+    const fresh: boolean[] = [];
+
+    for (let elapsed = 0; elapsed <= TUNING.autoShiftDelay + TUNING.autoRepeatInterval * 3; elapsed += FRAME) {
+      translator.update(frame({ direction: -1 }), (_, isFresh) => {
+        fresh.push(isFresh);
+        return true;
+      });
+    }
+
+    expect(fresh[0]).toBe(true);
+    expect(fresh.length).toBeGreaterThan(2);
+    expect(fresh.slice(1).every((isFresh) => !isFresh)).toBe(true);
+  });
+
+  it('counts turning back the other way as a fresh press', () => {
+    const translator = new InputTranslator(TUNING);
+    const fresh: boolean[] = [];
+    const attempt = (_: HorizontalDirection, isFresh: boolean) => {
+      fresh.push(isFresh);
+      return true;
+    };
+
+    translator.update(frame({ direction: -1 }), attempt);
+    translator.update(frame({ direction: 1 }), attempt);
+
+    expect(fresh).toEqual([true, true]);
+  });
+});

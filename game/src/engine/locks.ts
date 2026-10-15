@@ -14,11 +14,10 @@ import { findGroups } from './matching';
 import { allLit } from './neurons';
 
 export interface Lock {
-  objective: string;
   neurons: number;
   shadows: number;
   tiles: number;
-  pieces: number;
+  fallInterval: number;
 
   /** Score that fills the memory picture. Solving fills it regardless. */
   fillScore: number;
@@ -30,49 +29,37 @@ export const SEED_ROWS = 3;
 // and leaves the board unsolvable.
 export const LOCKS: readonly Lock[] = [
   {
-    objective: 'light every neuron',
-    neurons: 1,
+    neurons: 2,
     shadows: 0,
-    tiles: 13,
-    pieces: 14,
-    fillScore: 80,
+    tiles: 12,
+    fallInterval: 750,
+    fillScore: 100,
   },
   {
-    objective: 'light every neuron',
     neurons: 3,
     shadows: 1,
     tiles: 11,
-    pieces: 12,
+    fallInterval: 650,
     fillScore: 180,
   },
   {
-    objective: 'light every neuron',
-    neurons: 3,
-    shadows: 2,
-    tiles: 11,
-    pieces: 11,
-    fillScore: 180,
-  },
-  {
-    objective: 'light every neuron',
     neurons: 4,
     shadows: 2,
     tiles: 10,
-    pieces: 11,
+    fallInterval: 560,
     fillScore: 220,
   },
   {
-    objective: 'light every neuron',
     neurons: 5,
     shadows: 3,
     tiles: 9,
-    pieces: 10,
+    fallInterval: 480,
     fillScore: 280,
   },
 ];
 
-export function lockFor(fragmentsEarned: number): Lock {
-  const index = Math.max(0, Math.min(fragmentsEarned, LOCKS.length - 1));
+export function lockFor(chapterIndex: number): Lock {
+  const index = Math.max(0, Math.min(chapterIndex, LOCKS.length - 1));
   return LOCKS[index];
 }
 
@@ -80,7 +67,11 @@ export function isSolved(_lock: Lock, board: Board): boolean {
   return allLit(board);
 }
 
-export function seedLock(board: Board, lock: Lock, random: () => number): void {
+export function seedLock(
+  board: Board,
+  lock: Lock,
+  random: () => number,
+): void {
   board.reset();
 
   const total = lock.tiles + lock.shadows + lock.neurons;

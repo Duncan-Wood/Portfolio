@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COLUMNS,
   PIECE_TYPE_COUNT,
   ROWS,
   SHADOW,
@@ -118,15 +119,42 @@ describe('what the shadow is reaching for', () => {
     expect(game.board.pieceAt(target!.column, target!.row)).toBe(RED);
   });
 
+  it('never names a cell the last piece just landed on', () => {
+    const game = simulation();
+    const standing = game.pair.cells().map((cell) => cell.column);
+    for (let column = 0; column < COLUMNS; column += 1) {
+      if (!standing.includes(column)) {
+        game.board.place(column, ROWS - 1, RED);
+        game.board.place(column, ROWS - 2, BLUE);
+        game.board.place(column, ROWS - 3, RED);
+      }
+    }
+
+    game.hardDrop();
+
+    const target = game.threatenedCell;
+    expect(target).not.toBeNull();
+    const fresh = game.lastLanded.map((cell) => `${cell.column},${cell.row}`);
+    expect(fresh).not.toContain(`${target!.column},${target!.row}`);
+  });
+
+  it('names nothing when the only tiles on the board were just landed', () => {
+    const game = simulation();
+
+    game.hardDrop();
+
+    expect(game.threatenedCell).toBeNull();
+  });
+
   it('reports how close the next arrival is, from nothing to one', () => {
     const game = simulation();
     game.board.place(0, ROWS - 1, RED);
 
     expect(game.stallProgress).toBe(0);
 
-    game.update(DEFAULT_TUNING.shadowInterval / 2);
+    game.hardDrop();
 
     expect(game.stallProgress).toBeGreaterThan(0);
-    expect(game.stallProgress).toBeLessThanOrEqual(1);
+    expect(game.stallProgress).toBeLessThan(1);
   });
 });

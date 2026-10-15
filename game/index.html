@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Connected — a game by Duncan Wood</title>
     <link rel="canonical" href="https://duncanwoodpro.netlify.app/game/" />
     <meta name="author" content="Duncan Wood" />
@@ -46,152 +46,46 @@
         width: 100%;
       }
 
-      #gate {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 14px;
-        height: 100%;
-        padding: 24px;
-        box-sizing: border-box;
-        font-family: monospace;
-        color: #e9dcff;
-        text-align: center;
-      }
-
-      #gate label {
-        font-size: 14px;
-        line-height: 1.6;
-        max-width: 30ch;
-        color: #9d86b8;
-      }
-
-      #gate input {
-        font: inherit;
-        font-size: 18px;
-        width: 14ch;
-        padding: 8px 10px;
-        text-align: center;
-        color: #e9dcff;
-        background: #2b1644;
-        border: 1px solid #4a2f6b;
-        border-radius: 6px;
-      }
-
-      #gate input:focus-visible {
-        outline: none;
-        border-color: #c98cff;
-      }
-
-      #gate.wrong input {
-        border-color: #e4572e;
-      }
-
-      #gate button {
-        font: inherit;
-        font-size: 13px;
-        padding: 8px 18px;
-        color: #221038;
-        background: #c98cff;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-
-      #controls {
-        flex: none;
-        align-self: center;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 4px 18px;
-        padding: 10px 12px 0;
-        font-family: monospace;
-        font-size: 12px;
-        line-height: 1;
-        color: #6b5a80;
-      }
-
-      #controls b {
-        font-weight: normal;
-        color: #9d86b8;
-      }
-
-      #to-standard,
-      #to-contact {
+      #to-standard {
         flex: none;
         align-self: center;
         font-family: monospace;
         font-size: 12px;
         line-height: 1;
         white-space: nowrap;
-        color: #6b5a80;
+        color: #9481aa;
         text-decoration: none;
         padding: 9px 12px 11px;
         border-radius: 6px;
         transition: color 120ms ease, background-color 120ms ease;
       }
 
-      #to-contact {
-        color: #9d86b8;
-      }
-
       @media (pointer: coarse) {
-        #controls {
-          display: none;
-        }
-
         #to-standard {
           order: -1;
           align-self: flex-start;
           margin-top: env(safe-area-inset-top);
-          margin-right: 145px;
           padding: 12px;
           font-size: 11px;
           white-space: normal;
           text-align: left;
         }
-
-        #to-contact {
-          position: fixed;
-          top: calc(8px + env(safe-area-inset-top));
-          right: 10px;
-          z-index: 2;
-          padding: 10px 12px;
-          font-size: 11px;
-          background: #2b1644;
-          border: 1px solid #4a2f6b;
-          border-radius: 6px;
-        }
-
-        #to-contact:active {
-          background: #4a2f6b;
-          border-color: #c98cff;
-        }
       }
 
       #to-standard:hover,
-      #to-standard:focus-visible,
-      #to-contact:hover,
-      #to-contact:focus-visible {
+      #to-standard:focus-visible {
         color: #c98cff;
         background: #2b1644;
-        outline: none;
+      }
+
+      #to-standard:focus-visible {
+        outline: 2px solid #c98cff;
+        outline-offset: 2px;
       }
     </style>
   </head>
   <body>
     <div id="game-container"></div>
-    <div id="controls">
-      <span><b>&larr;&rarr;</b> move</span>
-      <span><b>&uarr;</b> rotate</span>
-      <span><b>&darr;</b> faster</span>
-      <span><b>space</b> drop</span>
-      <span><b>esc</b> pause</span>
-      <span><b>r</b> restart</span>
-    </div>
-    <a id="to-contact" href="/#contact">reach out to me</a>
     <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -14,6 +14,10 @@ const OUT = join(HERE, '..', 'src', 'memory-art.ts');
 const RAMP = ['.', '7', '4', '5', '6', '3', '0', '1', '2'];
 const CONTRAST = ['-normalize', '-sigmoidal-contrast', '4,50%'];
 
+// Transparent art has to land on the board's own empty colour or the ramp reads
+// the alpha as light.
+const EMPTY = '#241038';
+
 // `panelColumns` is the chunky version the sidebar fills in block by block; the
 // blocks have to be big enough to see arriving.
 const PANEL_COLUMNS = 22;
@@ -33,6 +37,18 @@ const PICTURES = {
     rows: 82,
     crop: ['-crop', '2775x2056+105+1104', '+repage'],
   },
+  'the-hat': {
+    file: 'cowboy_hat_portrait.JPG',
+    columns: 110,
+    rows: 48,
+    crop: ['-crop', '1040x455+70+0', '+repage'],
+  },
+  'the-theta': {
+    file: 'theta.jpg',
+    columns: 110,
+    rows: 97,
+    crop: ['-crop', '2600x2300+100+700', '+repage'],
+  },
   'the-notebook': {
     file: 'notebook_and_pen.jpg',
     columns: 110,
@@ -41,10 +57,10 @@ const PICTURES = {
   },
 };
 
-function quantize({ file, columns, rows, crop = [] }) {
+function quantize({ file, columns, rows, crop = [], contrast = CONTRAST, afterResize = [] }) {
   const raw = execFileSync('magick', [
-    join(SOURCES, file), '-auto-orient', ...crop, ...CONTRAST,
-    '-resize', `${columns}x${rows}!`, '-colorspace', 'sRGB', '-depth', '8', 'txt:-',
+    join(SOURCES, file), '-auto-orient', '-background', EMPTY, '-flatten', ...crop, ...contrast,
+    '-resize', `${columns}x${rows}!`, ...afterResize, '-colorspace', 'sRGB', '-depth', '8', 'txt:-',
   ], { encoding: 'utf8', maxBuffer: 1 << 26 });
 
   const grid = Array.from({ length: rows }, () => new Array(columns).fill('.'));

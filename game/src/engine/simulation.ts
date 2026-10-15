@@ -42,15 +42,13 @@ export class Simulation {
 
   toppedOut = false;
 
-  pieceBudget = 0;
-
   chainLength = 0;
-
-  deepestChain = 0;
 
   shadowTaken = 0;
 
   lastShadowCell: GroupCell | null = null;
+
+  shadowHeld = false;
 
   get shadowOnBoard(): number {
     let held = 0;
@@ -66,7 +64,7 @@ export class Simulation {
     return held;
   }
 
-  private stallTimer = 0;
+  private piecesSinceClear = 0;
 
   connectionsMade = 0;
 
@@ -106,16 +104,6 @@ export class Simulation {
       return;
     }
 
-    if (this.outOfPieces) {
-      return;
-    }
-
-    this.stallTimer += delta;
-    if (this.stallTimer >= this.tuning.shadowInterval) {
-      this.stallTimer = 0;
-      this.encroach();
-    }
-
     if (!this.pair.canFall(this.board)) {
       this.lockTimer += delta;
 
@@ -148,8 +136,7 @@ export class Simulation {
     this.score = 0;
     this.connectionsMade = 0;
     this.chainLength = 0;
-    this.deepestChain = 0;
-    this.stallTimer = 0;
+    this.piecesSinceClear = 0;
     this.resolving = false;
     this.settlePending = false;
     this.resolveTimer = 0;
@@ -194,26 +181,8 @@ export class Simulation {
     return distance;
   }
 
-  rememberChain(): void {
-    this.deepestChain = Math.max(this.deepestChain, this.chainLength);
-  }
-
-  get piecesRemaining(): number {
-    return this.pieceBudget === 0
-      ? Infinity
-      : Math.max(this.pieceBudget - this.piecesLocked, 0);
-  }
-
-  get outOfPieces(): boolean {
-    return this.pieceBudget !== 0 && this.piecesLocked >= this.pieceBudget;
-  }
-
-  get hasNextPiece(): boolean {
-    return this.piecesRemaining > 1;
-  }
-
   private get acceptsInput(): boolean {
-    return !this.resolving && !this.toppedOut && !this.outOfPieces;
+    return !this.resolving && !this.toppedOut;
   }
 
   private advanceChain(delta: number): void {
@@ -238,19 +207,19 @@ export class Simulation {
       return;
     }
 
-    this.stallTimer = 0;
+    this.piecesSinceClear = 0;
 
     const connections = link.cellsCleared * (this.chainLength + 1);
 
     this.score += scoreLink(link, this.chainLength);
     this.connectionsMade += connections;
     this.chainLength += 1;
-    this.rememberChain();
     this.settlePending = true;
     this.recordBeat({ kind: 'clear', link, connections });
   }
 
   get threatenedCell(): GroupCell | null {
+    const justLanded = new Set(this.lastLanded.map((cell) => cell.column * ROWS + cell.row));
     let chosenColumn = -1;
     let chosenRow = -1;
     let fewest = Number.POSITIVE_INFINITY;
@@ -260,7 +229,7 @@ export class Simulation {
       let topmost = -1;
 
       for (let row = FIRST_VISIBLE_ROW; row < ROWS; row += 1) {
-        if (isColour(this.board.pieceAt(column, row))) {
+        if (isColour(this.board.pieceAt(column, row)) && !justLanded.has(column * ROWS + row)) {
           tiles += 1;
           if (topmost === -1) {
             topmost = row;
@@ -279,7 +248,7 @@ export class Simulation {
   }
 
   get stallProgress(): number {
-    return Math.min(this.stallTimer / this.tuning.shadowInterval, 1);
+    return Math.min(this.piecesSinceClear / this.tuning.piecesPerShadow, 1);
   }
 
   private encroach(): void {
@@ -312,7 +281,20 @@ export class Simulation {
       return;
     }
 
+    this.countTowardShadow();
     this.spawnOrTopOut();
+  }
+
+  private countTowardShadow(): void {
+    if (this.shadowHeld) {
+      return;
+    }
+
+    this.piecesSinceClear += 1;
+    if (this.piecesSinceClear >= this.tuning.piecesPerShadow) {
+      this.piecesSinceClear = 0;
+      this.encroach();
+    }
   }
 
   private beginResolving(): void {

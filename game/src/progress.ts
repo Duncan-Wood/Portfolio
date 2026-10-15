@@ -1,8 +1,7 @@
 import { clearStored, readStored, writeStored } from './storage';
 
 const MEMORIES_KEY = 'connected.memories';
-const BEST_CHAIN_KEY = 'connected.bestChain';
-// PLAYED_KEY, FRAGMENTS_TOTAL_KEY, LOG_KEY and BEST_CHAIN_KEY are also read by
+// PLAYED_KEY, FRAGMENTS_TOTAL_KEY and LOG_KEY are also read by
 // src/game-progress.js, a separate bundle; renaming one here silently empties the
 // contact form's prefill.
 const PLAYED_KEY = 'connected.played';
@@ -10,6 +9,7 @@ const FRAGMENTS_TOTAL_KEY = 'connected.fragmentsTotal';
 const LOG_KEY = 'connected.log';
 const RESUME_KEY = 'connected.resume';
 const INTRO_SEEN_KEY = 'connected.introSeen';
+const COMPLETIONS_KEY = 'connected.completions';
 
 export function playedBefore(): boolean {
   return readStored(PLAYED_KEY) === 'true';
@@ -41,36 +41,30 @@ export function loggedWith(
   return [...next].map((held) => held ?? { title: '' });
 }
 
+function readLog(): SurfacedFragment[] {
+  try {
+    const held: unknown = JSON.parse(readStored(LOG_KEY) ?? '[]');
+    return Array.isArray(held) ? held as SurfacedFragment[] : [];
+  } catch {
+    return [];
+  }
+}
+
+export function foundIndices(log: readonly SurfacedFragment[]): number[] {
+  return log.flatMap((entry, index) => (entry?.title ? [index] : []));
+}
+
+export function foundFragments(): number[] {
+  return foundIndices(readLog());
+}
+
 export function rememberFragment(
   index: number,
   entry: SurfacedFragment,
   total: number,
 ): void {
-  let log: SurfacedFragment[] = [];
-  try {
-    const held: unknown = JSON.parse(readStored(LOG_KEY) ?? '[]');
-    if (Array.isArray(held)) {
-      log = held as SurfacedFragment[];
-    }
-  } catch {
-    log = [];
-  }
-
-  writeStored(LOG_KEY, JSON.stringify(loggedWith(log, index, entry)));
+  writeStored(LOG_KEY, JSON.stringify(loggedWith(readLog(), index, entry)));
   writeStored(FRAGMENTS_TOTAL_KEY, String(total));
-}
-
-export function rememberBestChain(deepest: number): void {
-  if (deepest < 2) {
-    return;
-  }
-
-  const held = Number(readStored(BEST_CHAIN_KEY));
-  if (Number.isFinite(held) && held >= deepest) {
-    return;
-  }
-
-  writeStored(BEST_CHAIN_KEY, String(deepest));
 }
 
 export function resumePoint(saved: number, total: number): number {
@@ -88,6 +82,34 @@ export function rememberResume(nodesRevealed: number, total: number): void {
   }
 
   writeStored(RESUME_KEY, String(nodesRevealed));
+}
+
+export function runFinished(total: number): boolean {
+  return foundFragments().length >= total;
+}
+
+export function completions(): number {
+  const held = Number(readStored(COMPLETIONS_KEY));
+  return Number.isInteger(held) && held > 0 ? held : 0;
+}
+
+export function rememberCompletion(): void {
+  writeStored(COMPLETIONS_KEY, String(completions() + 1));
+}
+
+export function forgetRun(): void {
+  for (const key of [LOG_KEY, FRAGMENTS_TOTAL_KEY, RESUME_KEY]) {
+    clearStored(key);
+  }
+}
+
+export function forgetAllProgress(): void {
+  forgetRun();
+  for (const key of [
+    PLAYED_KEY, INTRO_SEEN_KEY, COMPLETIONS_KEY,
+  ]) {
+    clearStored(key);
+  }
 }
 
 export function forgetProgressFromOlderMemories(signature: string): void {

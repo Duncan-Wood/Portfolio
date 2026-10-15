@@ -3,4 +3,4 @@
   publish = "build"
 
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "VITE_SENTRY_DSN,VITE_GAME_CODE"
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SENTRY_DSN"

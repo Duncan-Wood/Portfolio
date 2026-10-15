@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLUMNS, ROWS, SHADOW, isShadow } from './grid';
+import { COLUMNS, ROWS, SHADOW } from './grid';
 import { Board } from './board';
 import { findGroups } from './matching';
 import { type CascadeBeat, Simulation } from './simulation';
@@ -83,38 +83,68 @@ const withTilesToTake = (game: Simulation) => {
   }
 };
 
-describe('shadow encroaching while the player stalls', () => {
-  it('holds off while the player keeps clearing', () => {
-    const game = simulation();
-    expect(game.shadowOnBoard).toBe(0);
+const { piecesPerShadow } = DEFAULT_TUNING;
 
-    game.update(DEFAULT_TUNING.shadowInterval - 1);
+const occupied = (game: Simulation) => {
+  let cells = 0;
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let column = 0; column < COLUMNS; column += 1) {
+      if (game.board.pieceAt(column, row) !== null) {
+        cells += 1;
+      }
+    }
+  }
+  return cells;
+};
+
+const placeWithoutConnecting = (game: Simulation, pieces: number) => {
+  for (let piece = 0; piece < pieces; piece += 1) {
+    game.hardDrop();
+  }
+};
+
+describe('the shadow arriving while nothing connects', () => {
+  it('leaves the board alone for the first pieces that connect nothing', () => {
+    const game = simulation();
+    withTilesToTake(game);
+
+    placeWithoutConnecting(game, piecesPerShadow - 1);
 
     expect(game.shadowOnBoard).toBe(0);
   });
 
-  it('takes a cell once the player has stalled long enough', () => {
+  it('takes a cell once enough pieces in a row have connected nothing', () => {
     const game = simulation();
     withTilesToTake(game);
 
-    game.update(DEFAULT_TUNING.shadowInterval);
+    placeWithoutConnecting(game, piecesPerShadow);
 
     expect(game.shadowOnBoard).toBe(1);
   });
 
-  it('keeps taking cells the longer nothing connects', () => {
+  it('keeps taking cells while nothing connects', () => {
     const game = simulation();
     withTilesToTake(game);
 
-    game.update(DEFAULT_TUNING.shadowInterval);
-    game.update(DEFAULT_TUNING.shadowInterval);
+    placeWithoutConnecting(game, piecesPerShadow * 2);
 
     expect(game.shadowOnBoard).toBe(2);
   });
 
-  it('is held off by clearing, which is the whole point of it', () => {
+  it('never arrives on time alone, however long the player thinks', () => {
+    const game = new Simulation(() => [RED, BLUE], { ...DEFAULT_TUNING, fallInterval: 100_000 });
+    withTilesToTake(game);
+
+    for (let step = 0; step < 1200; step += 1) {
+      game.update(50);
+    }
+
+    expect(game.shadowOnBoard).toBe(0);
+  });
+
+  it('starts counting again after a connection, which is the whole point of it', () => {
     const game = simulation();
-    game.update(DEFAULT_TUNING.shadowInterval * 0.9);
+    placeWithoutConnecting(game, piecesPerShadow - 1);
 
     for (let offset = 0; offset < 3; offset += 1) {
       game.board.place(0, ROWS - 1 - offset, RED);
@@ -122,34 +152,9 @@ describe('shadow encroaching while the player stalls', () => {
     game.board.place(1, ROWS - 1, RED);
     settle(game);
 
-    game.update(DEFAULT_TUNING.shadowInterval * 0.9);
+    placeWithoutConnecting(game, piecesPerShadow - 1);
 
     expect(game.shadowOnBoard).toBe(0);
-  });
-
-  it('never takes the cell the falling pair is standing in', () => {
-    const game = simulation();
-
-    game.board.place(0, ROWS - 1, RED);
-    game.board.place(1, ROWS - 1, BLUE);
-    game.board.place(3, ROWS - 1, BLUE);
-    game.board.place(4, ROWS - 1, RED);
-    game.board.place(5, ROWS - 1, RED);
-
-  for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
-      game.update(DEFAULT_TUNING.fallInterval);
-    }
-    const standing = game.pair.cells();
-
-    expect(() => game.update(DEFAULT_TUNING.shadowInterval)).not.toThrow();
-
-    expect(game.shadowOnBoard).toBe(1);
-
-    for (const cell of standing) {
-      expect(isShadow(game.board.pieceAt(cell.column, cell.row))).toBe(false);
-    }
-
-    expect(() => game.update(DEFAULT_TUNING.lockDelay)).not.toThrow();
   });
 
   it('says where it took a cell, so the scene can show it arriving', () => {
@@ -158,7 +163,7 @@ describe('shadow encroaching while the player stalls', () => {
     expect(game.shadowTaken).toBe(0);
     expect(game.lastShadowCell).toBeNull();
 
-    game.update(DEFAULT_TUNING.shadowInterval);
+    placeWithoutConnecting(game, piecesPerShadow);
 
     expect(game.shadowTaken).toBe(1);
     const taken = game.lastShadowCell;
@@ -166,41 +171,15 @@ describe('shadow encroaching while the player stalls', () => {
     expect(game.board.pieceAt(taken!.column, taken!.row)).toBe(SHADOW);
   });
 
-  it('does not tick the arrival counter when there was nothing to take', () => {
-    const game = simulation();
-    game.board.reset();
-
-    game.update(DEFAULT_TUNING.shadowInterval);
-
-    expect(game.shadowTaken).toBe(0);
-    expect(game.toppedOut).toBe(false);
-  });
-
   it('never adds to the board, only takes from it', () => {
     const game = simulation();
     withTilesToTake(game);
-    const before = game.shadowOnBoard;
+    const before = occupied(game);
 
-    game.update(DEFAULT_TUNING.shadowInterval);
+    placeWithoutConnecting(game, piecesPerShadow);
 
-    expect(game.shadowOnBoard).toBe(before + 1);
-  });
-
-  it('does not creep in while a cascade is still resolving', () => {
-    const game = simulation();
-    for (let offset = 0; offset < 3; offset += 1) {
-      game.board.place(0, ROWS - 1 - offset, RED);
-    }
-    game.board.place(1, ROWS - 1, RED);
-    for (let step = 0; step < ROWS * 2 && game.pair.canFall(game.board); step += 1) {
-      game.update(DEFAULT_TUNING.fallInterval);
-    }
-    game.update(DEFAULT_TUNING.lockDelay);
-    expect(game.resolving).toBe(true);
-
-    game.update(DEFAULT_TUNING.shadowInterval);
-
-    expect(game.shadowOnBoard).toBe(0);
+    expect(occupied(game)).toBe(before + piecesPerShadow * 2);
+    expect(game.shadowOnBoard).toBe(1);
   });
 });
 
@@ -262,7 +241,7 @@ describe('pushing the shadow back', () => {
   it('forgets the shadow on restart', () => {
     const game = simulation();
     withTilesToTake(game);
-    game.update(DEFAULT_TUNING.shadowInterval);
+    placeWithoutConnecting(game, piecesPerShadow);
     expect(game.shadowOnBoard).toBe(1);
 
     game.restart();
@@ -283,7 +262,7 @@ describe('a long run with the shadow in it', () => {
 
     const game = new Simulation(
       () => [Math.floor(random() * 4), Math.floor(random() * 4)],
-      { ...DEFAULT_TUNING, shadowInterval: 500 },
+      { ...DEFAULT_TUNING, piecesPerShadow: 1 },
     );
 
     for (let step = 0; step < 6000 && !game.toppedOut; step += 1) {

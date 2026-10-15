@@ -1,6 +1,6 @@
 /*
  *   0..3   │   4..7    │   8    9
- * colours  │  shadow   │  neuron
+ * colours  │  shadow   │   neuron
  *          │ over 0..3 │ dark, lit
  *
  * Read cells with the predicates below, never by comparing to a band constant.

@@ -1,7 +1,9 @@
 import { Math as PhaserMath } from 'phaser';
-import { MEMORY_ART, type MemoryArt } from '../memory-art';
+import { type MemoryGrid } from '../memory-art';
+import { MEMORY_PICTURES, ONE_DOOR_DOORWAY, REVIEW_BASE } from '../memory-pictures';
 import { PIECE_TYPE_COUNT, isNeuron, isNeuronLit } from '../engine/grid';
 import {
+  STAR_COLOR,
   EMPTY_COLOR,
   NEURON_LIT_COLOR,
   NEURON_COLOR,
@@ -45,6 +47,9 @@ function tileCornerRadius(size: number): number {
 const NEURON_TEXTURE = 'neuron';
 const NEURON_LIT_TEXTURE = 'neuron-lit';
 
+export const STAR_TEXTURE = 'star';
+const STAR_SIZE = 30;
+
 export function tileTexture(pieceType: number | null): string {
   if (pieceType === null) {
     return EMPTY_TILE_TEXTURE;
@@ -53,6 +58,7 @@ export function tileTexture(pieceType: number | null): string {
   if (isNeuron(pieceType)) {
     return isNeuronLit(pieceType) ? NEURON_LIT_TEXTURE : NEURON_TEXTURE;
   }
+
   return `tile-${pieceType}`;
 }
 
@@ -101,6 +107,39 @@ function bakeNeuron(graphics: Phaser.GameObjects.Graphics, size: number, lit: bo
   graphics.strokeRoundedRect(inset, inset, span, span, corner);
 
   graphics.generateTexture(lit ? NEURON_LIT_TEXTURE : NEURON_TEXTURE, size, size);
+}
+
+function bakeStar(graphics: Phaser.GameObjects.Graphics): void {
+  const middle = STAR_SIZE / 2;
+
+  graphics.clear();
+
+  for (const [radius, alpha] of [[0.46, 0.12], [0.3, 0.16], [0.18, 0.28]] as const) {
+    graphics.fillStyle(STAR_COLOR, alpha);
+    graphics.fillCircle(middle, middle, STAR_SIZE * radius);
+  }
+
+  const spoke = STAR_SIZE * 0.08;
+
+  graphics.fillStyle(0xffffff, 1);
+  for (const reach of [0.46, 0.3] as const) {
+    graphics.fillPoints([
+      new PhaserMath.Vector2(middle, middle - STAR_SIZE * reach),
+      new PhaserMath.Vector2(middle + spoke, middle),
+      new PhaserMath.Vector2(middle, middle + STAR_SIZE * reach),
+      new PhaserMath.Vector2(middle - spoke, middle),
+    ], true);
+    graphics.fillPoints([
+      new PhaserMath.Vector2(middle - STAR_SIZE * reach, middle),
+      new PhaserMath.Vector2(middle, middle - spoke),
+      new PhaserMath.Vector2(middle + STAR_SIZE * reach, middle),
+      new PhaserMath.Vector2(middle, middle + spoke),
+    ], true);
+  }
+
+  graphics.fillCircle(middle, middle, STAR_SIZE * 0.1);
+
+  graphics.generateTexture(STAR_TEXTURE, STAR_SIZE, STAR_SIZE);
 }
 
 function bakeEmpty(graphics: Phaser.GameObjects.Graphics, size: number): void {
@@ -203,15 +242,70 @@ export function memoryArtTexture(key: string): string {
   return `memory-art-${key}`;
 }
 
+export const ONE_DOOR_DOORWAY_TEXTURE = 'one-door-doorway';
+
+export const REVIEW_BASE_TEXTURE = 'review-base';
+
 const MEMORY_ART_WIDTH = 660;
+
+export function memoryArtCell(columns: number): number {
+  return Math.max(3, Math.floor(MEMORY_ART_WIDTH / columns));
+}
+
+export function paintMemoryMark(
+  graphics: Phaser.GameObjects.Graphics,
+  mark: string,
+  x: number,
+  y: number,
+  cell: number,
+): void {
+  paintMemoryBlock(graphics, mark, x, y, cell, 1, 1);
+}
+
+export function paintMemoryBlock(
+  graphics: Phaser.GameObjects.Graphics,
+  mark: string,
+  x: number,
+  y: number,
+  cell: number,
+  across: number,
+  down: number,
+): void {
+  const code = Number(mark);
+  if (mark === '.' || !Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
+    return;
+  }
+
+  const inset = cell >= 10 ? 1 : 0;
+  const shaded = code >= PIECE_TYPE_COUNT;
+  const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
+  const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
+  const edge = mix(colour, 0x000000, shaded ? 0.8 : 0.62);
+
+  if (inset === 0) {
+    graphics.fillStyle(face, 1);
+    graphics.fillRect(x, y, across * cell, down * cell);
+    return;
+  }
+
+  for (let row = 0; row < down; row += 1) {
+    for (let column = 0; column < across; column += 1) {
+      const left = x + column * cell;
+      const top = y + row * cell;
+      graphics.fillStyle(edge, 1);
+      graphics.fillRect(left, top, cell, cell);
+      graphics.fillStyle(face, 1);
+      graphics.fillRect(left + inset, top + inset, cell - inset * 2, cell - inset * 2);
+    }
+  }
+}
 
 function bakeMemoryArt(
   graphics: Phaser.GameObjects.Graphics,
-  key: string,
-  art: MemoryArt,
+  textureKey: string,
+  art: MemoryGrid,
 ): void {
-  const cell = Math.max(3, Math.floor(MEMORY_ART_WIDTH / art.columns));
-  const inset = cell >= 10 ? 1 : 0;
+  const cell = memoryArtCell(art.columns);
 
   graphics.clear();
 
@@ -219,31 +313,13 @@ function bakeMemoryArt(
     const line = art.rows[row];
     for (let column = 0; column < art.columns; column += 1) {
       const mark = line[column];
-      if (mark === undefined || mark === '.') {
-        continue;
+      if (mark !== undefined) {
+        paintMemoryMark(graphics, mark, column * cell, row * cell, cell);
       }
-
-      const code = Number(mark);
-      if (!Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
-        continue;
-      }
-
-      const shaded = code >= PIECE_TYPE_COUNT;
-      const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
-      const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
-      const edge = mix(colour, 0x000000, shaded ? 0.8 : 0.62);
-
-      const x = column * cell;
-      const y = row * cell;
-
-      graphics.fillStyle(edge, 1);
-      graphics.fillRect(x, y, cell, cell);
-      graphics.fillStyle(face, 1);
-      graphics.fillRect(x + inset, y + inset, cell - inset * 2, cell - inset * 2);
     }
   }
 
-  graphics.generateTexture(memoryArtTexture(key), art.columns * cell, art.rows.length * cell);
+  graphics.generateTexture(textureKey, art.columns * cell, art.rows.length * cell);
 }
 
 export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number): void {
@@ -258,12 +334,16 @@ export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number)
   bakeNeuron(graphics, size, false);
   bakeNeuron(graphics, size, true);
 
+  bakeStar(graphics);
+
   bakeShadow(graphics, size);
   bakeShadowEyes(graphics, size);
 
-  for (const [key, art] of Object.entries(MEMORY_ART)) {
-    bakeMemoryArt(graphics, key, art);
+  for (const [key, art] of Object.entries(MEMORY_PICTURES)) {
+    bakeMemoryArt(graphics, memoryArtTexture(key), art);
   }
+  bakeMemoryArt(graphics, ONE_DOOR_DOORWAY_TEXTURE, ONE_DOOR_DOORWAY);
+  bakeMemoryArt(graphics, REVIEW_BASE_TEXTURE, REVIEW_BASE);
 
   bakeTrace(graphics, gap);
 

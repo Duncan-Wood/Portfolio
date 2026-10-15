@@ -10,13 +10,14 @@ Every command below must be run from inside `game/`. The root package has its ow
 
 ```
 npm install
-npm run dev         # localhost:5173, or /game/ via the root dev server
+npm run dev         # the game alone, or /game/ via the root dev server
 npm test            # vitest, engine and input only
 npm run typecheck   # tsc --noEmit
 npm run build       # typecheck, then vite build to dist/
 ```
 
-From the repo root, `npm start` runs both apps at `:3000` and `:3000/game/`, and
+From the repo root, `npm start` runs both apps on one server at `:3000` and
+`:3000/game/` (or the next free port), and
 `npm run build` builds both into `build/`. To check a production build, use
 `npx serve build` — `serve -s build` rewrites every path to the SPA index and
 breaks asset loading under `/game`.

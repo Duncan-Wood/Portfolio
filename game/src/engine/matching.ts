@@ -77,7 +77,8 @@ export function clearStep(board: Board): ChainLink | null {
 
   const purified = purifyShadow(board, groups);
 
-  const neuronsLit = lightAdjacent(board, groups.flatMap((group) => group.cells));
+  const cleared = groups.flatMap((group) => group.cells);
+  const neuronsLit = lightAdjacent(board, cleared);
 
   return { groups, cellsCleared, shadowPurified: purified, neuronsLit };
 }

@@ -1,7 +1,7 @@
 import { type SwipeTuning } from './input/swipe-controls';
 
 export interface Tuning {
-  shadowInterval: number;
+  piecesPerShadow: number;
 
   readingPerCharacter: number;
 
@@ -33,7 +33,7 @@ export interface Tuning {
 }
 
 export const DEFAULT_TUNING: Tuning = {
-  shadowInterval: 6000,
+  piecesPerShadow: 3,
   readingPerCharacter: 48,
   fallInterval: 400,
   softDropInterval: 50,

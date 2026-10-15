@@ -3,7 +3,6 @@ import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isColour, isNeuron, isShadow } from '
 import { lightAdjacent, neuronsOn, unlitCount } from './neurons';
 import { Board } from './board';
 import { LOCKS, SEED_ROWS, isSolved, lockFor, seedLock } from './locks';
-import { MEMORIES } from '../memories';
 
 const fixed = (values: number[]) => {
   let index = 0;
@@ -26,22 +25,10 @@ const cellsOn = (board: Board) => {
 };
 
 describe('a lock is a board with something to work out', () => {
-  it('has an objective written in words the player can act on', () => {
-    for (const lock of LOCKS) {
-      expect(lock.objective.length).toBeGreaterThan(0);
-      expect(lock.objective).toMatch(/[a-z]/);
-    }
-  });
-
   it('never asks for more seeded cells than the seed area holds', () => {
     for (const lock of LOCKS) {
       expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * SEED_ROWS);
     }
-  });
-
-  it('has a lock for every fragment, so difficulty does not plateau', () => {
-    const fragments = MEMORIES.reduce((total, memory) => total + memory.nodes.length, 0);
-    expect(LOCKS.length).toBeGreaterThanOrEqual(fragments);
   });
 
   it('gives every lock a score that fills the memory picture', () => {
@@ -122,7 +109,7 @@ describe('a lock is a board with something to work out', () => {
 
   it('opens on a lock with nothing opposing the player', () => {
     expect(LOCKS[0].shadows).toBe(0);
-    expect(LOCKS[0].neurons).toBe(1);
+    expect(LOCKS[0].neurons).toBeLessThanOrEqual(2);
   });
 
   it('seeds colour under every shadow, since a shadow possesses a tile', () => {
@@ -191,11 +178,16 @@ describe('a seeded lock is always solvable', () => {
 });
 
 describe('the run escalates across the memory it is unlocking', () => {
-  it('never eases the pressure as the memory fills in', () => {
-    const roomPerNeuron = LOCKS.map((lock) => lock.pieces / lock.neurons);
+  it('starts slowest and falls faster board by board', () => {
+    for (let index = 1; index < LOCKS.length; index += 1) {
+      expect(LOCKS[index].fallInterval).toBeLessThan(LOCKS[index - 1].fallInterval);
+    }
+  });
 
-    for (let index = 1; index < roomPerNeuron.length; index += 1) {
-      expect(roomPerNeuron[index]).toBeLessThan(roomPerNeuron[index - 1]);
+  it('never eases the pressure as the memory fills in', () => {
+    for (let index = 1; index < LOCKS.length; index += 1) {
+      expect(LOCKS[index].neurons).toBeGreaterThanOrEqual(LOCKS[index - 1].neurons);
+      expect(LOCKS[index].shadows).toBeGreaterThanOrEqual(LOCKS[index - 1].shadows);
     }
   });
 
@@ -212,10 +204,10 @@ describe('the run escalates across the memory it is unlocking', () => {
   });
 });
 
-describe('lockFor picks the board for the fragment being earned', () => {
-  it('walks the locks in order as fragments are earned', () => {
-    for (let earned = 0; earned < LOCKS.length; earned += 1) {
-      expect(lockFor(earned)).toBe(LOCKS[earned]);
+describe('lockFor picks the boards for the chapter being played', () => {
+  it('walks the locks in order as chapters go by', () => {
+    for (let chapter = 0; chapter < LOCKS.length; chapter += 1) {
+      expect(lockFor(chapter)).toBe(LOCKS[chapter]);
     }
   });
 
@@ -224,7 +216,7 @@ describe('lockFor picks the board for the fragment being earned', () => {
     expect(lockFor(LOCKS.length + 99)).toBe(LOCKS[LOCKS.length - 1]);
   });
 
-  it('holds on the first lock if it is ever asked for a nonsense fragment', () => {
+  it('holds on the first lock if it is ever asked for a nonsense chapter', () => {
     expect(lockFor(-1)).toBe(LOCKS[0]);
   });
 });

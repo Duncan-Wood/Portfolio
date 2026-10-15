@@ -1,5 +1,5 @@
 // A browser set to block site data throws on every localStorage access rather
-// than returning null, and the gate reads storage before Phaser exists.
+// than returning null.
 export function readStored(key: string): string | null {
   try {
     return localStorage.getItem(key);
