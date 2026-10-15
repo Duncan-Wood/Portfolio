@@ -8,6 +8,7 @@ import {
 } from './memories';
 import { LOCKS } from './engine/locks';
 import { MEMORY_PICTURES } from './memory-pictures';
+import { fitsReader, linesNeeded, pictureDisplayHeight } from './reader-fit';
 
 describe('the memories', () => {
   it('has at least one to pay out', () => {
@@ -43,6 +44,17 @@ describe('the memories', () => {
       for (const node of chapter.nodes) {
         expect(node.photo, node.title).toBeDefined();
         expect(MEMORY_PICTURES[node.photo!], node.photo).toBeDefined();
+      }
+    }
+  });
+
+  it('keeps every card on screen, between the top and the found row', () => {
+    for (const chapter of CHAPTERS) {
+      for (const node of chapter.nodes) {
+        const art = MEMORY_PICTURES[node.photo!];
+        const picture = pictureDisplayHeight(art?.columns, art?.rows.length);
+
+        expect(fitsReader(picture, linesNeeded(node.body)), node.title).toBe(true);
       }
     }
   });

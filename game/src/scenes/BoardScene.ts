@@ -89,6 +89,7 @@ import { Overthinking } from '../overthinking';
 import { SwipeControls } from '../input/swipe-controls';
 import { TouchControls } from '../input/touch-controls';
 import { SoundBoard } from '../audio/sound-board';
+import { READER_BOTTOM, READER_TEXT_WIDTH, READER_TOP } from '../reader-fit';
 import {
   chainVoices,
   hardDropVoice,
@@ -163,9 +164,6 @@ const FOUND_ROW_MARGIN = 24;
 const RESET_Y = CANVAS_HEIGHT / 2 + 290;
 const READING_HINT_Y = RESET_Y - 30;
 const PAUSE_HINT_Y = CANVAS_HEIGHT / 2 + 46;
-const READER_TOP = 40;
-const READER_BOTTOM = FOUND_ROW_Y - 72;
-const READER_TEXT_WIDTH = 480;
 
 
 const SIDE_COMMAND_GAP = 8;

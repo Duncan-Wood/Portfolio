@@ -1,8 +1,5 @@
+import { READER_PICTURE_GAP, READER_PICTURE_MAX_WIDTH, pictureRoom } from '../reader-fit';
 import { MemoryPicture } from './memory-picture';
-
-const PICTURE_MAX_WIDTH = 368;
-const PICTURE_MAX_HEIGHT = 200;
-const PICTURE_GAP = 22;
 
 export interface ReaderArea {
   centerX: number;
@@ -31,11 +28,11 @@ export class MemoryReader {
   }
 
   show(body: string, photo?: string): void {
-    this.picture.show(photo, PICTURE_MAX_WIDTH, PICTURE_MAX_HEIGHT);
     this.body.setText(body).setVisible(true);
+    this.picture.show(photo, READER_PICTURE_MAX_WIDTH, pictureRoom(this.body.height));
 
     const pictureHeight = this.picture.height;
-    const gap = pictureHeight > 0 ? PICTURE_GAP : 0;
+    const gap = pictureHeight > 0 ? READER_PICTURE_GAP : 0;
     const total = pictureHeight + gap + this.body.height;
     const top = (this.area.top + this.area.bottom) / 2 - total / 2;
 
