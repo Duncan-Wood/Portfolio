@@ -29,14 +29,12 @@ export const CHAPTERS: Chapter[] = [
         title: 'Update Detector',
         photo: 'the-review',
         body:
-          'A crawler proposed changes to our asset records, and nobody could check '
-          + 'them before they went in. About a month into the job, I was asked to '
-          + 'build the checking tool.\n\n'
-          + 'I started from an empty repo. A table of proposed changes: open a row, '
-          + 'see the old value next to the machine’s guess, then accept, reject or '
-          + 'edit. I kept the guess next to every correction.\n\n'
-          + 'I was the lead developer. The data team used it daily, and I kept '
-          + 'improving it for more than a year.'
+          'Anything an AI proposes has to pass a person before anyone should trust '
+          + 'it. I built the screen where that happens, at my first software '
+          + 'engineering job, in a framework I had never used.\n\n'
+          + 'At first almost everything about it was new, and it was a big '
+          + 'responsibility for a first job. I got it live in ten weeks, the data '
+          + 'team started using it, and I kept working on it for more than a year.'
       },
       {
         title: 'The Notebook',
@@ -119,14 +117,14 @@ export const CHAPTERS: Chapter[] = [
         title: 'The Build',
         photo: 'the-build',
         body:
-          'My grandparents bought the parts one Christmas when I was fourteen. I put '
-          + 'it together myself.\n\n'
-          + 'Freshman year of high school scattered everyone I knew. I spent most of '
-          + 'that year alone in front of it. Alone is the wrong word. Dota was on it, '
-          + 'and so were people I have known for thirteen years.\n\n'
-          + 'I have swapped its parts out several times since, and liked it every '
-          + 'time. It taught me that if I start with a plan and follow it to the end, '
-          + 'I can finish what I set out to do. Engineering started there for me.'
+          'My old laptop overheated and lagged on every game I played, so at '
+          + 'fourteen I decided to build a PC.\n\n'
+          + 'I spent months watching Linus Tech Tips and working out what I could '
+          + 'reasonably ask for. I told my family it was all I wanted that year, and '
+          + 'they came through.\n\n'
+          + 'When the parts arrived, building it was on me, and I think they were '
+          + 'proud of how much work I had put in. I have swapped its parts out '
+          + 'several times since, and it is still the computer I built.'
       },
     ],
   },
