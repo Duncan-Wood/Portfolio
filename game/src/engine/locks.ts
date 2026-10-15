@@ -14,7 +14,6 @@ import { findGroups } from './matching';
 import { allLit } from './neurons';
 
 export interface Lock {
-  objective: string;
   neurons: number;
   shadows: number;
   tiles: number;
@@ -30,7 +29,6 @@ export const SEED_ROWS = 3;
 // and leaves the board unsolvable.
 export const LOCKS: readonly Lock[] = [
   {
-    objective: 'light every neuron',
     neurons: 2,
     shadows: 0,
     tiles: 12,
@@ -38,7 +36,6 @@ export const LOCKS: readonly Lock[] = [
     fillScore: 100,
   },
   {
-    objective: 'light every neuron',
     neurons: 3,
     shadows: 1,
     tiles: 11,
@@ -46,7 +43,6 @@ export const LOCKS: readonly Lock[] = [
     fillScore: 180,
   },
   {
-    objective: 'light every neuron',
     neurons: 4,
     shadows: 2,
     tiles: 10,
@@ -54,7 +50,6 @@ export const LOCKS: readonly Lock[] = [
     fillScore: 220,
   },
   {
-    objective: 'light every neuron',
     neurons: 5,
     shadows: 3,
     tiles: 9,

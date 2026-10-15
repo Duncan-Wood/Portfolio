@@ -66,7 +66,6 @@ import {
   foundFragments,
   introSeen,
   playedBefore,
-  rememberBestChain,
   rememberCompletion,
   rememberFragment,
   rememberIntroSeen,
@@ -397,8 +396,6 @@ export class BoardScene extends Scene {
   private characterState = RESTING;
 
   private shownCharacterTexture = characterTexture('idle', 0);
-
-  private chainCarriedFromEarlierBoards = 0;
 
   private runReadouts: (Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle)[] = [];
 
@@ -1257,13 +1254,8 @@ export class BoardScene extends Scene {
     }
   }
 
-  private get deepestChainThisRun(): number {
-    return Math.max(this.chainCarriedFromEarlierBoards, this.simulation.deepestChain);
-  }
-
   private restart(keepMemory = false, keepStory = false): void {
     this.setPaused(false);
-    this.chainCarriedFromEarlierBoards = keepMemory ? this.deepestChainThisRun : 0;
     this.simulation.restart();
 
     this.lastPiecesSpawned = -1;
@@ -2458,7 +2450,6 @@ export class BoardScene extends Scene {
   }
 
   private loseTheBoard(): void {
-    rememberBestChain(this.deepestChainThisRun);
     this.characterState = characterOn(this.characterState, 'lost');
 
     const lit = this.connections.filter((slot) => slot.trace.visible);
@@ -2500,14 +2491,13 @@ export class BoardScene extends Scene {
       if (this.runOver === null) {
         return;
       }
-      this.endingScreen.showLost(closingLine(this.unfinishedBusiness()), this.deepestChainThisRun);
+      this.endingScreen.showLost(closingLine(this.unfinishedBusiness()));
     });
   }
 
   private winTheRun(): void {
     this.runOver = 'won';
     rememberCompletion();
-    rememberBestChain(this.deepestChainThisRun);
     this.characterState = characterOn(this.characterState, 'won');
 
     this.tweens.add({

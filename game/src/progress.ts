@@ -1,7 +1,6 @@
 import { clearStored, readStored, writeStored } from './storage';
 
 const MEMORIES_KEY = 'connected.memories';
-const BEST_CHAIN_KEY = 'connected.bestChain';
 // PLAYED_KEY, FRAGMENTS_TOTAL_KEY and LOG_KEY are also read by
 // src/game-progress.js, a separate bundle; renaming one here silently empties the
 // contact form's prefill.
@@ -68,19 +67,6 @@ export function rememberFragment(
   writeStored(FRAGMENTS_TOTAL_KEY, String(total));
 }
 
-export function rememberBestChain(deepest: number): void {
-  if (deepest < 2) {
-    return;
-  }
-
-  const held = Number(readStored(BEST_CHAIN_KEY));
-  if (Number.isFinite(held) && held >= deepest) {
-    return;
-  }
-
-  writeStored(BEST_CHAIN_KEY, String(deepest));
-}
-
 export function resumePoint(saved: number, total: number): number {
   return saved > 0 && saved < total ? saved : 0;
 }
@@ -120,7 +106,7 @@ export function forgetRun(): void {
 export function forgetAllProgress(): void {
   forgetRun();
   for (const key of [
-    BEST_CHAIN_KEY, PLAYED_KEY, INTRO_SEEN_KEY, COMPLETIONS_KEY,
+    PLAYED_KEY, INTRO_SEEN_KEY, COMPLETIONS_KEY,
   ]) {
     clearStored(key);
   }

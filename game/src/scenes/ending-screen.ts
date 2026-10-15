@@ -4,7 +4,6 @@ import { CONNECTION_LOST } from '../shadow-voice';
 const TITLE_OFFSET = -18;
 const LINE_OFFSET = 34;
 const HINT_OFFSET = 84;
-const CHAIN_NOTE_OFFSET = 172;
 
 export interface EndingArea {
   centerX: number;
@@ -18,7 +17,6 @@ export class EndingScreen {
   private readonly title: Phaser.GameObjects.Text;
   private readonly line: Phaser.GameObjects.Text;
   private readonly hint: Phaser.GameObjects.Text;
-  private readonly chainNote: Phaser.GameObjects.Text;
 
   private shown: Phaser.GameObjects.Text[] = [];
 
@@ -33,19 +31,6 @@ export class EndingScreen {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#8ea3b0',
-        backgroundColor: '#221038',
-        padding: { x: 10, y: 5 },
-      },
-    ).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.chainNote = scene.add.text(
-      area.centerX,
-      area.centerY + CHAIN_NOTE_OFFSET,
-      '',
-      {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffc914',
         backgroundColor: '#221038',
         padding: { x: 10, y: 5 },
       },
@@ -80,11 +65,11 @@ export class EndingScreen {
     ).setOrigin(0.5, 0.5).setVisible(false);
   }
 
-  showLost(closingLine: string, bestChain: number): void {
+  showLost(closingLine: string): void {
     this.title.setText(CONNECTION_LOST);
     this.line.setText(closingLine);
 
-    this.fadeIn([this.title, this.line, this.hint, ...this.chainNoteIfEarned(bestChain)]);
+    this.fadeIn([this.title, this.line, this.hint]);
   }
 
   showCrash(): void {
@@ -116,15 +101,6 @@ export class EndingScreen {
     this.shown = [];
   }
 
-  private chainNoteIfEarned(bestChain: number): Phaser.GameObjects.Text[] {
-    if (bestChain < 2) {
-      return [];
-    }
-
-    this.chainNote.setText(`BEST CHAIN  ${bestChain}`);
-    return [this.chainNote];
-  }
-
   private fadeIn(texts: Phaser.GameObjects.Text[]): void {
     this.shown = texts;
     for (const text of texts) {
@@ -134,6 +110,6 @@ export class EndingScreen {
   }
 
   private all(): Phaser.GameObjects.Text[] {
-    return [this.title, this.line, this.hint, this.chainNote];
+    return [this.title, this.line, this.hint];
   }
 }

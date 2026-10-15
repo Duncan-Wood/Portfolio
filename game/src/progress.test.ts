@@ -8,7 +8,6 @@ import {
   foundIndices,
   introSeen,
   loggedWith,
-  rememberBestChain,
   rememberCompletion,
   rememberIntroSeen,
   resumePoint,
@@ -145,48 +144,6 @@ describe('whether a player has read the intro', () => {
   });
 });
 
-describe('the best chain a player has managed', () => {
-  const held = new Map<string, string>();
-
-  beforeEach(() => {
-    held.clear();
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem: (key: string) => held.get(key) ?? null,
-        setItem: (key: string, value: string) => held.set(key, value),
-        removeItem: (key: string) => held.delete(key),
-      },
-    });
-  });
-
-  afterEach(() => {
-    Reflect.deleteProperty(globalThis, 'localStorage');
-  });
-
-  it('records a first result', () => {
-    rememberBestChain(4);
-    expect(held.get('connected.bestChain')).toBe('4');
-  });
-
-  it('keeps the deeper of the two, so a worse run cannot undo a good one', () => {
-    rememberBestChain(6);
-    rememberBestChain(3);
-    expect(held.get('connected.bestChain')).toBe('6');
-  });
-
-  it('raises it when a later run goes deeper', () => {
-    rememberBestChain(3);
-    rememberBestChain(7);
-    expect(held.get('connected.bestChain')).toBe('7');
-  });
-
-  it('ignores a run with no chain in it, which is not an achievement', () => {
-    rememberBestChain(1);
-    expect(held.has('connected.bestChain')).toBe(false);
-  });
-});
-
 describe('progress left behind by an older set of memories', () => {
   const held = new Map<string, string>();
 
@@ -285,7 +242,6 @@ describe('a player starting over', () => {
     held.set('connected.log', '[{"title":"The Build"}]');
     held.set('connected.fragmentsTotal', '5');
     held.set('connected.resume', '1');
-    held.set('connected.bestChain', '4');
     held.set('connected.played', 'true');
     held.set('connected.introSeen', 'true');
     held.set('connected.completions', '2');
@@ -300,7 +256,6 @@ describe('a player starting over', () => {
       'connected.log',
       'connected.fragmentsTotal',
       'connected.resume',
-      'connected.bestChain',
       'connected.played',
       'connected.introSeen',
       'connected.completions',

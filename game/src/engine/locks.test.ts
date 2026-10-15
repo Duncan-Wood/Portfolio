@@ -25,13 +25,6 @@ const cellsOn = (board: Board) => {
 };
 
 describe('a lock is a board with something to work out', () => {
-  it('has an objective written in words the player can act on', () => {
-    for (const lock of LOCKS) {
-      expect(lock.objective.length).toBeGreaterThan(0);
-      expect(lock.objective).toMatch(/[a-z]/);
-    }
-  });
-
   it('never asks for more seeded cells than the seed area holds', () => {
     for (const lock of LOCKS) {
       expect(lock.tiles + lock.shadows + lock.neurons).toBeLessThanOrEqual(COLUMNS * SEED_ROWS);

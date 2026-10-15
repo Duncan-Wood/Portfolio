@@ -910,49 +910,6 @@ describe('reporting where a pair came to rest', () => {
   });
 });
 
-describe('the deepest chain of a run', () => {
-  it('is nothing before anything has cleared', () => {
-    const simulation = new Simulation(() => [0, 1]);
-    simulation.restart();
-
-    expect(simulation.deepestChain).toBe(0);
-  });
-
-  it('keeps the deepest cascade after the chain counter has reset for the next one', () => {
-    const simulation = new Simulation(() => [0, 0]);
-    simulation.restart();
-
-    simulation.chainLength = 4;
-    simulation.rememberChain();
-    simulation.chainLength = 0;
-
-    expect(simulation.deepestChain).toBe(4);
-  });
-
-  it('does not lower it when a later cascade is shallower', () => {
-    const simulation = new Simulation(() => [0, 0]);
-    simulation.restart();
-
-    simulation.chainLength = 5;
-    simulation.rememberChain();
-    simulation.chainLength = 2;
-    simulation.rememberChain();
-
-    expect(simulation.deepestChain).toBe(5);
-  });
-
-  it('starts over with the run, so a new run reports its own best', () => {
-    const simulation = new Simulation(() => [0, 0]);
-    simulation.restart();
-
-    simulation.chainLength = 6;
-    simulation.rememberChain();
-    simulation.restart();
-
-    expect(simulation.deepestChain).toBe(0);
-  });
-});
-
 const THINKING = { ...DEFAULT_TUNING, fallInterval: 100_000 };
 
 describe('the shadow waits for the player to start', () => {
