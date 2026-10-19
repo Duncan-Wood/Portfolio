@@ -262,6 +262,17 @@ export function paintMemoryMark(
   paintMemoryBlock(graphics, mark, x, y, cell, 1, 1);
 }
 
+function memoryMarkFace(mark: string): number | null {
+  const code = Number(mark);
+  if (mark === '.' || !Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
+    return null;
+  }
+
+  const shaded = code >= PIECE_TYPE_COUNT;
+  const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
+  return shaded ? mix(colour, 0x000000, 0.62) : colour;
+}
+
 export function paintMemoryBlock(
   graphics: Phaser.GameObjects.Graphics,
   mark: string,
@@ -272,14 +283,14 @@ export function paintMemoryBlock(
   down: number,
 ): void {
   const code = Number(mark);
-  if (mark === '.' || !Number.isInteger(code) || code >= PIECE_TYPE_COUNT * 2) {
+  const face = memoryMarkFace(mark);
+  if (face === null) {
     return;
   }
 
   const inset = cell >= 10 ? 1 : 0;
   const shaded = code >= PIECE_TYPE_COUNT;
   const colour = PIECE_COLORS[shaded ? code - PIECE_TYPE_COUNT : code];
-  const face = shaded ? mix(colour, 0x000000, 0.62) : colour;
   const edge = mix(colour, 0x000000, shaded ? 0.8 : 0.62);
 
   if (inset === 0) {
@@ -320,6 +331,37 @@ function bakeMemoryArt(
   }
 
   graphics.generateTexture(textureKey, art.columns * cell, art.rows.length * cell);
+}
+
+const SKY_FEATHER = 0.28;
+const SKY_VIOLET = 0x6e3cbe;
+const SKY_VIOLET_SHARE = 0.5;
+
+export function skyPictureTexture(key: string): string {
+  return `sky-picture-${key}`;
+}
+
+function fadeToEdge(position: number, count: number): number {
+  const fromEdge = Math.min(position + 0.5, count - position - 0.5) / count;
+  return Math.max(0, Math.min(1, fromEdge / SKY_FEATHER));
+}
+
+export function bakeSkyPicture(scene: Phaser.Scene, key: string, art: MemoryGrid): void {
+  const graphics = scene.add.graphics();
+  const cell = memoryArtCell(art.columns);
+
+  for (let row = 0; row < art.rows.length; row += 1) {
+    for (let column = 0; column < art.columns; column += 1) {
+      const face = memoryMarkFace(art.rows[row][column]);
+      if (face !== null) {
+        graphics.fillStyle(mix(face, SKY_VIOLET, SKY_VIOLET_SHARE), fadeToEdge(column, art.columns) * fadeToEdge(row, art.rows.length));
+        graphics.fillRect(column * cell, row * cell, cell, cell);
+      }
+    }
+  }
+
+  graphics.generateTexture(skyPictureTexture(key), art.columns * cell, art.rows.length * cell);
+  graphics.destroy();
 }
 
 export function bakeTileTextures(scene: Phaser.Scene, size: number, gap: number): void {

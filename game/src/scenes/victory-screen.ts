@@ -2,23 +2,14 @@ import { Geom } from 'phaser';
 import { REACH_OUT_LINE, RECOVERED_LINE, STILL_CONNECTED } from '../shadow-voice';
 import { type FoundEntry } from './found-memories';
 import { VictorySky } from './victory-sky';
+import { CONTACT_Y, LINE_Y, PLAY_AGAIN_Y, RESET_Y, TITLE_Y } from '../victory-layout';
 import { PressTwiceButton } from './press-twice-button';
 
-const TITLE_Y = 96;
-const LINE_Y = 132;
 const LINE_MARGIN = 54;
-const SKY = { left: 0, top: 0, width: 620, height: 900 };
-const STAR_TITLE_Y = 508;
-const HINT_Y = 542;
-const CONTACT_Y = 596;
-const PLAY_AGAIN_Y = 660;
-const RESET_Y = 722;
-const GROUND_Y = 842;
 const NIGHT_TOP = 0x0b0518;
 const NIGHT_HORIZON = 0x2a1440;
 
 export interface VictoryLabels {
-  hint: string;
   reset: string;
   resetArmed: string;
 }
@@ -32,7 +23,6 @@ export class VictoryScreen {
   private readonly scrim: Phaser.GameObjects.Graphics;
   private readonly title: Phaser.GameObjects.Text;
   private readonly line: Phaser.GameObjects.Text;
-  private readonly hint: Phaser.GameObjects.Text;
 
   private isActive = false;
   private found: readonly number[] = [];
@@ -68,14 +58,7 @@ export class VictoryScreen {
       wordWrap: { width: width - LINE_MARGIN * 2 },
     }).setOrigin(0.5, 0).setVisible(false);
 
-    this.memories = new VictorySky(scene, entries, SKY, STAR_TITLE_Y, GROUND_Y, width);
-
-    this.hint = scene.add.text(centerX, HINT_Y, labels.hint, {
-      fontFamily: 'monospace',
-      fontSize: '15px',
-      color: '#9481aa',
-      align: 'center',
-    }).setOrigin(0.5, 0.5).setVisible(false);
+    this.memories = new VictorySky(scene, entries, width);
 
     this.contactButton = scene.add.text(centerX, CONTACT_Y, REACH_OUT_LINE, {
       fontFamily: 'monospace',
@@ -123,7 +106,7 @@ export class VictoryScreen {
   }
 
   showContents(select?: number): void {
-    for (const part of [this.title, this.line, this.hint, this.contactButton, this.playAgainButton]) {
+    for (const part of [this.title, this.line, this.contactButton, this.playAgainButton]) {
       part.setVisible(true);
     }
     this.memories.show(this.found, select);
@@ -131,7 +114,7 @@ export class VictoryScreen {
   }
 
   hideContents(): void {
-    for (const part of [this.title, this.line, this.hint, this.contactButton, this.playAgainButton]) {
+    for (const part of [this.title, this.line, this.contactButton, this.playAgainButton]) {
       part.setVisible(false);
     }
     this.memories.hide();

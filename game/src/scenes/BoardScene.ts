@@ -130,9 +130,6 @@ const READING_PROMPT = TOUCH_PRIMARY
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
 const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
-const VICTORY_HINT = TOUCH_PRIMARY
-  ? 'tap a memory to read it'
-  : '\u2190 \u2192  choose     \u2191 \u2193  move     space  pick';
 const INTRO_CONTROLS: IntroControls = TOUCH_PRIMARY ? 'swipe' : 'keyboard';
 
 const BLINK_DURATION = 90;
@@ -711,7 +708,7 @@ export class BoardScene extends Scene {
       collectionEntries(),
       CANVAS_WIDTH,
       CANVAS_HEIGHT,
-      { hint: VICTORY_HINT, reset: RESET_PROMPT, resetArmed: RESET_ARMED_PROMPT },
+      { reset: RESET_PROMPT, resetArmed: RESET_ARMED_PROMPT },
     );
     this.victory.memories.pictures.forEach((picture, index) => {
       if (picture !== null) {
@@ -1038,6 +1035,7 @@ export class BoardScene extends Scene {
     }
 
     this.victory.resetButton.expire(this.time.now);
+    this.victory.memories.tick(this.time.now, this.game.loop.delta);
     this.steerFocus(this.victory.memories);
 
     if (tapped !== null) {
