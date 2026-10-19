@@ -6,11 +6,14 @@ import {
   drawReview,
   drawReviewBase,
 } from './review-screen';
+import { TRANSCRIPT_COLUMNS, TRANSCRIPT_ROWS, drawTranscript } from './transcript-page';
 import { MEMORY_ART, type MemoryArt, type MemoryGrid } from './memory-art';
 
 export const ONE_DOOR_PICTURE = 'the-door';
 
 export const REVIEW_PICTURE = 'the-review';
+
+export const TRANSCRIPT_PICTURE = 'the-transcript';
 
 export const ONE_DOOR_DOORWAY: MemoryGrid = drawDoorway(DOOR_COLUMNS, DOOR_ROWS);
 
@@ -21,6 +24,10 @@ export const MEMORY_PICTURES: Readonly<Record<string, MemoryArt>> = {
   [ONE_DOOR_PICTURE]: {
     ...drawDoor(DOOR_COLUMNS, DOOR_ROWS, STILL_MOMENT),
     panel: drawDoor(22, 13, STILL_MOMENT),
+  },
+  [TRANSCRIPT_PICTURE]: {
+    ...drawTranscript(TRANSCRIPT_COLUMNS, TRANSCRIPT_ROWS),
+    panel: drawTranscript(22, 13),
   },
   [REVIEW_PICTURE]: {
     ...drawReview(REVIEW_COLUMNS, REVIEW_ROWS, REVIEW_STILL_MOMENT),
