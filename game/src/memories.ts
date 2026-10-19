@@ -88,14 +88,17 @@ export const CHAPTERS: Chapter[] = [
     title: 'Florida',
     nodes: [
       {
-        title: 'No Johns',
-        photo: 'no-johns',
+        title: 'The Writing Center',
+        photo: 'the-transcript',
         body:
-          'I had Melee as a kid and nobody to play it with. I did not touch it again '
-          + 'until I was eighteen, at a friend’s house.\n\n'
-          + 'Melee has a word for the excuse you make after you lose. A john. You do '
-          + 'not get to john.\n\n'
-          + 'The community they handed me is still mine.'
+          'I tutored at my university’s writing center, from ENC 1101 freshmen to PhD '
+          + 'candidates. It did not matter how little I knew about the subject if we '
+          + 'could find common ground.\n\n'
+          + 'In the tutoring class I learned that teaching is not reading an entry out '
+          + 'like a dictionary. It is a conversation two people build toward a goal.\n\n'
+          + 'Often the first thing a writer said was “I’m bad at writing.” I left '
+          + 'believing the job is helping someone find their own voice, not handing '
+          + 'them mine.'
       },
     ],
   },
@@ -112,6 +115,16 @@ export const CHAPTERS: Chapter[] = [
           + 'and was.\n\n'
           + 'I don’t have it anymore. I kept the part where I could speak as someone '
           + 'else.'
+      },
+      {
+        title: 'No Johns',
+        photo: 'no-johns',
+        body:
+          'I had Melee as a kid and nobody to play it with. I did not touch it again '
+          + 'until I was eighteen, at a friend’s house.\n\n'
+          + 'Melee has a word for the excuse you make after you lose. A john. You do '
+          + 'not get to john.\n\n'
+          + 'The community they handed me is still mine.'
       },
       {
         title: 'The Build',

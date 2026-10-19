@@ -1,34 +1,43 @@
+import { SKY_MEMORIES, SKY_REGIONS, type SkyRegion } from './sky-layout';
+
 export interface SkyPoint {
   x: number;
   y: number;
-  bright: boolean;
 }
 
 export type SkyEdge = readonly [number, number];
 
-export const SKY_POINTS: readonly SkyPoint[] = [
-  { x: 0.10, y: 0.62, bright: true },
-  { x: 0.21, y: 0.42, bright: true },
-  { x: 0.31, y: 0.66, bright: true },
-  { x: 0.43, y: 0.48, bright: true },
-  { x: 0.55, y: 0.70, bright: true },
-  { x: 0.66, y: 0.44, bright: true },
-  { x: 0.79, y: 0.62, bright: true },
-  { x: 0.90, y: 0.34, bright: true },
-  { x: 0.05, y: 0.36, bright: true },
-];
+export const SKY_ROUTE: readonly SkyEdge[] = SKY_MEMORIES.slice(1).map((_, index) => [index, index + 1]);
 
-export const SKY_EDGES: readonly SkyEdge[] = [
-  [0, 1],
-  [1, 2],
-  [2, 3],
-  [3, 4],
-  [4, 5],
-  [5, 6],
-  [6, 7],
-  [8, 0],
-];
+export function starOf(index: number): SkyPoint {
+  const memory = SKY_MEMORIES[index];
+  return memory.neurons[memory.main];
+}
 
-export function litEdges(found: readonly number[]): SkyEdge[] {
-  return SKY_EDGES.filter(([from, to]) => found.includes(from) && found.includes(to));
+export function regionOf(index: number): SkyRegion {
+  return SKY_REGIONS[SKY_MEMORIES[index].region];
+}
+
+function insideRing(point: SkyPoint, ring: readonly (readonly [number, number])[]): boolean {
+  let inside = false;
+
+  for (let at = 0, before = ring.length - 1; at < ring.length; before = at, at += 1) {
+    const [x, y] = ring[at];
+    const [beforeX, beforeY] = ring[before];
+    const crosses = (y > point.y) !== (beforeY > point.y)
+      && point.x < ((beforeX - x) * (point.y - y)) / (beforeY - y) + x;
+    if (crosses) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+export function insideRegion(point: SkyPoint, region: SkyRegion): boolean {
+  return region.rings.some((ring) => insideRing(point, ring.points));
+}
+
+export function litRoute(found: readonly number[]): SkyEdge[] {
+  return SKY_ROUTE.filter(([from, to]) => found.includes(from) && found.includes(to));
 }

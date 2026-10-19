@@ -7,7 +7,7 @@ import {
   nodeAt,
 } from './memories';
 import { LOCKS } from './engine/locks';
-import { MEMORY_PICTURES } from './memory-pictures';
+import { MEMORY_PICTURES, TRANSCRIPT_PICTURE } from './memory-pictures';
 import { fitsReader, linesNeeded, pictureDisplayHeight } from './reader-fit';
 
 describe('the memories', () => {
@@ -57,6 +57,27 @@ describe('the memories', () => {
         expect(fitsReader(picture, linesNeeded(node.body)), node.title).toBe(true);
       }
     }
+  });
+});
+
+describe('where the memories come from', () => {
+  const titlesIn = (place: string) => (
+    CHAPTERS.find((chapter) => chapter.title === place)!.nodes.map((node) => node.title)
+  );
+
+  it('keeps No Johns in Illinois, where the friend’s house was', () => {
+    expect(titlesIn('Illinois')).toContain('No Johns');
+    expect(titlesIn('Florida')).not.toContain('No Johns');
+  });
+
+  it('gives Florida the Writing Center', () => {
+    expect(titlesIn('Florida')).toEqual(['The Writing Center']);
+  });
+
+  it('draws the Writing Center as the coded transcript', () => {
+    const card = CHAPTERS.flatMap((chapter) => chapter.nodes).find((node) => node.title === 'The Writing Center')!;
+
+    expect(card.photo).toBe(TRANSCRIPT_PICTURE);
   });
 });
 

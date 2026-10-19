@@ -7,7 +7,7 @@ import { PressTwiceButton } from './press-twice-button';
 const TITLE_Y = 96;
 const LINE_Y = 132;
 const LINE_MARGIN = 54;
-const SKY = { left: 54, top: 190, width: 512, height: 292 };
+const SKY = { left: 0, top: 0, width: 620, height: 900 };
 const STAR_TITLE_Y = 508;
 const HINT_Y = 542;
 const CONTACT_Y = 596;
