@@ -70,8 +70,9 @@ describe('where the memories come from', () => {
     expect(titlesIn('Florida')).not.toContain('No Johns');
   });
 
-  it('gives Florida the Writing Center', () => {
-    expect(titlesIn('Florida')).toEqual(['The Writing Center']);
+  it('gives Florida the Writing Center and the notebook kept there', () => {
+    expect(titlesIn('Florida')).toEqual(['The Writing Center', 'The Notebook']);
+    expect(titlesIn('Now')).not.toContain('The Notebook');
   });
 
   it('draws the Writing Center as the coded transcript', () => {

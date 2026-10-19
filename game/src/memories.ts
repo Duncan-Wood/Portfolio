@@ -37,16 +37,6 @@ export const CHAPTERS: Chapter[] = [
           + 'team started using it, and I kept working on it for more than a year.'
       },
       {
-        title: 'The Notebook',
-        photo: 'the-notebook',
-        body:
-          'A notebook, and a pen nice enough that I slow down for it.\n\n'
-          + 'Everything else I own hands me more material than I can use. This gives me '
-          + 'nothing. Only what I can get out of my own head.\n\n'
-          + 'Most of what is in it is unfinished, and I have stopped minding. I keep '
-          + 'opening it.'
-      },
-      {
         title: 'Theta',
         photo: 'the-theta',
         body:
@@ -99,6 +89,16 @@ export const CHAPTERS: Chapter[] = [
           + 'Often the first thing a writer said was “I’m bad at writing.” I left '
           + 'believing the job is helping someone find their own voice, not handing '
           + 'them mine.'
+      },
+      {
+        title: 'The Notebook',
+        photo: 'the-notebook',
+        body:
+          'A notebook, and a pen nice enough that I slow down for it.\n\n'
+          + 'Everything else I own hands me more material than I can use. This gives me '
+          + 'nothing. Only what I can get out of my own head.\n\n'
+          + 'Most of what is in it is unfinished, and I have stopped minding. I keep '
+          + 'opening it.'
       },
     ],
   },
