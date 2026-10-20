@@ -1,5 +1,7 @@
 import { GROUND_COLOR } from '../palette';
 import { MemoryPicture } from './memory-picture';
+import { fixedCardLayout } from '../card-layout';
+import { READER_MAX_LINES, textHeight } from '../reader-fit';
 
 const PHOTO_MAX_WIDTH = 368;
 const PHOTO_MAX_HEIGHT = 300;
@@ -16,6 +18,7 @@ export interface RevealArea {
   coverHeight: number;
   textWidth: number;
   coverColor?: number;
+  pictureFrameHeight?: number;
 }
 
 export class RevealCard {
@@ -23,6 +26,7 @@ export class RevealCard {
   private readonly centerX: number;
   private readonly centerY: number;
   private readonly skipPrompt: string;
+  private readonly pictureFrameHeight: number | undefined;
 
   private readonly scrim: Phaser.GameObjects.Rectangle;
   private readonly picture: MemoryPicture;
@@ -38,6 +42,7 @@ export class RevealCard {
     this.centerX = area.centerX;
     this.centerY = area.centerY;
     this.skipPrompt = skipPrompt;
+    this.pictureFrameHeight = area.pictureFrameHeight;
 
     this.scrim = scene.add.rectangle(
       area.centerX,
@@ -85,7 +90,7 @@ export class RevealCard {
 
     this.scene.tweens.killTweensOf([this.scrim, this.title, this.body, ...this.picture.parts]);
 
-    this.picture.show(photo, PHOTO_MAX_WIDTH, PHOTO_MAX_HEIGHT);
+    this.picture.show(photo, PHOTO_MAX_WIDTH, this.pictureFrameHeight ?? PHOTO_MAX_HEIGHT);
     this.title.setText(title).setVisible(title !== '');
     this.body.setText(body).setVisible(true);
 
@@ -166,7 +171,29 @@ export class RevealCard {
     this.isHolding = false;
   }
 
+  private layOutInFrame(frameHeight: number): void {
+    const layout = fixedCardLayout({
+      centerY: this.centerY,
+      frameHeight,
+      gap: REVEAL_GAP,
+      titleHeight: this.title.height,
+      bodyHeight: this.body.height,
+      tallestBody: textHeight(READER_MAX_LINES),
+      hintHeight: this.hint.height,
+    });
+
+    this.picture.placeAt(this.centerX, layout.pictureY);
+    this.title.setPosition(this.centerX, layout.titleY);
+    this.body.setPosition(this.centerX, layout.bodyTop + this.body.height / 2);
+    this.hint.setPosition(this.centerX, layout.hintY);
+  }
+
   private layOut(): void {
+    if (this.pictureFrameHeight !== undefined) {
+      this.layOutInFrame(this.pictureFrameHeight);
+      return;
+    }
+
     const photoHeight = this.picture.height;
     const titleHeight = this.title.visible ? this.title.height : 0;
     const bodyHeight = this.body.height;

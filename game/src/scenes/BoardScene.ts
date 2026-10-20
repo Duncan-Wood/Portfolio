@@ -176,6 +176,7 @@ const PREVIEW_TOP_Y = ORIGIN_Y + 72;
 
 const BOARD_FRAME_MARGIN = 15;
 const VICTORY_CARD_COLOR = 0x150a28;
+const VICTORY_PICTURE_FRAME = 300;
 
 const BOARD_FRAME_CHAMFER = 20;
 
@@ -734,6 +735,7 @@ export class BoardScene extends Scene {
       coverHeight: CANVAS_HEIGHT,
       textWidth: CANVAS_WIDTH - 60,
       coverColor: VICTORY_CARD_COLOR,
+      pictureFrameHeight: VICTORY_PICTURE_FRAME,
     }, SKIP_PROMPT);
 
     this.staticOverlay = this.add.tileSprite(
