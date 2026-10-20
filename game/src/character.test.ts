@@ -6,6 +6,7 @@ import {
   characterAfter,
   characterFrame,
   characterOn,
+  thoughtFrame,
 } from './character';
 
 const playedThrough = (animation: CharacterAnimation): number => (
@@ -73,5 +74,74 @@ describe('when the run ends', () => {
 
   it('returns to idle when a new run starts', () => {
     expect(characterOn(characterOn(RESTING, 'won'), 'restart')).toEqual(RESTING);
+  });
+});
+
+describe('the character on the screens around the board', () => {
+  it('thinks while the welcome card is up', () => {
+    expect(characterOn(RESTING, 'welcome').animation).toBe('thinking');
+  });
+
+  it('reads while the how to play card is up', () => {
+    expect(characterOn(RESTING, 'instructions').animation).toBe('reading');
+  });
+
+  it('sits while the game is paused', () => {
+    expect(characterOn(RESTING, 'pause').animation).toBe('sitting');
+  });
+
+  it('keeps each of those going instead of settling back to idle', () => {
+    for (const moment of ['welcome', 'instructions', 'pause'] as const) {
+      const state = characterOn(RESTING, moment);
+      const muchLater = characterAfter(state, 100000);
+
+      expect(muchLater.animation, moment).toBe(state.animation);
+    }
+  });
+
+  it('loops their frames rather than holding the last one', () => {
+    for (const animation of ['thinking', 'reading', 'sitting'] as const) {
+      const { frames, frameMs } = CHARACTER_SHEET[animation];
+      const state = { animation, elapsed: 0 };
+
+      expect(characterFrame(characterAfter(state, frameMs * frames)), animation).toBe(0);
+      expect(characterFrame(characterAfter(state, frameMs * (frames + 1))), animation).toBe(1);
+    }
+  });
+
+  it('stands back up when play resumes', () => {
+    expect(characterOn(characterOn(RESTING, 'pause'), 'resume')).toEqual(RESTING);
+    expect(characterOn(characterOn(RESTING, 'instructions'), 'resume')).toEqual(RESTING);
+  });
+
+  it('leaves a reaction already playing alone when play resumes', () => {
+    const cheering = characterOn(RESTING, 'good');
+
+    expect(characterOn(cheering, 'resume')).toEqual(cheering);
+  });
+
+  it('does not stand a finished run back up on resume', () => {
+    const lost = characterOn(RESTING, 'lost');
+
+    expect(characterOn(lost, 'resume')).toEqual(lost);
+    expect(characterOn(lost, 'pause')).toEqual(lost);
+  });
+
+  it('can go from one screen to the next without standing up in between', () => {
+    expect(characterOn(characterOn(RESTING, 'welcome'), 'instructions').animation).toBe('reading');
+  });
+});
+
+describe('the thought bubble', () => {
+  const thinking = { animation: 'thinking', elapsed: 0 } as const;
+
+  it('starts with one dot and fills up, one more at a time', () => {
+    expect(thoughtFrame(thinking, 3)).toBe(0);
+    expect(thoughtFrame(characterAfter(thinking, 600), 3)).toBe(1);
+    expect(thoughtFrame(characterAfter(thinking, 1200), 3)).toBe(2);
+  });
+
+  it('starts over once every dot has shown', () => {
+    expect(thoughtFrame(characterAfter(thinking, 1800), 3)).toBe(0);
   });
 });

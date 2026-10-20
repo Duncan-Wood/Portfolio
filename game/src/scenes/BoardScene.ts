@@ -33,8 +33,8 @@ import {
   tileTexture,
 } from './tile-textures';
 import { reportCrash } from '../crash-reporter';
-import { RESTING, characterAfter, characterFrame, characterOn } from '../character';
-import { bakeCharacterStandIn, characterTexture } from './character-textures';
+import { RESTING, characterAfter, characterFrame, characterOn, thoughtFrame } from '../character';
+import { THOUGHT_FRAMES, bakeCharacterStandIn, characterTexture, thoughtTexture } from './character-textures';
 import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
@@ -169,6 +169,9 @@ const SIDE_COMMAND_WIDTH = (MEMORY_BOX.width - SIDE_COMMAND_GAP) / 2;
 const SIDE_COMMAND_Y = ORIGIN_Y + BOARD_HEIGHT - 34;
 const CHARACTER_X = MEMORY_BOX.left + MEMORY_BOX.width / 2;
 const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
+const ABOVE_PAUSE_SCRIM = 10;
+const THOUGHT_OFFSET_X = 52;
+const THOUGHT_OFFSET_Y = 176;
 const MEMORY_LANDS_AT = { x: CHARACTER_X, y: CHARACTER_BOTTOM - 90 };
 
 const PREVIEW_CELL = 48;
@@ -382,6 +385,7 @@ export class BoardScene extends Scene {
   private runOver: 'topped-out' | 'won' | null = null;
 
   private character: Phaser.GameObjects.Image;
+  private thought: Phaser.GameObjects.Image;
 
   private characterState = RESTING;
 
@@ -603,6 +607,9 @@ export class BoardScene extends Scene {
 
     this.character = this.add.image(CHARACTER_X, CHARACTER_BOTTOM, characterTexture('idle', 0))
       .setOrigin(0.5, 1);
+    this.thought = this.add.image(CHARACTER_X + THOUGHT_OFFSET_X, CHARACTER_BOTTOM - THOUGHT_OFFSET_Y, thoughtTexture(0))
+      .setOrigin(0.5, 1)
+      .setVisible(false);
 
     this.sheriffCount = this.add.text(CHARACTER_X, SHERIFF_COUNT_Y, '', {
       fontFamily: 'monospace',
@@ -878,6 +885,7 @@ export class BoardScene extends Scene {
     }
 
     if (this.paused) {
+      this.advanceCharacter(delta);
       this.memoryReader.advance(delta);
       this.drawBoard();
       this.drawConnections(0);
@@ -960,6 +968,8 @@ export class BoardScene extends Scene {
     this.swipe.cancel();
     this.pauseScrim.setVisible(paused);
     this.pauseText.setVisible(paused);
+    this.characterState = characterOn(this.characterState, paused ? 'pause' : 'resume');
+    this.character.setDepth(paused ? ABOVE_PAUSE_SCRIM : 0);
 
     if (paused) {
       this.resetButton.show();
@@ -2052,6 +2062,12 @@ export class BoardScene extends Scene {
       this.shownCharacterTexture = texture;
       this.character.setTexture(texture);
     }
+
+    const thinking = this.characterState.animation === 'thinking';
+    this.thought.setVisible(thinking);
+    if (thinking) {
+      this.thought.setTexture(thoughtTexture(thoughtFrame(this.characterState, THOUGHT_FRAMES)));
+    }
   }
 
   private get storyHolding(): boolean {
@@ -2071,6 +2087,7 @@ export class BoardScene extends Scene {
         return;
       }
       this.introCardShowing = null;
+      this.characterState = characterOn(this.characterState, 'resume');
       rememberIntroSeen();
     }
 
@@ -2080,6 +2097,7 @@ export class BoardScene extends Scene {
   private showIntroCard(index: number): void {
     const card = introCards(INTRO_CONTROLS)[index];
     this.introCardShowing = index;
+    this.characterState = characterOn(this.characterState, index === 0 ? 'welcome' : 'instructions');
     this.revealCard.show(card.title, card.body);
   }
 
