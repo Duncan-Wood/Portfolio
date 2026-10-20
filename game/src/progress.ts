@@ -123,3 +123,15 @@ export function forgetProgressFromOlderMemories(signature: string): void {
 
   writeStored(MEMORIES_KEY, signature);
 }
+
+export function setFoundMemories(count: number, titles: readonly string[]): void {
+  if (!Number.isInteger(count) || count < 0 || count > titles.length) {
+    throw new RangeError(`Memories found must be a whole number from 0 to ${titles.length}, got ${count}`);
+  }
+
+  forgetRun();
+  titles.slice(0, count).forEach((title, index) => rememberFragment(index, { title }, titles.length));
+  rememberResume(count, titles.length);
+  rememberPlayed();
+  rememberIntroSeen();
+}

@@ -1,8 +1,8 @@
 import { Game, Scale, WEBGL } from 'phaser';
 import { BoardScene, CANVAS_HEIGHT, CANVAS_WIDTH, TOUCH_PRIMARY } from './scenes/BoardScene';
 import { GROUND_COLOR } from './palette';
-import { MEMORY_SIGNATURE } from './memories';
-import { forgetProgressFromOlderMemories } from './progress';
+import { MEMORY_SIGNATURE, collectionEntries } from './memories';
+import { forgetProgressFromOlderMemories, setFoundMemories } from './progress';
 import { startCrashReporting } from './crash-reporter';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -28,6 +28,13 @@ const config: Phaser.Types.Core.GameConfig = {
 
 startCrashReporting();
 forgetProgressFromOlderMemories(MEMORY_SIGNATURE);
+
+if (import.meta.env.DEV) {
+  window.setMemories = (count: number) => {
+    setFoundMemories(count, collectionEntries().map((memory) => memory.title));
+    location.reload();
+  };
+}
 
 const game = new Game(config);
 

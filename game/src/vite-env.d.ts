@@ -15,5 +15,6 @@ declare global {
     tuning?: Tuning;
     simulation?: Simulation;
     boardScene?: BoardScene;
+    setMemories?: (count: number) => void;
   }
 }

@@ -10,8 +10,11 @@ import {
   loggedWith,
   rememberCompletion,
   rememberIntroSeen,
+  resumeAt,
   resumePoint,
   runFinished,
+  playedBefore,
+  setFoundMemories,
 } from './progress';
 
 describe('resumePoint', () => {
@@ -321,5 +324,70 @@ describe('finishing the game and playing it again', () => {
     expect(held.has('connected.resume')).toBe(false);
     expect(completions()).toBe(1);
     expect(held.get('connected.introSeen')).toBe('true');
+  });
+});
+
+describe('setting how many memories are found', () => {
+  const held = new Map<string, string>();
+  const titles = ['One', 'Two', 'Three', 'Four', 'Five'];
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('finds the first few memories and no others', () => {
+    setFoundMemories(3, titles);
+
+    expect(foundFragments()).toEqual([0, 1, 2]);
+  });
+
+  it('finishes the run when every memory is set', () => {
+    setFoundMemories(5, titles);
+
+    expect(runFinished(5)).toBe(true);
+  });
+
+  it('puts a partly found run back at the next memory', () => {
+    setFoundMemories(3, titles);
+
+    expect(resumeAt(5)).toBe(3);
+  });
+
+  it('leaves no place to resume once the run is finished', () => {
+    setFoundMemories(5, titles);
+
+    expect(resumeAt(5)).toBe(0);
+  });
+
+  it('replaces what was found before', () => {
+    setFoundMemories(4, titles);
+    setFoundMemories(1, titles);
+
+    expect(foundFragments()).toEqual([0]);
+  });
+
+  it('skips the intro, like a returning player', () => {
+    setFoundMemories(2, titles);
+
+    expect(playedBefore()).toBe(true);
+    expect(introSeen()).toBe(true);
+  });
+
+  it('rejects a count that is not a whole number from 0 to the number of memories', () => {
+    for (const count of [-1, 1.5, 6, NaN]) {
+      expect(() => setFoundMemories(count, titles), `${count}`).toThrow(RangeError);
+    }
   });
 });
