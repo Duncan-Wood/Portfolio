@@ -1,4 +1,5 @@
 import { CHARACTER_SHEET, type CharacterAnimation } from '../character';
+import { CHAIN_COLOR, PURSE_ART, PURSE_PALETTE, chainBetween } from '../character-purse';
 
 const PIXEL = 3;
 
@@ -102,6 +103,26 @@ function blockOn(graphics: Phaser.GameObjects.Graphics, dx = 0, dy = 0): DrawBlo
   };
 }
 
+const PURSE_AT = { x: 25, y: 37 };
+const STRAP_FROM = { x: 18, y: 27 };
+const STRAP_TO = { x: 31, y: 37 };
+const PURSE_ON_FLOOR = { x: 37, y: 52 };
+
+function drawPurse(block: DrawBlock, left: number, top: number): void {
+  PURSE_ART.forEach((row, y) => {
+    [...row].forEach((pixel, x) => {
+      if (pixel !== '.') {
+        block(PURSE_PALETTE[pixel], left + x, top + y, 1, 1);
+      }
+    });
+  });
+}
+
+function drawWornPurse(block: DrawBlock): void {
+  chainBetween(STRAP_FROM, STRAP_TO).forEach(({ x, y }) => block(CHAIN_COLOR, x, y, 1, 1));
+  drawPurse(block, PURSE_AT.x, PURSE_AT.y);
+}
+
 function drawHead(block: DrawBlock, dx: number, dy: number): void {
   block(SKIN, 18 + dx, 13 + dy, 12, 13);
   block(HAT, 18 + dx, 5 + dy, 12, 7);
@@ -132,6 +153,7 @@ function drawThinking(graphics: Phaser.GameObjects.Graphics, frame: number): voi
   body(TROUSERS, 19, 44, 4, 16);
   body(TROUSERS, 25, 44, 4, 16);
   body(SHIRT, 17, 26, 14, 18);
+  drawWornPurse(body);
   body(SHIRT, 13, 27, 3, 8);
   body(SKIN, 13, 34, 17, 3);
   body(SHIRT, 32, 27, 3, 8);
@@ -152,6 +174,7 @@ function drawReading(graphics: Phaser.GameObjects.Graphics, frame: number): void
   body(TROUSERS, 19, 44, 4, 16);
   body(TROUSERS, 25, 44, 4, 16);
   body(SHIRT, 17, 26, 14, 18);
+  drawWornPurse(body);
   body(SHIRT, 13, 27, 3, 7);
   body(SHIRT, 32, 27, 3, 7);
   body(PAPER, 16, 30, 16, 12);
@@ -180,6 +203,7 @@ function drawSitting(graphics: Phaser.GameObjects.Graphics, frame: number): void
   floor(TROUSERS, 31, 51, 5, 5);
   floor(BOOT, 19, 58, 4, 3);
   floor(BOOT, 25, 58, 4, 3);
+  drawPurse(floor, PURSE_ON_FLOOR.x, PURSE_ON_FLOOR.y);
   upper(SHIRT, 17, 26, 14, 14);
   upper(SHIRT, 13, 27, 3, 6);
   upper(SHIRT, 32, 27, 3, 6);
@@ -199,6 +223,7 @@ function drawStandIn(graphics: Phaser.GameObjects.Graphics, { dx, dy, arms }: Po
   block(TROUSERS, 19, 44, 4, 16);
   block(TROUSERS, 25, 44, 4, 16);
   block(SHIRT, 17, 26, 14, 18);
+  drawWornPurse(block);
   if (arms === 'up') {
     block(SKIN, 13, 13, 3, 9);
     block(SKIN, 32, 13, 3, 9);
