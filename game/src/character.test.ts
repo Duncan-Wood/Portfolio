@@ -13,6 +13,10 @@ const playedThrough = (animation: CharacterAnimation): number => (
   CHARACTER_SHEET[animation].frames * CHARACTER_SHEET[animation].frameMs
 );
 
+const settled = (moment: 'welcome' | 'instructions' | 'pause') => (
+  characterAfter(characterOn(RESTING, moment), 100000)
+);
+
 describe('the character at rest', () => {
   it('starts idle on its first frame', () => {
     expect(RESTING.animation).toBe('idle');
@@ -79,23 +83,22 @@ describe('when the run ends', () => {
 
 describe('the character on the screens around the board', () => {
   it('thinks while the welcome card is up', () => {
-    expect(characterOn(RESTING, 'welcome').animation).toBe('thinking');
+    expect(settled('welcome').animation).toBe('thinking');
   });
 
   it('reads while the how to play card is up', () => {
-    expect(characterOn(RESTING, 'instructions').animation).toBe('reading');
+    expect(settled('instructions').animation).toBe('reading');
   });
 
   it('sits while the game is paused', () => {
-    expect(characterOn(RESTING, 'pause').animation).toBe('sitting');
+    expect(settled('pause').animation).toBe('sitting');
   });
 
   it('keeps each of those going instead of settling back to idle', () => {
     for (const moment of ['welcome', 'instructions', 'pause'] as const) {
-      const state = characterOn(RESTING, moment);
-      const muchLater = characterAfter(state, 100000);
+      const state = settled(moment);
 
-      expect(muchLater.animation, moment).toBe(state.animation);
+      expect(characterAfter(state, 100000).animation, moment).toBe(state.animation);
     }
   });
 
@@ -107,11 +110,6 @@ describe('the character on the screens around the board', () => {
       expect(characterFrame(characterAfter(state, frameMs * frames)), animation).toBe(0);
       expect(characterFrame(characterAfter(state, frameMs * (frames + 1))), animation).toBe(1);
     }
-  });
-
-  it('stands back up when play resumes', () => {
-    expect(characterOn(characterOn(RESTING, 'pause'), 'resume')).toEqual(RESTING);
-    expect(characterOn(characterOn(RESTING, 'instructions'), 'resume')).toEqual(RESTING);
   });
 
   it('leaves a reaction already playing alone when play resumes', () => {
@@ -126,9 +124,78 @@ describe('the character on the screens around the board', () => {
     expect(characterOn(lost, 'resume')).toEqual(lost);
     expect(characterOn(lost, 'pause')).toEqual(lost);
   });
+});
 
-  it('can go from one screen to the next without standing up in between', () => {
-    expect(characterOn(characterOn(RESTING, 'welcome'), 'instructions').animation).toBe('reading');
+describe('moving between poses', () => {
+  const ENTRIES = [
+    ['welcome', 'musing', 'thinking'],
+    ['instructions', 'drawing', 'reading'],
+    ['pause', 'settling', 'sitting'],
+  ] as const;
+
+  const EXITS = [
+    ['thinking', 'lowering'],
+    ['reading', 'stowing'],
+    ['sitting', 'rising'],
+  ] as const;
+
+  it.each(ENTRIES)('goes through a transition on its way into the %s pose', (moment, transition, pose) => {
+    const entering = characterOn(RESTING, moment);
+
+    expect(entering).toEqual({ animation: transition, elapsed: 0 });
+    expect(characterAfter(entering, playedThrough(transition) - 1).animation).toBe(transition);
+    expect(characterAfter(entering, playedThrough(transition)).animation).toBe(pose);
+  });
+
+  it.each(EXITS)('goes through a transition on its way out of the %s pose', (pose, transition) => {
+    const leaving = characterOn({ animation: pose, elapsed: 0 }, 'resume');
+
+    expect(leaving).toEqual({ animation: transition, elapsed: 0 });
+    expect(characterAfter(leaving, playedThrough(transition)).animation).toBe('idle');
+  });
+
+  it('carries the time left over from a transition into the pose after it', () => {
+    const entering = characterOn(RESTING, 'pause');
+    const afterwards = characterAfter(entering, playedThrough('settling') + 70);
+
+    expect(afterwards).toEqual({ animation: 'sitting', elapsed: 70 });
+  });
+
+  it('plays every transition once through, never looping or holding its last frame', () => {
+    for (const transition of ['musing', 'lowering', 'drawing', 'stowing', 'settling', 'rising'] as const) {
+      const { frames, frameMs } = CHARACTER_SHEET[transition];
+      const state = { animation: transition, elapsed: 0 };
+
+      expect(characterFrame(characterAfter(state, frameMs)), transition).toBe(frames > 1 ? 1 : 0);
+    }
+  });
+
+  it('stands back up from a pose that is still being entered', () => {
+    const settling = characterOn(RESTING, 'pause');
+
+    expect(characterOn(settling, 'resume')).toEqual({ animation: 'rising', elapsed: 0 });
+  });
+
+  it('does not restart a pose it is already in or entering', () => {
+    const settling = characterOn(RESTING, 'pause');
+    const sitting = settled('pause');
+
+    expect(characterOn(settling, 'pause')).toEqual(settling);
+    expect(characterOn(sitting, 'pause')).toEqual(sitting);
+  });
+
+  it('lets a reaction cut a transition short', () => {
+    expect(characterOn(characterOn(RESTING, 'pause'), 'good')).toEqual({ animation: 'cheer', elapsed: 0 });
+  });
+
+  it('reaches for the card when it goes from the welcome to the how to play screen', () => {
+    expect(characterOn(settled('welcome'), 'instructions')).toEqual({ animation: 'drawing', elapsed: 0 });
+  });
+
+  it('is not a screen pose again once it has started rising', () => {
+    const rising = characterOn(settled('pause'), 'resume');
+
+    expect(characterOn(rising, 'resume')).toEqual(rising);
   });
 });
 

@@ -136,9 +136,94 @@ function drawScreenPose(graphics: Phaser.GameObjects.Graphics, animation: Charac
     drawReading(graphics, frame);
   } else if (animation === 'sitting') {
     drawSitting(graphics, frame);
+  } else if (animation === 'musing' || animation === 'lowering') {
+    drawMusing(graphics, animation === 'musing' ? frame : 1 - frame);
+  } else if (animation === 'drawing' || animation === 'stowing') {
+    drawDrawing(graphics, animation === 'drawing' ? frame : 1 - frame);
+  } else if (animation === 'settling' || animation === 'rising') {
+    drawSettling(graphics, animation === 'settling' ? frame : 1 - frame);
   } else {
     throw new Error(`No drawing for the ${animation} animation.`);
   }
+}
+
+function drawMusing(graphics: Phaser.GameObjects.Graphics, frame: number): void {
+  const body = blockOn(graphics);
+
+  body(TROUSERS, 19, 44, 4, 16);
+  body(TROUSERS, 25, 44, 4, 16);
+  body(SHIRT, 17, 26, 14, 18);
+  drawWornPurse(body);
+  if (frame === 0) {
+    body(SHIRT, 13, 27, 3, 5);
+    body(SKIN, 13, 32, 3, 9);
+    body(SHIRT, 32, 27, 3, 5);
+    body(SKIN, 32, 32, 3, 4);
+    body(SKIN, 28, 32, 5, 3);
+  } else {
+    body(SHIRT, 13, 27, 3, 8);
+    body(SKIN, 13, 34, 17, 3);
+    body(SHIRT, 32, 27, 3, 8);
+    body(SKIN, 28, 34, 7, 3);
+    body(SKIN, 27, 30, 4, 5);
+  }
+  drawHead(body, frame, 0);
+}
+
+function drawDrawing(graphics: Phaser.GameObjects.Graphics, frame: number): void {
+  const body = blockOn(graphics);
+
+  body(TROUSERS, 19, 44, 4, 16);
+  body(TROUSERS, 25, 44, 4, 16);
+  body(SHIRT, 17, 26, 14, 18);
+  drawWornPurse(body);
+  if (frame === 0) {
+    body(SHIRT, 13, 27, 3, 5);
+    body(SKIN, 13, 32, 3, 9);
+    body(SHIRT, 32, 27, 3, 7);
+    body(SKIN, 29, 34, 6, 3);
+  } else {
+    body(SHIRT, 13, 27, 3, 7);
+    body(SHIRT, 32, 27, 3, 7);
+    body(PAPER, 17, 33, 14, 8);
+    body(INK, 17, 33, 14, 1);
+    body(INK, 19, 36, 10, 1);
+    body(SKIN, 13, 34, 4, 4);
+    body(SKIN, 31, 34, 4, 4);
+  }
+  drawHead(body, 0, 1);
+}
+
+const SETTLING_SHIFT = [4, 9];
+
+function drawSettling(graphics: Phaser.GameObjects.Graphics, frame: number): void {
+  const shift = SETTLING_SHIFT[frame];
+  const floor = blockOn(graphics);
+  const upper = blockOn(graphics, 0, shift);
+
+  if (frame === 0) {
+    floor(TROUSERS, 19, 48, 4, 12);
+    floor(TROUSERS, 25, 48, 4, 12);
+    upper(SHIRT, 17, 26, 14, 18);
+    drawWornPurse(upper);
+    upper(SHIRT, 13, 27, 3, 5);
+    upper(SKIN, 13, 32, 3, 9);
+    upper(SHIRT, 32, 27, 3, 5);
+    upper(SKIN, 32, 32, 3, 9);
+  } else {
+    floor(TROUSERS, 13, 54, 22, 6);
+    floor(TROUSERS, 12, 51, 5, 5);
+    floor(TROUSERS, 31, 51, 5, 5);
+    floor(BOOT, 19, 58, 4, 3);
+    floor(BOOT, 25, 58, 4, 3);
+    drawPurse(floor, PURSE_ON_FLOOR.x, PURSE_ON_FLOOR.y);
+    upper(SHIRT, 17, 26, 14, 14);
+    upper(SHIRT, 13, 27, 3, 5);
+    upper(SKIN, 13, 32, 3, 6);
+    upper(SHIRT, 32, 27, 3, 5);
+    upper(SKIN, 32, 32, 3, 6);
+  }
+  drawHead(floor, 0, shift);
 }
 
 const THINKING_HEAD_DX = [0, 1, 2, 1];

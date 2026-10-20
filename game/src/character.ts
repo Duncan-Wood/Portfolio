@@ -1,4 +1,5 @@
-export type CharacterAnimation = 'idle' | 'cheer' | 'worried' | 'lost' | 'won' | 'thinking' | 'reading' | 'sitting';
+export type CharacterAnimation = 'idle' | 'cheer' | 'worried' | 'lost' | 'won' | 'thinking' | 'reading' | 'sitting'
+  | 'musing' | 'lowering' | 'drawing' | 'stowing' | 'settling' | 'rising';
 
 export type CharacterMoment = 'good' | 'shadow' | 'lost' | 'won' | 'restart' | 'welcome' | 'instructions' | 'pause' | 'resume';
 
@@ -16,6 +17,12 @@ export const CHARACTER_SHEET: Record<CharacterAnimation, AnimationTiming> = {
   thinking: { frames: 4, frameMs: 450 },
   reading: { frames: 4, frameMs: 400 },
   sitting: { frames: 4, frameMs: 500 },
+  musing: { frames: 2, frameMs: 130 },
+  lowering: { frames: 2, frameMs: 130 },
+  drawing: { frames: 2, frameMs: 140 },
+  stowing: { frames: 2, frameMs: 140 },
+  settling: { frames: 2, frameMs: 160 },
+  rising: { frames: 2, frameMs: 160 },
 };
 
 export interface CharacterState {
@@ -25,15 +32,43 @@ export interface CharacterState {
 
 export const RESTING: CharacterState = { animation: 'idle', elapsed: 0 };
 
-const SCREEN_ANIMATION: Partial<Record<CharacterMoment, CharacterAnimation>> = {
+const SCREEN_ANIMATION: Partial<Record<CharacterMoment, ScreenPose>> = {
   welcome: 'thinking',
   instructions: 'reading',
   pause: 'sitting',
 };
 
-const isScreenPose = (animation: CharacterAnimation): boolean => (
+type ScreenPose = 'thinking' | 'reading' | 'sitting';
+
+const ENTRY_TRANSITION: Record<ScreenPose, CharacterAnimation> = {
+  thinking: 'musing',
+  reading: 'drawing',
+  sitting: 'settling',
+};
+
+const EXIT_TRANSITION: Record<ScreenPose, CharacterAnimation> = {
+  thinking: 'lowering',
+  reading: 'stowing',
+  sitting: 'rising',
+};
+
+const TRANSITION_TARGET: Partial<Record<CharacterAnimation, CharacterAnimation>> = {
+  musing: 'thinking',
+  drawing: 'reading',
+  settling: 'sitting',
+  lowering: 'idle',
+  stowing: 'idle',
+  rising: 'idle',
+};
+
+const isScreenPose = (animation: CharacterAnimation): animation is ScreenPose => (
   animation === 'thinking' || animation === 'reading' || animation === 'sitting'
 );
+
+function screenPoseOf(animation: CharacterAnimation): ScreenPose | null {
+  const target = TRANSITION_TARGET[animation] ?? animation;
+  return isScreenPose(target) ? target : null;
+}
 
 const isLooping = (animation: CharacterAnimation): boolean => animation === 'idle' || isScreenPose(animation);
 
@@ -54,13 +89,15 @@ export function characterOn(state: CharacterState, moment: CharacterMoment): Cha
     return state;
   }
 
+  const current = screenPoseOf(state.animation);
+
   if (moment === 'resume') {
-    return isScreenPose(state.animation) ? RESTING : state;
+    return current === null ? state : { animation: EXIT_TRANSITION[current], elapsed: 0 };
   }
 
   const screenPose = SCREEN_ANIMATION[moment];
   if (screenPose !== undefined) {
-    return { animation: screenPose, elapsed: 0 };
+    return screenPose === current ? state : { animation: ENTRY_TRANSITION[screenPose], elapsed: 0 };
   }
 
   return { animation: moment === 'good' ? 'cheer' : 'worried', elapsed: 0 };
@@ -75,7 +112,7 @@ export function characterAfter(state: CharacterState, delta: number): CharacterS
 
   const finished = playTime(CHARACTER_SHEET[state.animation]);
   return elapsed >= finished
-    ? { animation: 'idle', elapsed: elapsed - finished }
+    ? { animation: TRANSITION_TARGET[state.animation] ?? 'idle', elapsed: elapsed - finished }
     : { animation: state.animation, elapsed };
 }
 
