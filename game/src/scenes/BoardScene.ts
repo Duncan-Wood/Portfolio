@@ -34,7 +34,16 @@ import {
 } from './tile-textures';
 import { reportCrash } from '../crash-reporter';
 import { RESTING, characterAfter, characterFrame, characterOn, thoughtFrame } from '../character';
-import { THOUGHT_FRAMES, bakeCharacterStandIn, characterTexture, thoughtTexture } from './character-textures';
+import {
+  CHARACTER_FRAME_HEIGHT,
+  CHARACTER_FRAME_WIDTH,
+  CHARACTER_PIXEL,
+  THOUGHT_FRAMES,
+  bakeCharacterStandIn,
+  characterTexture,
+  thoughtTexture,
+} from './character-textures';
+import { PURSE_CENTER } from '../character-purse';
 import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
@@ -172,7 +181,12 @@ const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
 const ABOVE_PAUSE_SCRIM = 10;
 const THOUGHT_OFFSET_X = 52;
 const THOUGHT_OFFSET_Y = 176;
-const MEMORY_LANDS_AT = { x: CHARACTER_X, y: CHARACTER_BOTTOM - 90 };
+const MEMORY_LANDS_AT = {
+  x: CHARACTER_X - CHARACTER_FRAME_WIDTH / 2 + PURSE_CENTER.x * CHARACTER_PIXEL,
+  y: CHARACTER_BOTTOM - CHARACTER_FRAME_HEIGHT + PURSE_CENTER.y * CHARACTER_PIXEL,
+};
+const PURSE_FLASH_COLOR = 0xf2b705;
+const PURSE_FLASH_MS = 380;
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -1008,8 +1022,21 @@ export class BoardScene extends Scene {
     const found = foundFragments().length;
 
     this.characterState = characterOn(this.characterState, 'good');
+    this.flashPurse();
     this.soundBoard.play(nodeVoice(Math.max(found - 1, 0), FRAGMENT_COUNT));
     this.refreshSheriffCount();
+  }
+
+  private flashPurse(): void {
+    const flash = this.add.circle(MEMORY_LANDS_AT.x, MEMORY_LANDS_AT.y, 10, PURSE_FLASH_COLOR, 0.9);
+    this.tweens.add({
+      targets: flash,
+      scale: 2.4,
+      alpha: 0,
+      duration: PURSE_FLASH_MS,
+      ease: 'Sine.easeOut',
+      onComplete: () => flash.destroy(),
+    });
   }
 
   private refreshSheriffCount(): void {

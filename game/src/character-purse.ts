@@ -12,6 +12,8 @@ export const PURSE_PALETTE: Readonly<Record<string, number>> = {
   L: 0x6fae4a,
 };
 
+export const PURSE_AT: Pixel = { x: 25, y: 37 };
+
 export const CHAIN_COLOR = 0x9a7b3c;
 
 export const PURSE_ART: readonly string[] = [
@@ -32,3 +34,8 @@ export function chainBetween(from: Pixel, to: Pixel): Pixel[] {
     y: Math.round(from.y + ((to.y - from.y) * step) / steps),
   }));
 }
+
+export const PURSE_CENTER: Pixel = {
+  x: PURSE_AT.x + PURSE_ART[0].length / 2,
+  y: PURSE_AT.y + PURSE_ART.length / 2,
+};

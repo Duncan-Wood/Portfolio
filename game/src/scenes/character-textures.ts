@@ -1,7 +1,9 @@
 import { CHARACTER_SHEET, type CharacterAnimation } from '../character';
-import { CHAIN_COLOR, PURSE_ART, PURSE_PALETTE, chainBetween } from '../character-purse';
+import { CHAIN_COLOR, PURSE_ART, PURSE_AT, PURSE_PALETTE, chainBetween } from '../character-purse';
 
-const PIXEL = 3;
+export const CHARACTER_PIXEL = 3;
+
+const PIXEL = CHARACTER_PIXEL;
 
 export const CHARACTER_FRAME_WIDTH = 48 * PIXEL;
 
@@ -103,7 +105,6 @@ function blockOn(graphics: Phaser.GameObjects.Graphics, dx = 0, dy = 0): DrawBlo
   };
 }
 
-const PURSE_AT = { x: 25, y: 37 };
 const STRAP_FROM = { x: 18, y: 27 };
 const STRAP_TO = { x: 31, y: 37 };
 const PURSE_ON_FLOOR = { x: 37, y: 52 };
