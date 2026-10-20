@@ -75,6 +75,7 @@ import {
   runFinished,
 } from '../progress';
 import { type IntroControls, introCards } from '../intro';
+import { neighbourOf } from '../sky';
 import {
   OVERTHINKING_LINE,
   SHADOW_OPENING_LINE,
@@ -860,6 +861,8 @@ export class BoardScene extends Scene {
       this.readFromPause();
     } else if (this.victory.active && this.readingIndex === null) {
       this.readFromVictory();
+    } else if (this.victory.active) {
+      this.readWhileReadingVictory(this.readingIndex!);
     }
 
     const restartPressed = Input.Keyboard.JustDown(this.restartKey) || this.touch.takeRestart();
@@ -1034,6 +1037,21 @@ export class BoardScene extends Scene {
       this.playAgain();
     } else if (picked) {
       this.pressFocused();
+    }
+  }
+
+  private readWhileReadingVictory(reading: number): void {
+    const direction = Input.Keyboard.JustDown(this.cursors.left) ? -1
+      : Input.Keyboard.JustDown(this.cursors.right) ? 1
+        : 0;
+
+    if (direction !== 0) {
+      const next = neighbourOf(foundFragments(), reading, direction);
+      if (next !== reading) {
+        this.openFound(next);
+      }
+    } else if (Input.Keyboard.JustDown(this.enterKey)) {
+      this.closeReading();
     }
   }
 

@@ -11,6 +11,7 @@ import {
   nearestTrunkSample,
   pictureFrameOf,
   placeOf,
+  neighbourOf,
   routeCovers,
   trunkLitAt,
   starOf,
@@ -259,5 +260,26 @@ describe('which trunk samples are lit', () => {
   it('is dark off either end of the trunk', () => {
     expect(trunkLitAt([0, 1], -1)).toBe(false);
     expect(trunkLitAt([0, 1], SKY_TRUNK.length)).toBe(false);
+  });
+});
+
+describe('moving to the next memory along the trunk', () => {
+  it('goes to the next found memory either way', () => {
+    expect(neighbourOf([0, 1, 2, 3], 1, 1)).toBe(2);
+    expect(neighbourOf([0, 1, 2, 3], 2, -1)).toBe(1);
+  });
+
+  it('skips over a memory that was not found', () => {
+    expect(neighbourOf([0, 1, 3, 4], 1, 1)).toBe(3);
+    expect(neighbourOf([0, 1, 3, 4], 3, -1)).toBe(1);
+  });
+
+  it('stays put at either end', () => {
+    expect(neighbourOf([0, 1, 2], 2, 1)).toBe(2);
+    expect(neighbourOf([0, 1, 2], 0, -1)).toBe(0);
+  });
+
+  it('does not depend on the order the found memories are listed in', () => {
+    expect(neighbourOf([3, 0, 2, 1], 1, 1)).toBe(2);
   });
 });

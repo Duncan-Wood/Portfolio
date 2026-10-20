@@ -58,6 +58,14 @@ export function litRoute(found: readonly number[]): SkyEdge[] {
   return SKY_ROUTE.filter(([from, to]) => found.includes(from) && found.includes(to));
 }
 
+export function neighbourOf(found: readonly number[], index: number, direction: -1 | 1): number {
+  const ahead = found.filter((other) => (other - index) * direction > 0);
+
+  return ahead.length === 0 ? index : ahead.reduce((nearest, other) => (
+    Math.abs(other - index) < Math.abs(nearest - index) ? other : nearest
+  ));
+}
+
 export function routeCovers(found: readonly number[], along: number): boolean {
   return litRoute(found).some(([from, to]) => along >= from && along <= to);
 }
