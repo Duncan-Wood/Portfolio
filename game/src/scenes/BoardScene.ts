@@ -88,7 +88,7 @@ import { Overthinking } from '../overthinking';
 import { SwipeControls } from '../input/swipe-controls';
 import { TouchControls } from '../input/touch-controls';
 import { SoundBoard } from '../audio/sound-board';
-import { READER_BOTTOM, READER_TEXT_WIDTH, READER_TOP } from '../reader-fit';
+import { READER_TEXT_WIDTH } from '../reader-fit';
 import {
   chainVoices,
   hardDropVoice,
@@ -120,13 +120,6 @@ export const TOUCH_PRIMARY = typeof matchMedia === 'function'
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
 const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
-const RESUME_PROMPT = TOUCH_PRIMARY ? 'tap to resume' : 'esc or space to resume';
-const READ_PROMPT = TOUCH_PRIMARY
-  ? 'tap a memory to read it\ntap anywhere else to resume'
-  : '\u2190 \u2192  choose     \u2191 \u2193  move     enter  read     space  resume';
-const READING_PROMPT = TOUCH_PRIMARY
-  ? 'tap another memory, or anywhere to go back'
-  : '\u2190 \u2192  read another     space  back';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
 const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
@@ -158,8 +151,6 @@ const MEMORY_PANEL_TOP = 300;
 const FOUND_ROW_Y = CANVAS_HEIGHT / 2 + 160;
 const FOUND_ROW_MARGIN = 24;
 const RESET_Y = CANVAS_HEIGHT / 2 + 290;
-const READING_HINT_Y = RESET_Y - 30;
-const PAUSE_HINT_Y = CANVAS_HEIGHT / 2 + 46;
 
 
 const SIDE_COMMAND_GAP = 8;
@@ -184,6 +175,7 @@ const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
 const PREVIEW_TOP_Y = ORIGIN_Y + 72;
 
 const BOARD_FRAME_MARGIN = 15;
+const VICTORY_CARD_COLOR = 0x150a28;
 
 const BOARD_FRAME_CHAMFER = 20;
 
@@ -335,7 +327,6 @@ export class BoardScene extends Scene {
 
   private pauseScrim: Phaser.GameObjects.Rectangle;
   private pauseText: Phaser.GameObjects.Text;
-  private pauseHint: Phaser.GameObjects.Text;
 
   private foundMemories: FoundMemories;
 
@@ -420,6 +411,7 @@ export class BoardScene extends Scene {
   private lastRevealPiece = -1;
 
   private revealCard: RevealCard;
+  private victoryCard: RevealCard;
 
   private introCardShowing: number | null = null;
 
@@ -735,6 +727,15 @@ export class BoardScene extends Scene {
       textWidth: BOARD_WIDTH,
     }, SKIP_PROMPT);
 
+    this.victoryCard = new RevealCard(this, {
+      centerX: CANVAS_WIDTH / 2,
+      centerY: CANVAS_HEIGHT / 2,
+      coverWidth: CANVAS_WIDTH,
+      coverHeight: CANVAS_HEIGHT,
+      textWidth: CANVAS_WIDTH - 60,
+      coverColor: VICTORY_CARD_COLOR,
+    }, SKIP_PROMPT);
+
     this.staticOverlay = this.add.tileSprite(
       ORIGIN_X + BOARD_WIDTH / 2,
       CANVAS_HEIGHT / 2,
@@ -774,13 +775,6 @@ export class BoardScene extends Scene {
       color: '#c98cff',
     }).setOrigin(0.5, 0.5).setVisible(false);
 
-    this.pauseHint = this.add.text(CANVAS_WIDTH / 2, PAUSE_HINT_Y, RESUME_PROMPT, {
-      fontFamily: 'monospace',
-      fontSize: '15px',
-      color: '#9481aa',
-      align: 'center',
-    }).setOrigin(0.5, 0.5).setVisible(false);
-
     this.foundMemories = new FoundMemories(
       this,
       collectionEntries(),
@@ -790,8 +784,6 @@ export class BoardScene extends Scene {
     );
     this.memoryReader = new MemoryReader(this, {
       centerX: CANVAS_WIDTH / 2,
-      top: READER_TOP,
-      bottom: READER_BOTTOM,
       textWidth: READER_TEXT_WIDTH,
     });
 
@@ -892,10 +884,10 @@ export class BoardScene extends Scene {
     }
 
     this.advanceCharacter(delta);
-    this.revealCard.advance(delta);
+    this.card.advance(delta);
 
-    if (this.revealCard.holding) {
-      if (this.revealCard.waitForSkip(
+    if (this.card.holding) {
+      if (this.card.waitForSkip(
         delta,
         () => Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop(),
       )) {
@@ -962,15 +954,11 @@ export class BoardScene extends Scene {
     this.swipe.cancel();
     this.pauseScrim.setVisible(paused);
     this.pauseText.setVisible(paused);
-    this.pauseHint.setVisible(paused);
 
     if (paused) {
       this.resetButton.show();
       this.tweens.pauseAll();
       this.foundMemories.show(this.storyHolding ? [] : this.collected, select);
-      this.pauseHint
-        .setText(this.foundMemories.showing ? READ_PROMPT : RESUME_PROMPT)
-        .setY(PAUSE_HINT_Y);
       this.startFocus();
     } else {
       this.stopReadingInPause();
@@ -1219,13 +1207,12 @@ export class BoardScene extends Scene {
     if (!this.victory.active) {
       this.foundMemories.select(index);
       this.pauseText.setVisible(false);
-      this.pauseHint.setText(READING_PROMPT).setY(READING_HINT_Y);
       this.memoryReader.show(node.body, node.photo);
       return;
     }
 
     this.victory.hideContents();
-    this.revealCard.show(node.title, node.body, node.photo);
+    this.victoryCard.show(node.title, node.body, node.photo);
   }
 
   private closeReading(): void {
@@ -1235,12 +1222,11 @@ export class BoardScene extends Scene {
     if (!this.victory.active) {
       this.stopReadingInPause();
       this.pauseText.setVisible(true);
-      this.pauseHint.setText(READ_PROMPT).setY(PAUSE_HINT_Y);
       this.startFocus();
       return;
     }
 
-    this.revealCard.reset();
+    this.victoryCard.reset();
     this.victory.showContents(read);
     this.startFocus();
   }
@@ -1493,8 +1479,12 @@ export class BoardScene extends Scene {
     return target;
   }
 
+  private get card(): RevealCard {
+    return this.victory.active ? this.victoryCard : this.revealCard;
+  }
+
   private get betweenPlay(): boolean {
-    return this.paused || this.revealCard.holding || this.runOver !== null || this.crashed;
+    return this.paused || this.card.holding || this.runOver !== null || this.crashed;
   }
 
   private shift(direction: HorizontalDirection): boolean {
@@ -2043,7 +2033,7 @@ export class BoardScene extends Scene {
   }
 
   private get storyHolding(): boolean {
-    return this.revealCard.holding;
+    return this.card.holding;
   }
 
   private advanceReveal(): void {

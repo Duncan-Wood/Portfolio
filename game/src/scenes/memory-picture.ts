@@ -2,11 +2,13 @@ import {
   ONE_DOOR_DOORWAY_TEXTURE,
   REVIEW_BASE_TEXTURE,
   TRACE_TEXTURE,
+  TRANSCRIPT_BASE_TEXTURE,
   memoryArtTexture,
 } from './tile-textures';
 import { OneDoorStream } from './one-door-stream';
 import { ReviewPlay } from './review-play';
-import { ONE_DOOR_PICTURE, REVIEW_PICTURE } from '../memory-pictures';
+import { TranscriptPlay } from './transcript-play';
+import { ONE_DOOR_PICTURE, REVIEW_PICTURE, TRANSCRIPT_PICTURE } from '../memory-pictures';
 
 interface PictureAnimation {
   readonly graphics: Phaser.GameObjects.Graphics;
@@ -25,6 +27,7 @@ export class MemoryPicture {
     this.animations = {
       [ONE_DOOR_PICTURE]: { texture: ONE_DOOR_DOORWAY_TEXTURE, animation: new OneDoorStream(scene) },
       [REVIEW_PICTURE]: { texture: REVIEW_BASE_TEXTURE, animation: new ReviewPlay(scene) },
+      [TRANSCRIPT_PICTURE]: { texture: TRANSCRIPT_BASE_TEXTURE, animation: new TranscriptPlay(scene) },
     };
   }
 

@@ -8,7 +8,7 @@ import {
 } from './memories';
 import { LOCKS } from './engine/locks';
 import { MEMORY_PICTURES, TRANSCRIPT_PICTURE } from './memory-pictures';
-import { fitsReader, linesNeeded, pictureDisplayHeight } from './reader-fit';
+import { READER_MAX_LINES, linesNeeded } from './reader-fit';
 
 describe('the memories', () => {
   it('has at least one to pay out', () => {
@@ -48,13 +48,10 @@ describe('the memories', () => {
     }
   });
 
-  it('keeps every card on screen, between the top and the found row', () => {
+  it('keeps every card to the same number of lines or fewer, so each takes the same room', () => {
     for (const chapter of CHAPTERS) {
       for (const node of chapter.nodes) {
-        const art = MEMORY_PICTURES[node.photo!];
-        const picture = pictureDisplayHeight(art?.columns, art?.rows.length);
-
-        expect(fitsReader(picture, linesNeeded(node.body)), node.title).toBe(true);
+        expect(linesNeeded(node.body), node.title).toBeLessThanOrEqual(READER_MAX_LINES);
       }
     }
   });

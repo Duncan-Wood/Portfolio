@@ -15,6 +15,7 @@ export interface RevealArea {
   coverWidth: number;
   coverHeight: number;
   textWidth: number;
+  coverColor?: number;
 }
 
 export class RevealCard {
@@ -43,7 +44,7 @@ export class RevealCard {
       area.centerY,
       area.coverWidth,
       area.coverHeight,
-      GROUND_COLOR,
+      area.coverColor ?? GROUND_COLOR,
     ).setVisible(false);
 
     this.picture = new MemoryPicture(scene);

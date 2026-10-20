@@ -1,10 +1,8 @@
-import { READER_PICTURE_GAP, READER_PICTURE_MAX_WIDTH, pictureRoom } from '../reader-fit';
+import { READER_FRAME_HEIGHT, READER_FRAME_TOP, READER_PICTURE_MAX_WIDTH, READER_TEXT_TOP } from '../reader-fit';
 import { MemoryPicture } from './memory-picture';
 
 export interface ReaderArea {
   centerX: number;
-  top: number;
-  bottom: number;
   textWidth: number;
 }
 
@@ -29,17 +27,12 @@ export class MemoryReader {
 
   show(body: string, photo?: string): void {
     this.body.setText(body).setVisible(true);
-    this.picture.show(photo, READER_PICTURE_MAX_WIDTH, pictureRoom(this.body.height));
+    this.picture.show(photo, READER_PICTURE_MAX_WIDTH, READER_FRAME_HEIGHT);
 
-    const pictureHeight = this.picture.height;
-    const gap = pictureHeight > 0 ? READER_PICTURE_GAP : 0;
-    const total = pictureHeight + gap + this.body.height;
-    const top = (this.area.top + this.area.bottom) / 2 - total / 2;
-
-    if (pictureHeight > 0) {
-      this.picture.placeAt(this.area.centerX, top + pictureHeight / 2);
+    if (this.picture.height > 0) {
+      this.picture.placeAt(this.area.centerX, READER_FRAME_TOP + READER_FRAME_HEIGHT / 2);
     }
-    this.body.setY(top + pictureHeight + gap);
+    this.body.setY(READER_TEXT_TOP);
   }
 
   advance(delta: number): void {
