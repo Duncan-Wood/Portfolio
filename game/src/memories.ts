@@ -112,12 +112,12 @@ export const CHAPTERS: Chapter[] = [
         title: 'The Hat',
         photo: 'the-hat',
         body:
-          'Bought in Corpus Christi on a family vacation, with a pair of steel-toed '
-          + 'boots.\n\n'
-          + 'I wore it to an audition for a sheriff I did not expect to be cast as, '
-          + 'and was.\n\n'
-          + 'I don’t have it anymore. The sheriff showed me I could stand up and be '
-          + 'someone I wasn’t.'
+          'Bought in Corpus Christi on a family vacation.\n\n'
+          + 'I wore it to an audition for the sheriff in The Laramie Project, a lead I '
+          + 'did not expect to get, and got.\n\n'
+          + 'I don’t have it anymore. Later, as Lurch in The Addams Family, I '
+          + 'improvised a swig from a wine bottle and a full theatre laughed. I had '
+          + 'never felt anything like it.'
       },
       {
         title: 'The Build',
