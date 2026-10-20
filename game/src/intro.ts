@@ -14,12 +14,11 @@ export function introCards(controls: IntroControls): readonly IntroCard[] {
   return [
     {
       title: 'Connected',
-      body: 'A brain connected by neurons.\n\nLight the dark ones to unlock memories and connections.',
+      body: 'Nothing I’ve built happened without other people.\n\nLight the neurons to unlock the memories behind it.',
     },
     {
       title: 'how to play',
-      body: 'Blocks drop in twos.\nCombine four that match to pop them.\n'
-        + `Pop one next to a dark neuron to light it.\n\n${CONTROLS[controls]}`,
+      body: `Match four of a color to clear them. Clear beside a dark neuron to light it.\n\n${CONTROLS[controls]}`,
     },
   ];
 }

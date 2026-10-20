@@ -10,6 +10,17 @@ describe('the cards that open a first run', () => {
     expect(cards[1].title).toBe('how to play');
   });
 
+  it('does not describe the game as a brain, which it no longer shows', () => {
+    expect(introCards('keyboard')[0].body.toLowerCase()).not.toContain('brain');
+  });
+
+  it('tells the rules in one short line, without the word pop', () => {
+    const [firstLine] = introCards('keyboard')[1].body.split('\n\n');
+
+    expect(firstLine.toLowerCase()).not.toContain('pop');
+    expect(firstLine.split('\n')).toHaveLength(1);
+    expect(firstLine.length).toBeLessThanOrEqual(80);
+  });
 });
 
 describe('the controls a player is told about', () => {

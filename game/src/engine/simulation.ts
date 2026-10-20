@@ -94,6 +94,10 @@ export class Simulation {
     this.restart();
   }
 
+  get resting(): boolean {
+    return !this.toppedOut && !this.resolving && !this.pair.canFall(this.board);
+  }
+
   update(delta: number): void {
     if (this.toppedOut) {
       return;

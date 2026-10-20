@@ -425,6 +425,7 @@ export class BoardScene extends Scene {
   private shownToppedOut = false;
 
   private soundedPiecesLocked = 0;
+  private soundedResting = false;
 
   private judgedPiecesLocked = 0;
 
@@ -1343,6 +1344,7 @@ export class BoardScene extends Scene {
 
     this.shownBeats = this.simulation.beatsPlayed;
     this.soundedPiecesLocked = this.simulation.piecesLocked;
+    this.soundedResting = false;
     this.judgedPiecesLocked = this.simulation.piecesLocked;
     this.overthinking.newBoard();
     this.slamDistance = null;
@@ -2095,11 +2097,17 @@ export class BoardScene extends Scene {
   private playSounds(): void {
     const { piecesLocked, toppedOut, chainLength, resolving } = this.simulation;
 
+    const { resting } = this.simulation;
+    if (resting && !this.soundedResting && this.slamDistance === null) {
+      this.soundBoard.play(landVoice());
+    }
+    this.soundedResting = resting;
+
     if (piecesLocked !== this.soundedPiecesLocked) {
       this.soundedPiecesLocked = piecesLocked;
-      this.soundBoard.play(
-        this.slamDistance === null ? landVoice() : hardDropVoice(this.slamDistance),
-      );
+      if (this.slamDistance !== null) {
+        this.soundBoard.play(hardDropVoice(this.slamDistance));
+      }
       this.slamDistance = null;
       this.bounceLanding();
     }

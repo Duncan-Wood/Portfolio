@@ -77,6 +77,27 @@ describe('gravity', () => {
   });
 });
 
+describe('resting on the floor', () => {
+  it('is not resting while the pair is still falling', () => {
+    expect(simulation().resting).toBe(false);
+  });
+
+  it('is resting the moment the pair touches down, before it locks', () => {
+    const game = simulation();
+    dropToFloor(game);
+
+    expect(game.resting).toBe(true);
+  });
+
+  it('stops resting once the pair locks and the next one starts to fall', () => {
+    const game = simulation();
+    dropToFloor(game);
+    game.update(lockDelay);
+
+    expect(game.resting).toBe(false);
+  });
+});
+
 describe('lock delay', () => {
   it('does not lock the instant the pair lands', () => {
     const game = simulation();

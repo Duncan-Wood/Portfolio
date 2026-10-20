@@ -146,6 +146,14 @@ describe('what a finished memory says', () => {
     expect(STILL_CONNECTED.toLowerCase()).toContain('connected');
   });
 
+  it('makes no claim that connecting and building are opposites', () => {
+    expect(RECOVERED_LINE).not.toMatch(/more than/i);
+  });
+
+  it('says whose life goes next rather than leaving it as a bare it', () => {
+    expect(RECOVERED_LINE).toContain('my life');
+  });
+
   it('fits the three wrapped lines the sky leaves room for', () => {
     expect(RECOVERED_LINE.length).toBeLessThanOrEqual(150);
   });

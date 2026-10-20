@@ -49,6 +49,21 @@ describe('every voice', () => {
   });
 });
 
+describe('the landing, which sounds when a piece touches down', () => {
+  it('is clearly audible rather than a faint tick', () => {
+    expect(landVoice().gain).toBeGreaterThanOrEqual(0.1);
+    expect(landVoice().duration).toBeGreaterThanOrEqual(80);
+  });
+
+  it('is lighter than the heaviest hard drop', () => {
+    expect(landVoice().gain).toBeLessThan(hardDropVoice(12).gain);
+  });
+
+  it('is in the same family as the hard drop, so the two read as one sound at different weights', () => {
+    expect(landVoice().waveform).toBe(hardDropVoice(0).waveform);
+  });
+});
+
 describe('the pop, which carries the chain escalation', () => {
   it('starts at the base pitch on the first link', () => {
     expect(popVoice(0).startFrequency).toBe(BASE_POP_FREQUENCY);
