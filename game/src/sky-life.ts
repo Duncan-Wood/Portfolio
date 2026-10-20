@@ -167,7 +167,7 @@ export function standingAt(at: number): Walker {
   return { at, facing: 1, walking: false };
 }
 
-export function walkAfter(walker: Walker, target: number, elapsed: number): Walker {
+export function walkAfter(walker: Walker, target: number, elapsed: number, isLit: (sample: number) => boolean): Walker {
   const gap = target - walker.at;
   if (gap === 0) {
     return walker;
@@ -175,7 +175,18 @@ export function walkAfter(walker: Walker, target: number, elapsed: number): Walk
 
   const direction = gap > 0 ? 1 : -1;
   const step = Math.min(Math.abs(gap), elapsed * WALK_SPEED);
-  const at = step === Math.abs(gap) ? target : walker.at + direction * step;
+  const reached = step === Math.abs(gap) ? target : walker.at + direction * step;
+
+  let at = reached;
+  for (let sample = Math.round(walker.at) + direction; (sample - Math.round(reached)) * direction <= 0; sample += direction) {
+    if (!isLit(sample)) {
+      at = sample;
+      while (!isLit(at) && at !== target) {
+        at += direction;
+      }
+      break;
+    }
+  }
 
   return { at, facing: direction, walking: at !== target };
 }

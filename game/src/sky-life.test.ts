@@ -178,12 +178,14 @@ describe('the lights that drift along the trunk by themselves', () => {
 });
 
 describe('the cowboy walking the trunk', () => {
+  const everywhere = (): boolean => true;
+
   it('starts out standing still, facing forward', () => {
     expect(standingAt(40)).toEqual({ at: 40, facing: 1, walking: false });
   });
 
   it('walks towards a target further along at a steady pace, facing that way', () => {
-    const walker = walkAfter(standingAt(40), 100, 100);
+    const walker = walkAfter(standingAt(40), 100, 100, everywhere);
 
     expect(walker.at).toBeCloseTo(40 + 100 * WALK_SPEED, 5);
     expect(walker.facing).toBe(1);
@@ -191,27 +193,58 @@ describe('the cowboy walking the trunk', () => {
   });
 
   it('turns round to walk back the other way', () => {
-    const walker = walkAfter(standingAt(100), 40, 100);
+    const walker = walkAfter(standingAt(100), 40, 100, everywhere);
 
     expect(walker.at).toBeCloseTo(100 - 100 * WALK_SPEED, 5);
     expect(walker.facing).toBe(-1);
   });
 
   it('keeps facing the way he last walked once he stops', () => {
-    const arrived = walkAfter(walkAfter(standingAt(100), 40, 100), 40, 100000);
+    const arrived = walkAfter(walkAfter(standingAt(100), 40, 100, everywhere), 40, 100000, everywhere);
 
     expect(arrived.walking).toBe(false);
     expect(arrived.facing).toBe(-1);
   });
 
   it('stops on the target without overshooting it', () => {
-    const arrived = walkAfter(standingAt(40), 42, 100000);
+    const arrived = walkAfter(standingAt(40), 42, 100000, everywhere);
 
     expect(arrived.at).toBe(42);
     expect(arrived.walking).toBe(false);
   });
 
   it('stays put when he is already there', () => {
-    expect(walkAfter(standingAt(40), 40, 100)).toEqual(standingAt(40));
+    expect(walkAfter(standingAt(40), 40, 100, everywhere)).toEqual(standingAt(40));
+  });
+
+  it('hops over an unlit stretch instead of walking across it', () => {
+    const lit = (sample: number): boolean => sample < 60 || sample > 90;
+    const hopped = walkAfter(standingAt(58), 120, 100, lit);
+
+    expect(hopped.at).toBe(91);
+    expect(hopped.walking).toBe(true);
+    expect(hopped.facing).toBe(1);
+  });
+
+  it('hops backwards over an unlit stretch too', () => {
+    const lit = (sample: number): boolean => sample < 60 || sample > 90;
+    const hopped = walkAfter(standingAt(93), 10, 100, lit);
+
+    expect(hopped.at).toBe(59);
+    expect(hopped.facing).toBe(-1);
+  });
+
+  it('never stands on an unlit sample part-way through a step', () => {
+    const lit = (sample: number): boolean => sample < 60 || sample > 90;
+    const hopped = walkAfter(standingAt(59.4), 120, 2, lit);
+
+    expect(lit(Math.round(hopped.at))).toBe(true);
+  });
+
+  it('does not hop when the whole way is lit', () => {
+    const lit = (sample: number): boolean => sample < 60 || sample > 90;
+    const stepped = walkAfter(standingAt(10), 50, 100, lit);
+
+    expect(stepped.at).toBeCloseTo(10 + 100 * WALK_SPEED, 5);
   });
 });

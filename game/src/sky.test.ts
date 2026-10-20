@@ -12,6 +12,7 @@ import {
   pictureFrameOf,
   placeOf,
   routeCovers,
+  trunkLitAt,
   starOf,
   trunkWidth,
 } from './sky';
@@ -239,5 +240,24 @@ describe('the route a run took', () => {
     const everything = SKY_CELLS.map((_, index) => index);
 
     expect(litRoute(everything)).toEqual([...SKY_ROUTE]);
+  });
+});
+
+describe('which trunk samples are lit', () => {
+  it('lights the stretch between two found neighbours', () => {
+    expect(trunkLitAt([2, 3], Math.round((CELL_SAMPLE[2] + CELL_SAMPLE[3]) / 2))).toBe(true);
+  });
+
+  it('keeps the sample under a lone found cell lit', () => {
+    expect(trunkLitAt([4], CELL_SAMPLE[4])).toBe(true);
+  });
+
+  it('leaves the stretch beside a lone found cell dark', () => {
+    expect(trunkLitAt([4], CELL_SAMPLE[4] + 6)).toBe(false);
+  });
+
+  it('is dark off either end of the trunk', () => {
+    expect(trunkLitAt([0, 1], -1)).toBe(false);
+    expect(trunkLitAt([0, 1], SKY_TRUNK.length)).toBe(false);
   });
 });

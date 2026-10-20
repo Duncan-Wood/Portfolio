@@ -10,6 +10,7 @@ import {
   placeOf,
   routeCovers,
   starOf,
+  trunkLitAt,
   trunkWidth,
 } from '../sky';
 import {
@@ -200,7 +201,7 @@ export class VictorySky {
       backdrop.setAlpha(backdrop.alpha + (target - backdrop.alpha) * Math.min(1, elapsed * PICTURE_EASE));
     }
 
-    this.walker = walkAfter(this.walker, CELL_SAMPLE[this.selected], elapsed);
+    this.walker = walkAfter(this.walker, CELL_SAMPLE[this.selected], elapsed, (sample) => trunkLitAt(this.shown, sample));
     this.placeFigure(time);
     this.drawLive(time);
   }

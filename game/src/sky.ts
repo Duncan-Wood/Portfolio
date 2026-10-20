@@ -62,6 +62,11 @@ export function routeCovers(found: readonly number[], along: number): boolean {
   return litRoute(found).some(([from, to]) => along >= from && along <= to);
 }
 
+export function trunkLitAt(found: readonly number[], sample: number): boolean {
+  const along = SKY_TRUNK[sample]?.along;
+  return along !== undefined && (routeCovers(found, along) || found.includes(along));
+}
+
 function buildTrunk(): TrunkSample[] {
   const waypoints: TrunkSample[] = SKY_CELLS.map((cell, along) => ({ ...cell, along }));
   waypoints.splice(7, 0, BOTTOM_SWING);
