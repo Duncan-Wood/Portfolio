@@ -48,6 +48,7 @@ import { PURSE_CENTER } from '../character-purse';
 import { STILL_AMBIENT, ambientAfter } from '../audio/ambient';
 import { themeFor } from '../audio/memory-themes';
 import { LockSequence, type SequenceWorld } from '../lock-sequence';
+import { staticFrame } from '../static-noise';
 import { chooseOpening } from '../opening';
 import { revealNextNode } from '../reveal';
 import { RevealCard } from './reveal-card';
@@ -125,6 +126,9 @@ const THREAD_PULSE = 420;
 
 export const TOUCH_PRIMARY = typeof matchMedia === 'function'
   && matchMedia('(pointer: coarse)').matches;
+
+const REDUCED_MOTION = typeof matchMedia === 'function'
+  && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
 const CONTACT_URL = '/#contact';
@@ -1008,9 +1012,10 @@ export class BoardScene extends Scene {
       return;
     }
 
-    this.staticOverlay.tilePositionX = Math.random() * STATIC_SIZE;
-    this.staticOverlay.tilePositionY = Math.random() * STATIC_SIZE;
-    this.staticOverlay.setAlpha(this.staticStrength * (0.1 + Math.random() * 0.14));
+    const frame = staticFrame(this.staticStrength, REDUCED_MOTION, Math.random, STATIC_SIZE);
+    this.staticOverlay.tilePositionX = frame.offsetX;
+    this.staticOverlay.tilePositionY = frame.offsetY;
+    this.staticOverlay.setAlpha(frame.alpha);
   }
 
   private setPaused(paused: boolean, select?: number): void {
@@ -2256,8 +2261,10 @@ export class BoardScene extends Scene {
   private popCells(link: ChainLink, connections: number): number | null {
     const purified = link.shadowPurified;
     this.tweens.killTweensOf(this.popTiles);
-    this.hitStopRemaining = this.tuning.hitStopDuration;
-    this.kickCamera();
+    if (!REDUCED_MOTION) {
+      this.hitStopRemaining = this.tuning.hitStopDuration;
+      this.kickCamera();
+    }
     this.chargeNetwork(link);
 
     let borrowed = 0;
