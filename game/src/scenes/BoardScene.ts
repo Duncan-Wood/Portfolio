@@ -47,6 +47,7 @@ import {
 import { PURSE_CENTER } from '../character-purse';
 import { STILL_AMBIENT, ambientAfter } from '../audio/ambient';
 import { themeFor } from '../audio/memory-themes';
+import { revealNextNode } from '../reveal';
 import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel, type FlightHooks } from './memory-panel';
 import { EndingScreen } from './ending-screen';
@@ -78,11 +79,8 @@ import {
   foundFragments,
   introSeen,
   playedBefore,
-  rememberCompletion,
-  rememberFragment,
   rememberIntroSeen,
   rememberPlayed,
-  rememberResume,
   rememberSoundMuted,
   resumeAt,
   runFinished,
@@ -2114,29 +2112,22 @@ export class BoardScene extends Scene {
 
     this.revealPending = false;
     this.lastRevealPiece = this.simulation.piecesLocked;
-    this.revealNextNode();
+    this.surfaceNextNode();
   }
 
-  private revealNextNode(): void {
-    const at = nodeAt(this.nodesRevealed);
-    if (at === null) {
+  private surfaceNextNode(): void {
+    const reveal = revealNextNode(this.nodesRevealed);
+    if (reveal.kind === 'none') {
       return;
     }
 
-    const { node } = at;
-    const firstFind = foundFragments().length === 0;
-    this.nodesRevealed += 1;
-    this.simulation.shadowHeld = this.nodesRevealed === 0;
-    rememberFragment(
-      this.nodesRevealed - 1,
-      { title: node.title },
-      FRAGMENT_COUNT,
-    );
-    rememberResume(this.nodesRevealed, FRAGMENT_COUNT);
+    this.nodesRevealed = reveal.nodesRevealed;
+    this.simulation.shadowHeld = false;
 
-    const hint = firstFind ? FOUND_HINT : null;
+    const { node } = reveal;
+    const hint = reveal.firstFind ? FOUND_HINT : null;
 
-    if (!this.moreToReach) {
+    if (reveal.kind === 'won') {
       this.winTheRun();
       this.memoryPanel.showFoundFlying(node.photo, node.title, hint, this.flightHooks());
       return;
@@ -2632,7 +2623,6 @@ export class BoardScene extends Scene {
 
   private winTheRun(): void {
     this.runOver = 'won';
-    rememberCompletion();
     this.characterState = characterOn(this.characterState, 'won');
 
     this.tweens.add({
