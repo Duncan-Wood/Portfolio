@@ -2,6 +2,7 @@ import { type Voice } from './voices';
 
 export class SoundBoard {
   private context: AudioContext | null = null;
+  private musicOn = true;
 
   // Must be called from a keypress, not scene creation: a context built before
   // the user interacts is born `suspended`.
@@ -50,6 +51,21 @@ export class SoundBoard {
 
     oscillator.start(startAt);
     oscillator.stop(endAt);
+  }
+
+  get musicPlaying(): boolean {
+    return this.musicOn;
+  }
+
+  toggleMusic(): boolean {
+    this.musicOn = !this.musicOn;
+    return this.musicOn;
+  }
+
+  playMusic(voices: Voice[]): void {
+    if (this.musicOn) {
+      this.playAll(voices);
+    }
   }
 
   playAll(voices: Voice[]): void {

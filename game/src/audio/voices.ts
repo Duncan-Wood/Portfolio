@@ -1,4 +1,4 @@
-type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
+export type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 export interface Voice {
   waveform: Waveform;

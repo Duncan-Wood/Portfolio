@@ -44,6 +44,8 @@ import {
   thoughtTexture,
 } from './character-textures';
 import { PURSE_CENTER } from '../character-purse';
+import { STILL_AMBIENT, ambientAfter } from '../audio/ambient';
+import { themeFor } from '../audio/memory-themes';
 import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
 import { EndingScreen } from './ending-screen';
@@ -187,6 +189,7 @@ const MEMORY_LANDS_AT = {
 };
 const PURSE_FLASH_COLOR = 0xf2b705;
 const PURSE_FLASH_MS = 380;
+const THEME_AFTER_CHIME_MS = 220;
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -440,6 +443,7 @@ export class BoardScene extends Scene {
   private shownBeats = 0;
 
   private readonly soundBoard = new SoundBoard();
+  private ambient = STILL_AMBIENT;
   private shownToppedOut = false;
 
   private soundedPiecesLocked = 0;
@@ -644,6 +648,7 @@ export class BoardScene extends Scene {
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
     this.enterKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ENTER);
+    this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.M).on('down', () => this.soundBoard.toggleMusic());
     this.resetKeys = [Input.Keyboard.KeyCodes.BACKSPACE, Input.Keyboard.KeyCodes.DELETE]
       .map((code) => this.input.keyboard!.addKey(code));
 
@@ -900,6 +905,7 @@ export class BoardScene extends Scene {
 
     if (this.paused) {
       this.advanceCharacter(delta);
+      this.advanceAmbient(delta);
       this.memoryReader.advance(delta);
       this.drawBoard();
       this.drawConnections(0);
@@ -912,6 +918,7 @@ export class BoardScene extends Scene {
     }
 
     this.advanceCharacter(delta);
+    this.advanceAmbient(delta);
     this.card.advance(delta);
 
     if (this.card.holding) {
@@ -1024,6 +1031,10 @@ export class BoardScene extends Scene {
     this.characterState = characterOn(this.characterState, 'good');
     this.flashPurse();
     this.soundBoard.play(nodeVoice(Math.max(found - 1, 0), FRAGMENT_COUNT));
+    const photo = collectableAt(found - 1)?.photo;
+    if (photo !== undefined) {
+      this.soundBoard.playMusic(themeFor(photo).map((voice) => ({ ...voice, delay: voice.delay + THEME_AFTER_CHIME_MS })));
+    }
     this.refreshSheriffCount();
   }
 
@@ -1261,6 +1272,9 @@ export class BoardScene extends Scene {
 
     this.readingIndex = index;
     this.focusFrame.setVisible(false);
+    if (node.photo !== undefined) {
+      this.soundBoard.playMusic(themeFor(node.photo));
+    }
 
     if (!this.victory.active) {
       this.foundMemories.select(index);
@@ -2079,6 +2093,12 @@ export class BoardScene extends Scene {
 
   private holdFor(text: string, floor: number): number {
     return floor + text.length * this.tuning.readingPerCharacter;
+  }
+
+  private advanceAmbient(delta: number): void {
+    const { clock, voices } = ambientAfter(this.ambient, delta, foundFragments().length);
+    this.ambient = clock;
+    this.soundBoard.playMusic(voices);
   }
 
   private advanceCharacter(delta: number): void {
