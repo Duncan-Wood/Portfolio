@@ -72,6 +72,28 @@
         }
       }
 
+      #turn-upright {
+        display: none;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+        padding: 0 24px;
+        font-family: monospace;
+        font-size: 16px;
+        text-align: center;
+        color: #c98cff;
+      }
+
+      @media (pointer: coarse) and (orientation: landscape) {
+        #game-container {
+          display: none;
+        }
+
+        #turn-upright {
+          display: flex;
+        }
+      }
+
       #to-standard:hover,
       #to-standard:focus-visible {
         color: #c98cff;
@@ -86,6 +108,7 @@
   </head>
   <body>
     <div id="game-container"></div>
+    <div id="turn-upright">Turn your phone upright to play.</div>
     <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
     <script type="module" src="/src/main.ts"></script>
   </body>
