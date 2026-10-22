@@ -137,6 +137,8 @@ function drawScreenPose(graphics: Phaser.GameObjects.Graphics, animation: Charac
     drawReading(graphics, frame);
   } else if (animation === 'sitting') {
     drawSitting(graphics, frame);
+  } else if (animation === 'reaching' || animation === 'catching') {
+    drawCatch(graphics, animation, frame);
   } else if (animation === 'musing' || animation === 'lowering') {
     drawMusing(graphics, animation === 'musing' ? frame : 1 - frame);
   } else if (animation === 'drawing' || animation === 'stowing') {
@@ -146,6 +148,37 @@ function drawScreenPose(graphics: Phaser.GameObjects.Graphics, animation: Charac
   } else {
     throw new Error(`No drawing for the ${animation} animation.`);
   }
+}
+
+export const HAND_REACH_AT = { x: 33.5, y: 12 };
+
+function drawCatch(graphics: Phaser.GameObjects.Graphics, animation: CharacterAnimation, frame: number): void {
+  const body = blockOn(graphics);
+
+  body(TROUSERS, 19, 44, 4, 16);
+  body(TROUSERS, 25, 44, 4, 16);
+  body(SHIRT, 17, 26, 14, 18);
+  drawWornPurse(body);
+  body(SHIRT, 13, 27, 3, 5);
+  body(SKIN, 13, 32, 3, 9);
+
+  if (animation === 'reaching') {
+    body(SHIRT, 32, 22, 3, 5);
+    body(SKIN, 32, 13, 3, 9);
+    body(SKIN, frame === 0 ? 31 : 32, 10, frame === 0 ? 5 : 3, 3);
+  } else if (frame === 0) {
+    body(SHIRT, 32, 22, 3, 5);
+    body(SKIN, 32, 14, 3, 8);
+    body(SKIN, 31, 11, 5, 4);
+  } else if (frame === 1) {
+    body(SHIRT, 32, 27, 3, 5);
+    body(SKIN, 32, 32, 3, 4);
+    body(SKIN, 31, 31, 4, 4);
+  } else {
+    body(SHIRT, 32, 27, 3, 5);
+    body(SKIN, 29, 34, 6, 3);
+  }
+  drawHead(body, 0, 0);
 }
 
 function drawMusing(graphics: Phaser.GameObjects.Graphics, frame: number): void {

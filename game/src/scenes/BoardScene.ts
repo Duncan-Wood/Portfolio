@@ -38,6 +38,7 @@ import {
   CHARACTER_FRAME_HEIGHT,
   CHARACTER_FRAME_WIDTH,
   CHARACTER_PIXEL,
+  HAND_REACH_AT,
   THOUGHT_FRAMES,
   bakeCharacterStandIn,
   characterTexture,
@@ -47,7 +48,7 @@ import { PURSE_CENTER } from '../character-purse';
 import { STILL_AMBIENT, ambientAfter } from '../audio/ambient';
 import { themeFor } from '../audio/memory-themes';
 import { RevealCard } from './reveal-card';
-import { FOUND_FLIGHT_END_MS, MemoryPanel } from './memory-panel';
+import { FOUND_FLIGHT_END_MS, MemoryPanel, type FlightHooks } from './memory-panel';
 import { EndingScreen } from './ending-screen';
 import { FoundMemories } from './found-memories';
 import { MemoryReader } from './memory-reader';
@@ -183,10 +184,15 @@ const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
 const ABOVE_PAUSE_SCRIM = 10;
 const THOUGHT_OFFSET_X = 52;
 const THOUGHT_OFFSET_Y = 176;
+const onCharacter = (frameX: number, frameY: number) => ({
+  x: CHARACTER_X - CHARACTER_FRAME_WIDTH / 2 + frameX * CHARACTER_PIXEL,
+  y: CHARACTER_BOTTOM - CHARACTER_FRAME_HEIGHT + frameY * CHARACTER_PIXEL,
+});
 const MEMORY_LANDS_AT = {
-  x: CHARACTER_X - CHARACTER_FRAME_WIDTH / 2 + PURSE_CENTER.x * CHARACTER_PIXEL,
-  y: CHARACTER_BOTTOM - CHARACTER_FRAME_HEIGHT + PURSE_CENTER.y * CHARACTER_PIXEL,
+  hand: onCharacter(HAND_REACH_AT.x, HAND_REACH_AT.y),
+  purse: onCharacter(PURSE_CENTER.x, PURSE_CENTER.y),
 };
+const PURSE_AT_SCREEN = MEMORY_LANDS_AT.purse;
 const PURSE_FLASH_COLOR = 0xf2b705;
 const PURSE_FLASH_MS = 380;
 const THEME_AFTER_CHIME_MS = 220;
@@ -1025,6 +1031,14 @@ export class BoardScene extends Scene {
     this.restart();
   }
 
+  private flightHooks(): FlightHooks {
+    return {
+      onReach: () => { this.characterState = characterOn(this.characterState, 'reach'); },
+      onCaught: () => { this.characterState = characterOn(this.characterState, 'catch'); },
+      onLanded: () => this.memoryLanded(),
+    };
+  }
+
   private memoryLanded(): void {
     const found = foundFragments().length;
 
@@ -1039,7 +1053,7 @@ export class BoardScene extends Scene {
   }
 
   private flashPurse(): void {
-    const flash = this.add.circle(MEMORY_LANDS_AT.x, MEMORY_LANDS_AT.y, 10, PURSE_FLASH_COLOR, 0.9);
+    const flash = this.add.circle(PURSE_AT_SCREEN.x, PURSE_AT_SCREEN.y, 10, PURSE_FLASH_COLOR, 0.9);
     this.tweens.add({
       targets: flash,
       scale: 2.4,
@@ -1719,7 +1733,7 @@ export class BoardScene extends Scene {
     } else if (stage === 'bloom' && found !== null) {
       this.memoryHandover.bloom(found.photo, found.title);
     } else if (stage === 'flight') {
-      this.memoryHandover.fly(stageLength('flight'), () => this.memoryLanded());
+      this.memoryHandover.fly(stageLength('flight'), this.flightHooks());
     } else if (stage === 'return') {
       this.restart(true);
       this.memoryHandover.uncoverBoard(stageLength('return'));
@@ -2084,7 +2098,7 @@ export class BoardScene extends Scene {
 
     if (!this.moreToReach) {
       this.winTheRun();
-      this.memoryPanel.showFoundFlying(node.photo, node.title, hint, () => this.memoryLanded());
+      this.memoryPanel.showFoundFlying(node.photo, node.title, hint, this.flightHooks());
       return;
     }
 

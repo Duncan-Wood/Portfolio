@@ -1,7 +1,7 @@
 export type CharacterAnimation = 'idle' | 'cheer' | 'worried' | 'lost' | 'won' | 'thinking' | 'reading' | 'sitting'
-  | 'musing' | 'lowering' | 'drawing' | 'stowing' | 'settling' | 'rising';
+  | 'reaching' | 'catching' | 'musing' | 'lowering' | 'drawing' | 'stowing' | 'settling' | 'rising';
 
-export type CharacterMoment = 'good' | 'shadow' | 'lost' | 'won' | 'restart' | 'welcome' | 'instructions' | 'pause' | 'resume';
+export type CharacterMoment = 'good' | 'shadow' | 'lost' | 'won' | 'restart' | 'welcome' | 'instructions' | 'pause' | 'resume' | 'reach' | 'catch';
 
 export interface AnimationTiming {
   frames: number;
@@ -17,6 +17,8 @@ export const CHARACTER_SHEET: Record<CharacterAnimation, AnimationTiming> = {
   thinking: { frames: 4, frameMs: 450 },
   reading: { frames: 4, frameMs: 400 },
   sitting: { frames: 4, frameMs: 500 },
+  reaching: { frames: 2, frameMs: 170 },
+  catching: { frames: 3, frameMs: 200 },
   musing: { frames: 2, frameMs: 130 },
   lowering: { frames: 2, frameMs: 130 },
   drawing: { frames: 2, frameMs: 140 },
@@ -70,7 +72,9 @@ function screenPoseOf(animation: CharacterAnimation): ScreenPose | null {
   return isScreenPose(target) ? target : null;
 }
 
-const isLooping = (animation: CharacterAnimation): boolean => animation === 'idle' || isScreenPose(animation);
+const isLooping = (animation: CharacterAnimation): boolean => (
+  animation === 'idle' || animation === 'reaching' || isScreenPose(animation)
+);
 
 const isEnding = (animation: CharacterAnimation): boolean => animation === 'lost' || animation === 'won';
 
@@ -90,6 +94,10 @@ export function characterOn(state: CharacterState, moment: CharacterMoment): Cha
   }
 
   const current = screenPoseOf(state.animation);
+
+  if (moment === 'reach' || moment === 'catch') {
+    return current === null ? { animation: moment === 'reach' ? 'reaching' : 'catching', elapsed: 0 } : state;
+  }
 
   if (moment === 'resume') {
     return current === null ? state : { animation: EXIT_TRANSITION[current], elapsed: 0 };

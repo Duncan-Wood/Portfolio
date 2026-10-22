@@ -212,3 +212,55 @@ describe('the thought bubble', () => {
     expect(thoughtFrame(characterAfter(thinking, 1800), 3)).toBe(0);
   });
 });
+
+describe('catching a memory', () => {
+  it('holds an arm up while a memory is on its way', () => {
+    const reaching = characterOn(RESTING, 'reach');
+
+    expect(reaching).toEqual({ animation: 'reaching', elapsed: 0 });
+    expect(characterAfter(reaching, 100000).animation).toBe('reaching');
+  });
+
+  it('wiggles its reaching hand rather than freezing it', () => {
+    const { frames, frameMs } = CHARACTER_SHEET.reaching;
+    const reaching = characterOn(RESTING, 'reach');
+
+    expect(characterFrame(characterAfter(reaching, frameMs))).toBe(1);
+    expect(characterFrame(characterAfter(reaching, frameMs * frames))).toBe(0);
+  });
+
+  it('grabs it, tucks it into the purse, then goes back to idle', () => {
+    const catching = characterOn(characterOn(RESTING, 'reach'), 'catch');
+
+    expect(catching).toEqual({ animation: 'catching', elapsed: 0 });
+    expect(characterAfter(catching, playedThrough('catching') - 1).animation).toBe('catching');
+    expect(characterAfter(catching, playedThrough('catching')).animation).toBe('idle');
+  });
+
+  it('plays its frames in order once through', () => {
+    const { frames, frameMs } = CHARACTER_SHEET.catching;
+    const catching = characterOn(RESTING, 'catch');
+
+    for (let frame = 0; frame < frames; frame += 1) {
+      expect(characterFrame(characterAfter(catching, frameMs * frame))).toBe(frame);
+    }
+  });
+
+  it('takes as long to catch as the flight spends held and dropped', () => {
+    expect(playedThrough('catching')).toBe(600);
+  });
+
+  it('leaves a finished run and the screen poses alone', () => {
+    const lost = characterOn(RESTING, 'lost');
+    const sitting = settled('pause');
+
+    expect(characterOn(lost, 'reach')).toEqual(lost);
+    expect(characterOn(lost, 'catch')).toEqual(lost);
+    expect(characterOn(sitting, 'reach')).toEqual(sitting);
+    expect(characterOn(sitting, 'catch')).toEqual(sitting);
+  });
+
+  it('can still be cut short by a reaction', () => {
+    expect(characterOn(characterOn(RESTING, 'reach'), 'shadow').animation).toBe('worried');
+  });
+});

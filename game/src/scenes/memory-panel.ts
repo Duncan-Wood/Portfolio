@@ -13,9 +13,12 @@ const FOUND_CROSSFADE_MS = 140;
 const FOUND_LIFT_MS = 300;
 const FOUND_LIFT_RISE = 18;
 const FOUND_FLIGHT_MS = 900;
-const FOUND_HELD_MS = 600;
-const FOUND_LAND_FADE_MS = 220;
-const FOUND_LANDED_WIDTH = 18;
+export const FOUND_CAUGHT_HOLD_MS = 200;
+export const FOUND_DROP_MS = 400;
+const FOUND_HELD_MS = FOUND_CAUGHT_HOLD_MS + FOUND_DROP_MS;
+export const FOUND_LAND_FADE_MS = 120;
+export const FOUND_CAUGHT_WIDTH = 26;
+export const FOUND_LANDED_WIDTH = 14;
 
 export const FOUND_FLIGHT_END_MS = FOUND_FLIGHT_DELAY + FOUND_CROSSFADE_MS + FOUND_LIFT_MS
   + FOUND_FLIGHT_MS + FOUND_HELD_MS + FOUND_LAND_FADE_MS;
@@ -32,15 +35,26 @@ export interface PanelBox {
   height: number;
 }
 
-export interface FlightTarget {
+export interface FlightPoint {
   x: number;
   y: number;
+}
+
+export interface LandingPlace {
+  hand: FlightPoint;
+  purse: FlightPoint;
+}
+
+export interface FlightHooks {
+  onReach: () => void;
+  onCaught: () => void;
+  onLanded: () => void;
 }
 
 export class MemoryPanel {
   private readonly scene: Phaser.Scene;
   private readonly box: PanelBox;
-  private readonly flyTo: FlightTarget;
+  private readonly landing: LandingPlace;
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly flier: Phaser.GameObjects.Image;
   private readonly foundTitle: Phaser.GameObjects.Text;
@@ -54,10 +68,10 @@ export class MemoryPanel {
   private fill: Phaser.Tweens.Tween | null = null;
   private showingFound = false;
 
-  constructor(scene: Phaser.Scene, box: PanelBox, flyTo: FlightTarget) {
+  constructor(scene: Phaser.Scene, box: PanelBox, landing: LandingPlace) {
     this.scene = scene;
     this.box = box;
-    this.flyTo = flyTo;
+    this.landing = landing;
     this.graphics = scene.add.graphics();
     this.flier = scene.add.image(0, 0, TRACE_TEXTURE).setVisible(false);
 
@@ -108,11 +122,11 @@ export class MemoryPanel {
     photo: string | undefined,
     title: string,
     hint: string | null,
-    onLanded: () => void,
+    hooks: FlightHooks,
   ): void {
     const art = this.present(photo, title, hint);
     if (art !== null && photo !== undefined) {
-      this.flyToTarget(art, photo, onLanded);
+      this.flyToTarget(art, photo, hooks);
     }
   }
 
@@ -161,18 +175,31 @@ export class MemoryPanel {
     this.shownCells = 0;
   }
 
-  private restInTheirHands(onLanded: () => void): void {
+  private catchAndStow(aspect: number, hooks: FlightHooks): void {
+    hooks.onCaught();
+
     this.scene.tweens.add({
       targets: this.flier,
-      alpha: 0,
-      delay: FOUND_HELD_MS,
-      duration: FOUND_LAND_FADE_MS,
-      onStart: onLanded,
-      onComplete: () => this.flier.setVisible(false),
+      x: this.landing.purse.x,
+      y: this.landing.purse.y,
+      displayWidth: FOUND_LANDED_WIDTH,
+      displayHeight: FOUND_LANDED_WIDTH * aspect,
+      delay: FOUND_CAUGHT_HOLD_MS,
+      duration: FOUND_DROP_MS,
+      ease: 'Sine.easeIn',
+      onComplete: () => {
+        hooks.onLanded();
+        this.scene.tweens.add({
+          targets: this.flier,
+          alpha: 0,
+          duration: FOUND_LAND_FADE_MS,
+          onComplete: () => this.flier.setVisible(false),
+        });
+      },
     });
   }
 
-  private flyToTarget(art: MemoryGrid, photo: string, onLanded: () => void): void {
+  private flyToTarget(art: MemoryGrid, photo: string, hooks: FlightHooks): void {
     const key = memoryArtTexture(photo);
     if (!this.scene.textures.exists(key)) {
       return;
@@ -214,15 +241,16 @@ export class MemoryPanel {
       delay: FOUND_FLIGHT_DELAY + FOUND_CROSSFADE_MS + FOUND_LIFT_MS,
       duration: FOUND_FLIGHT_MS,
     };
-    this.scene.tweens.add({ targets: this.flier, x: this.flyTo.x, ease: 'Sine.easeInOut', ...flying });
+    this.scene.tweens.add({ targets: this.flier, x: this.landing.hand.x, ease: 'Sine.easeInOut', ...flying });
     this.scene.tweens.add({
       targets: this.flier,
-      y: this.flyTo.y,
-      displayWidth: FOUND_LANDED_WIDTH,
-      displayHeight: FOUND_LANDED_WIDTH * (tall / wide),
+      y: this.landing.hand.y,
+      displayWidth: FOUND_CAUGHT_WIDTH,
+      displayHeight: FOUND_CAUGHT_WIDTH * (tall / wide),
       ease: 'Sine.easeInOut',
       ...flying,
-      onComplete: () => this.restInTheirHands(onLanded),
+      onStart: hooks.onReach,
+      onComplete: () => this.catchAndStow(tall / wide, hooks),
     });
   }
 
