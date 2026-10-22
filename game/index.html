@@ -84,6 +84,24 @@
         color: #c98cff;
       }
 
+      #no-webgl {
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 0 24px;
+        font-family: monospace;
+        font-size: 16px;
+        line-height: 1.5;
+        text-align: center;
+        color: #c98cff;
+      }
+
+      #no-webgl:not([hidden]) {
+        display: flex;
+      }
+
       @media (pointer: coarse) and (orientation: landscape) {
         #game-container {
           display: none;
@@ -108,6 +126,10 @@
   </head>
   <body>
     <div id="game-container"></div>
+    <div id="no-webgl" hidden>
+      <div>This game needs WebGL, and this browser is not offering it.</div>
+      <div>Try another browser, or use the link to the standard version of the site.</div>
+    </div>
     <div id="turn-upright">Turn your phone upright to play.</div>
     <a id="to-standard" href="/">this is cool and all, but take me to the standard version</a>
     <script type="module" src="/src/main.ts"></script>

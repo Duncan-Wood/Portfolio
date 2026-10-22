@@ -4,6 +4,7 @@ import { GROUND_COLOR } from './palette';
 import { MEMORY_SIGNATURE, collectionEntries } from './memories';
 import { forgetProgressFromOlderMemories, setFoundMemories } from './progress';
 import { startCrashReporting } from './crash-reporter';
+import { webglSupported } from './webgl-support';
 
 const config: Phaser.Types.Core.GameConfig = {
   // Not `AUTO`, which falls back to Canvas 2D silently and slowly.
@@ -36,14 +37,19 @@ if (import.meta.env.DEV) {
   };
 }
 
-const game = new Game(config);
+if (webglSupported()) {
+  const game = new Game(config);
 
-game.events.once('ready', () => {
-  game.canvas.setAttribute('role', 'img');
-  game.canvas.setAttribute(
-    'aria-label',
-    'Connected: a falling-block game played on a grid. A screen reader cannot read the '
-    + 'board or the memories it unlocks. The link to the standard version of the site is '
-    + 'plain text.',
-  );
-});
+  game.events.once('ready', () => {
+    game.canvas.setAttribute('role', 'img');
+    game.canvas.setAttribute(
+      'aria-label',
+      'Connected: a falling-block game played on a grid. A screen reader cannot read the '
+      + 'board or the memories it unlocks. The link to the standard version of the site is '
+      + 'plain text.',
+    );
+  });
+} else {
+  document.getElementById('game-container')!.hidden = true;
+  document.getElementById('no-webgl')!.hidden = false;
+}
