@@ -48,6 +48,7 @@ import { PURSE_CENTER } from '../character-purse';
 import { STILL_AMBIENT, ambientAfter } from '../audio/ambient';
 import { themeFor } from '../audio/memory-themes';
 import { LockSequence, type SequenceWorld } from '../lock-sequence';
+import { chooseOpening } from '../opening';
 import { revealNextNode } from '../reveal';
 import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel, type FlightHooks } from './memory-panel';
@@ -72,17 +73,12 @@ import {
   nodeAt,
 } from '../memories';
 import {
-  completions,
   forgetAllProgress,
   forgetRun,
   foundFragments,
-  introSeen,
-  playedBefore,
   rememberIntroSeen,
-  rememberPlayed,
   rememberSoundMuted,
   resumeAt,
-  runFinished,
   soundMuted,
 } from '../progress';
 import { type IntroControls, introCards } from '../intro';
@@ -1468,19 +1464,20 @@ export class BoardScene extends Scene {
   }
 
   private openTheRun(): void {
-    if (runFinished(FRAGMENT_COUNT)) {
+    const opening = chooseOpening();
+
+    if (opening === 'victory') {
       this.runOver = 'won';
       this.showVictory();
       return;
     }
 
-    if (!introSeen()) {
+    if (opening === 'intro') {
       this.showIntroCard(0);
-    } else if (playedBefore() && completions() === 0) {
+    } else if (opening === 'shadow') {
       this.revealCard.show('', SHADOW_OPENING_LINE);
       this.revealCard.setBodyColor('#b07dff');
     }
-    rememberPlayed();
 
     this.holdObjective();
   }
