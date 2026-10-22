@@ -1,4 +1,4 @@
-import { BlendModes } from 'phaser';
+import { BlendModes, Geom } from 'phaser';
 import {
   CELL_SAMPLE,
   SKY_CELLS,
@@ -42,6 +42,8 @@ const STAR_SCALE = 0.55;
 const DIMMED = 0.55;
 const DIMMED_TINT = 0xd7c4ff;
 const HOVER_REACH = 34;
+const STAR_HIT_CENTER = 15;
+const STAR_HIT_RADIUS = 34 / STAR_SCALE;
 
 const PICTURE_ALPHA = 0.34;
 const PICTURE_EASE = 0.008;
@@ -125,7 +127,11 @@ export class VictorySky {
     this.pictures = SKY_CELLS.map((_, index) => scene.add
       .image(starOf(index).x, starOf(index).y, STAR_TEXTURE)
       .setVisible(false)
-      .setInteractive({ useHandCursor: true }));
+      .setInteractive({
+        hitArea: new Geom.Circle(STAR_HIT_CENTER, STAR_HIT_CENTER, STAR_HIT_RADIUS),
+        hitAreaCallback: Geom.Circle.Contains,
+        useHandCursor: true,
+      }));
 
     // The scrim sits above the stars for input, so hovering has to be worked out here.
     scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {

@@ -873,7 +873,7 @@ export class BoardScene extends Scene {
     if (Input.Keyboard.JustDown(this.pauseKey) || this.touch.takePause()) {
       if (this.readingIndex !== null) {
         this.closeReading();
-      } else if (!this.victory.active) {
+      } else if (!this.victory.active && this.runOver !== 'won') {
         this.setPaused(!this.paused);
       }
     }
@@ -2436,7 +2436,7 @@ export class BoardScene extends Scene {
       const tile = this.fallTiles[index];
       tile
         .setPosition(centerOfColumn(move.column), centerOfRow(move.fromRow))
-        .setTexture(tileTexture(pieceType))
+        .setTexture(tileTexture(isShadow(pieceType) ? shadowHolding(pieceType) : pieceType))
         .setScale(1)
         .setAlpha(1)
         .setVisible(true);
