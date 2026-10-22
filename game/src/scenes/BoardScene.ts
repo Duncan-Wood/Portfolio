@@ -202,6 +202,8 @@ const PURSE_AT_SCREEN = MEMORY_LANDS_AT.purse;
 const PURSE_FLASH_COLOR = 0xf2b705;
 const PURSE_FLASH_MS = 380;
 const THEME_AFTER_CHIME_MS = 220;
+const WIN_CONNECTION_STAGGER_MS = 60;
+const LOSS_CONNECTION_STAGGER_MS = 45;
 
 const PREVIEW_CELL = 48;
 const PREVIEW_CENTER_X = ORIGIN_X + BOARD_WIDTH + 88;
@@ -498,7 +500,7 @@ export class BoardScene extends Scene {
       window.boardScene = this;
     }
 
-    this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
+    this.applyVignette();
 
     this.boardFrame = this.add.graphics();
     const frame = boardFrameCorners();
@@ -1419,7 +1421,7 @@ export class BoardScene extends Scene {
     this.staticStrength = 0;
     this.staticOverlay.setVisible(false);
     this.cameras.main.filters.external.clear();
-    this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
+    this.applyVignette();
     for (const slot of this.connections) {
       this.tweens.killTweensOf(slot.trace);
       slot.trace.setAlpha(1);
@@ -1571,6 +1573,10 @@ export class BoardScene extends Scene {
 
   private openContact(): void {
     window.location.href = CONTACT_URL;
+  }
+
+  private applyVignette(): void {
+    this.cameras.main.filters.external.addVignette(0.5, 0.5, 1.15, 0.22);
   }
 
   private toggleSound(): void {
@@ -2547,7 +2553,7 @@ export class BoardScene extends Scene {
     this.tweens.addCounter({
       from: 0,
       to: 1,
-      duration: Math.max(lit.length * 45, 600),
+      duration: Math.max(lit.length * LOSS_CONNECTION_STAGGER_MS, 600),
       onUpdate: (tween) => {
         this.staticStrength = tween.getValue() ?? 0;
       },
@@ -2557,7 +2563,7 @@ export class BoardScene extends Scene {
     this.tweens.addCounter({
       from: 0,
       to: 0.75,
-      duration: Math.max(lit.length * 45, 600),
+      duration: Math.max(lit.length * LOSS_CONNECTION_STAGGER_MS, 600),
       onUpdate: (tween) => drained.colorMatrix.grayscale(tween.getValue() ?? 0),
     });
 
@@ -2567,12 +2573,12 @@ export class BoardScene extends Scene {
         targets: slot.trace,
         alpha: 0,
         duration: 220,
-        delay: index * 45,
+        delay: index * LOSS_CONNECTION_STAGGER_MS,
         onComplete: () => slot.trace.setAlpha(1).setVisible(false),
       });
     });
 
-    const settled = lit.length * 45 + 320;
+    const settled = lit.length * LOSS_CONNECTION_STAGGER_MS + 320;
 
     this.memoryPanel.fadeTo(0.15, 700, settled * 0.4);
 
@@ -2610,13 +2616,13 @@ export class BoardScene extends Scene {
         targets: slot.trace,
         alpha: 1,
         duration: 260,
-        delay: index * 60,
+        delay: index * WIN_CONNECTION_STAGGER_MS,
       });
     });
 
     this.memoryPanel.fadeTo(1, 900);
 
-    const settled = Math.max(built.length * 60 + 520, FOUND_FLIGHT_END_MS + 400);
+    const settled = Math.max(built.length * WIN_CONNECTION_STAGGER_MS + 520, FOUND_FLIGHT_END_MS + 400);
 
     this.time.delayedCall(settled, this.guarded(() => {
       if (this.runOver !== 'won') {
