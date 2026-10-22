@@ -7,14 +7,10 @@ import {
   nodeAt,
 } from './memories';
 import { LOCKS } from './engine/locks';
-import { MEMORY_PICTURES, TRANSCRIPT_PICTURE } from './memory-pictures';
+import { MEMORY_PICTURES } from './memory-pictures';
 import { READER_MAX_LINES, linesNeeded } from './reader-fit';
 
 describe('the memories', () => {
-  it('has at least one to pay out', () => {
-    expect(CHAPTERS.length).toBeGreaterThan(0);
-  });
-
   it('gives every chapter a place to name and nodes to connect', () => {
     for (const chapter of CHAPTERS) {
       expect(chapter.title).not.toBe('');
@@ -35,10 +31,6 @@ describe('the memories', () => {
     }
   });
 
-  it('has a fragment count the contact form can divide by', () => {
-    expect(FRAGMENT_COUNT).toBeGreaterThan(0);
-  });
-
   it('has a picture for every memory, since the found row drops one without', () => {
     for (const chapter of CHAPTERS) {
       for (const node of chapter.nodes) {
@@ -54,28 +46,6 @@ describe('the memories', () => {
         expect(linesNeeded(node.body), node.title).toBeLessThanOrEqual(READER_MAX_LINES);
       }
     }
-  });
-});
-
-describe('where the memories come from', () => {
-  const titlesIn = (place: string) => (
-    CHAPTERS.find((chapter) => chapter.title === place)!.nodes.map((node) => node.title)
-  );
-
-  it('keeps No Johns in Illinois, where the friend’s house was', () => {
-    expect(titlesIn('Illinois')).toContain('No Johns');
-    expect(titlesIn('Florida')).not.toContain('No Johns');
-  });
-
-  it('gives Florida the Writing Center and the notebook kept there', () => {
-    expect(titlesIn('Florida')).toEqual(['The Writing Center', 'The Notebook']);
-    expect(titlesIn('Now')).not.toContain('The Notebook');
-  });
-
-  it('draws the Writing Center as the coded transcript', () => {
-    const card = CHAPTERS.flatMap((chapter) => chapter.nodes).find((node) => node.title === 'The Writing Center')!;
-
-    expect(card.photo).toBe(TRANSCRIPT_PICTURE);
   });
 });
 

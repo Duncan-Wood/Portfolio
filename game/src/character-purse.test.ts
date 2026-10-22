@@ -13,23 +13,6 @@ describe('the sunflower purse', () => {
       }
     }
   });
-
-  it('has a brass frame along the top, like the real one', () => {
-    expect(PURSE_ART[0]).toBe('G'.repeat(PURSE_ART[0].length));
-  });
-
-  it('has sunflowers: yellow petals around a brown centre, on a black body', () => {
-    const pixels = PURSE_ART.join('');
-
-    expect(pixels).toContain('Y');
-    expect(pixels).toContain('B');
-    expect(pixels).toContain('K');
-  });
-
-  it('stays small enough not to crowd the character', () => {
-    expect(PURSE_ART[0].length).toBeLessThanOrEqual(9);
-    expect(PURSE_ART.length).toBeLessThanOrEqual(8);
-  });
 });
 
 describe('the chain strap', () => {

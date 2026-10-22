@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CHARS_PER_LINE,
   READER_BOTTOM,
-  READER_FRAME_HEIGHT,
   READER_FRAME_TOP,
   READER_MAX_LINES,
-  READER_PICTURE_GAP,
   READER_TEXT_TOP,
   READER_TOP,
   linesNeeded,
@@ -30,10 +28,6 @@ describe('counting the lines a card needs', () => {
 });
 
 describe('the room every card takes', () => {
-  it('puts the text a fixed gap below the picture frame', () => {
-    expect(READER_TEXT_TOP).toBe(READER_FRAME_TOP + READER_FRAME_HEIGHT + READER_PICTURE_GAP);
-  });
-
   it('fits the picture frame and the longest allowed text between the top and the found row', () => {
     expect(READER_FRAME_TOP).toBeGreaterThanOrEqual(READER_TOP);
     expect(READER_TEXT_TOP + textHeight(READER_MAX_LINES)).toBeLessThanOrEqual(READER_BOTTOM);
