@@ -7,10 +7,12 @@ const COMPRESSOR_RATIO = 8;
 const COMPRESSOR_ATTACK_SECONDS = 0.005;
 const COMPRESSOR_RELEASE_SECONDS = 0.2;
 const MUTE_FADE_SECONDS = 0.02;
+const THEME_FADE_SECONDS = 0.05;
 
 export class SoundBoard {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
+  private themeBus: GainNode | null = null;
   private isMuted: boolean;
   private readonly createContext: () => AudioContext;
 
@@ -57,9 +59,37 @@ export class SoundBoard {
   }
 
   play(voice: Voice): void {
+    if (this.master !== null) {
+      this.schedule(voice, this.master);
+    }
+  }
+
+  playTheme(voices: Voice[]): void {
     const context = this.context;
     const master = this.master;
-    if (this.isMuted || context === null || master === null || context.state !== 'running') {
+    if (!this.canSound() || context === null || master === null) {
+      return;
+    }
+
+    this.themeBus?.gain.setTargetAtTime(0, context.currentTime, THEME_FADE_SECONDS);
+
+    const bus = context.createGain();
+    bus.gain.value = 1;
+    bus.connect(master);
+    this.themeBus = bus;
+
+    for (const voice of voices) {
+      this.schedule(voice, bus);
+    }
+  }
+
+  private canSound(): boolean {
+    return !this.isMuted && this.context !== null && this.context.state === 'running';
+  }
+
+  private schedule(voice: Voice, destination: AudioNode): void {
+    const context = this.context;
+    if (!this.canSound() || context === null) {
       return;
     }
 
@@ -84,9 +114,9 @@ export class SoundBoard {
       const panner = context.createStereoPanner();
       panner.pan.setValueAtTime(Math.max(-1, Math.min(1, voice.pan)), startAt);
       envelope.connect(panner);
-      panner.connect(master);
+      panner.connect(destination);
     } else {
-      envelope.connect(master);
+      envelope.connect(destination);
     }
 
     oscillator.start(startAt);

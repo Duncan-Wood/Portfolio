@@ -1081,7 +1081,7 @@ export class BoardScene extends Scene {
     this.soundBoard.play(nodeVoice(Math.max(found - 1, 0), FRAGMENT_COUNT));
     const photo = collectableAt(found - 1)?.photo;
     if (photo !== undefined) {
-      this.soundBoard.playAll(themeFor(photo).map((voice) => ({ ...voice, delay: voice.delay + THEME_AFTER_CHIME_MS })));
+      this.soundBoard.playTheme(themeFor(photo).map((voice) => ({ ...voice, delay: voice.delay + THEME_AFTER_CHIME_MS })));
     }
     this.refreshSheriffCount();
   }
@@ -1321,7 +1321,7 @@ export class BoardScene extends Scene {
     this.readingIndex = index;
     this.focusFrame.setVisible(false);
     if (node.photo !== undefined) {
-      this.soundBoard.playAll(themeFor(node.photo));
+      this.soundBoard.playTheme(themeFor(node.photo));
     }
 
     if (!this.victory.active) {

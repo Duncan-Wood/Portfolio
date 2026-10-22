@@ -262,3 +262,83 @@ describe('muting the sound board', () => {
     expect(masterGain(context)).toBe(0);
   });
 });
+
+describe('memory themes on the sound board', () => {
+  const theme = [plain, { ...plain, startFrequency: 550, endFrequency: 550, delay: 200 }];
+
+  function oscillatorRoutes(context: FakeContext): FakeNode[][] {
+    return context.nodes
+      .filter((node) => node.kind === 'oscillator')
+      .map((oscillator) => reachable(oscillator));
+  }
+
+  function busOf(route: FakeNode[]): FakeNode {
+    return route[2];
+  }
+
+  it('still reaches the speakers through the compressor', () => {
+    const { board, context } = unlockedBoard();
+
+    board.playTheme(theme);
+
+    for (const route of oscillatorRoutes(context)) {
+      expect(route.map((node) => node.kind)).toEqual([
+        'oscillator', 'gain', 'gain', 'gain', 'compressor', 'destination',
+      ]);
+    }
+  });
+
+  it('gives every line of one theme the same bus', () => {
+    const { board, context } = unlockedBoard();
+
+    board.playTheme(theme);
+
+    const buses = new Set(oscillatorRoutes(context).map(busOf));
+    expect(buses.size).toBe(1);
+  });
+
+  it('fades the previous theme out when the next begins, so jingles never stack', () => {
+    const { board, context } = unlockedBoard();
+
+    board.playTheme(theme);
+    board.playTheme(theme);
+
+    const routes = oscillatorRoutes(context);
+    const firstBus = busOf(routes[0]);
+    const secondBus = busOf(routes[theme.length]);
+    expect(firstBus).not.toBe(secondBus);
+    expect(firstBus.gain.value).toBe(0);
+    expect(secondBus.gain.value).toBe(1);
+  });
+
+  it('replays a theme that is asked for again, rather than ignoring the repeat', () => {
+    const { board, context } = unlockedBoard();
+
+    board.playTheme(theme);
+    board.playTheme(theme);
+
+    expect(context.nodes.filter((node) => node.kind === 'oscillator')).toHaveLength(theme.length * 2);
+  });
+
+  it('leaves effects and ambient notes ringing when a theme starts', () => {
+    const { board, context } = unlockedBoard();
+    board.play(plain);
+    const effectRoute = oscillatorRoutes(context)[0];
+
+    board.playTheme(theme);
+
+    expect(effectRoute.map((node) => node.kind)).toEqual([
+      'oscillator', 'gain', 'gain', 'compressor', 'destination',
+    ]);
+    expect(effectRoute[2].gain.value).toBe(masterGain(context));
+  });
+
+  it('plays no theme while muted, and does not build a bus', () => {
+    const { board, context } = unlockedBoard(true);
+
+    board.playTheme(theme);
+
+    expect(context.nodes.filter((node) => node.kind === 'oscillator')).toHaveLength(0);
+    expect(context.nodes.filter((node) => node.kind === 'gain')).toHaveLength(1);
+  });
+});
