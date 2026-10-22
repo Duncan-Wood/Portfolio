@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { type HorizontalDirection, type InputFrame, InputTranslator } from './input-translator';
+import {
+  type HorizontalDirection,
+  type InputFrame,
+  InputTranslator,
+  pressedDirection,
+} from './input-translator';
 
 const TUNING = { autoShiftDelay: 130, autoRepeatInterval: 40 };
 const FRAME = 16;
@@ -198,5 +203,35 @@ describe('telling a fresh press from a held one', () => {
     translator.update(frame({ direction: 1 }), attempt);
 
     expect(fresh).toEqual([true, true]);
+  });
+});
+
+describe('choosing a direction from the left and right keys', () => {
+  const up = { isDown: false, timeDown: 0 };
+  const heldSince = (timeDown: number) => ({ isDown: true, timeDown });
+
+  it('goes nowhere when neither key is held', () => {
+    expect(pressedDirection(up, up)).toBeNull();
+  });
+
+  it('goes left when only left is held', () => {
+    expect(pressedDirection(heldSince(100), up)).toBe(-1);
+  });
+
+  it('goes right when only right is held', () => {
+    expect(pressedDirection(up, heldSince(100))).toBe(1);
+  });
+
+  it('follows the key pressed last when both are held, so a roll from one to the other turns around', () => {
+    expect(pressedDirection(heldSince(100), heldSince(250))).toBe(1);
+    expect(pressedDirection(heldSince(250), heldSince(100))).toBe(-1);
+  });
+
+  it('goes right when both were pressed at the very same moment', () => {
+    expect(pressedDirection(heldSince(100), heldSince(100))).toBe(1);
+  });
+
+  it('ignores how long a released key was last held', () => {
+    expect(pressedDirection({ isDown: false, timeDown: 900 }, heldSince(100))).toBe(1);
   });
 });

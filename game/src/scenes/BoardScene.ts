@@ -91,7 +91,7 @@ import {
   type UnfinishedBusiness,
 } from '../shadow-voice';
 import { FIXED_STEP, FixedTimestep } from '../fixed-timestep';
-import { type HorizontalDirection, InputTranslator } from '../input/input-translator';
+import { type HorizontalDirection, InputTranslator, pressedDirection } from '../input/input-translator';
 import { Overthinking } from '../overthinking';
 import { SwipeControls } from '../input/swipe-controls';
 import { TouchControls } from '../input/touch-controls';
@@ -1540,7 +1540,7 @@ export class BoardScene extends Scene {
 
     this.simulation.softDropping = this.inputTranslator.update(
       {
-        direction: this.pressedDirection(),
+        direction: pressedDirection(this.cursors.left, this.cursors.right),
         softDropHeld: this.cursors.down.isDown,
         newPiece,
         delta,
@@ -1558,20 +1558,6 @@ export class BoardScene extends Scene {
     const muted = this.soundBoard.toggleMute();
     rememberSoundMuted(muted);
     this.soundCommand.setText(soundLabel(muted));
-  }
-
-  private pressedDirection(): HorizontalDirection | null {
-    const { left, right } = this.cursors;
-    if (left.isDown && right.isDown) {
-      return left.timeDown > right.timeDown ? -1 : 1;
-    }
-    if (left.isDown) {
-      return -1;
-    }
-    if (right.isDown) {
-      return 1;
-    }
-    return null;
   }
 
   // Phaser fires pointerup on whatever the finger is over, not on what it

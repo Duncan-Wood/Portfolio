@@ -1,5 +1,23 @@
 export type HorizontalDirection = -1 | 1;
 
+export interface HeldKey {
+  isDown: boolean;
+  timeDown: number;
+}
+
+export function pressedDirection(left: HeldKey, right: HeldKey): HorizontalDirection | null {
+  if (left.isDown && right.isDown) {
+    return left.timeDown > right.timeDown ? -1 : 1;
+  }
+  if (left.isDown) {
+    return -1;
+  }
+  if (right.isDown) {
+    return 1;
+  }
+  return null;
+}
+
 interface InputTuning {
   autoShiftDelay: number;
   autoRepeatInterval: number;
