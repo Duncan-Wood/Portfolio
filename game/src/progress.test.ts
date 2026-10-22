@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   completions,
   forgetAllProgress,
@@ -110,6 +110,27 @@ describe('the memories a player has found', () => {
     held.set('connected.log', '{"title":"The Build"}');
 
     expect(foundFragments()).toEqual([]);
+  });
+
+  it('reads the stored log once however often it is asked, since the scene asks every frame', () => {
+    held.set('connected.log', '[{"title":"The Build"}]');
+    const parse = vi.spyOn(JSON, 'parse');
+
+    foundFragments();
+    foundFragments();
+    foundFragments();
+
+    expect(parse).toHaveBeenCalledTimes(1);
+    parse.mockRestore();
+  });
+
+  it('notices when the stored log changes', () => {
+    held.set('connected.log', '[{"title":"The Build"}]');
+    foundFragments();
+
+    held.set('connected.log', '[{"title":"The Build"},{"title":"No Johns"}]');
+
+    expect(foundFragments()).toEqual([0, 1]);
   });
 });
 

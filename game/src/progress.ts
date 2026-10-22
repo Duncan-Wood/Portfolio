@@ -41,13 +41,24 @@ export function loggedWith(
   return [...next].map((held) => held ?? { title: '' });
 }
 
+let parsedLog: { stored: string; log: SurfacedFragment[] } | null = null;
+
 function readLog(): SurfacedFragment[] {
-  try {
-    const held: unknown = JSON.parse(readStored(LOG_KEY) ?? '[]');
-    return Array.isArray(held) ? held as SurfacedFragment[] : [];
-  } catch {
-    return [];
+  const stored = readStored(LOG_KEY) ?? '[]';
+  if (parsedLog?.stored === stored) {
+    return parsedLog.log;
   }
+
+  let log: SurfacedFragment[] = [];
+  try {
+    const held: unknown = JSON.parse(stored);
+    log = Array.isArray(held) ? held as SurfacedFragment[] : [];
+  } catch {
+    log = [];
+  }
+
+  parsedLog = { stored, log };
+  return log;
 }
 
 export function foundIndices(log: readonly SurfacedFragment[]): number[] {
@@ -117,10 +128,7 @@ export function forgetProgressFromOlderMemories(signature: string): void {
     return;
   }
 
-  for (const key of [LOG_KEY, FRAGMENTS_TOTAL_KEY, RESUME_KEY]) {
-    clearStored(key);
-  }
-
+  forgetRun();
   writeStored(MEMORIES_KEY, signature);
 }
 

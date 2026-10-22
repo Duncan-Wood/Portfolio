@@ -851,33 +851,42 @@ export class BoardScene extends Scene {
     if (this.crashed) {
       if (Input.Keyboard.JustDown(this.restartKey) || this.touch.takeRestart()
         || this.touch.takeDrop()) {
-        this.recoverFromCrash();
+        this.guarded(() => this.recoverFromCrash())();
       }
       return;
     }
 
-    try {
-      this.step(time, delta);
-    } catch (error) {
-      this.crash(error);
-    }
+    this.guarded(() => this.step(time, delta))();
+  }
+
+  private guarded(run: () => void): () => void {
+    return () => {
+      try {
+        run();
+      } catch (error) {
+        this.crash(error);
+      }
+    };
   }
 
   private crash(error: unknown): void {
     this.crashed = true;
     reportCrash(error);
 
-    this.setPaused(false);
-
-    this.endingScreen.showCrash();
-    this.revealCard.coverBoard();
+    try {
+      this.setPaused(false);
+      this.endingScreen.showCrash();
+      this.revealCard.coverBoard();
+    } catch (secondError) {
+      reportCrash(secondError);
+    }
   }
 
   private recoverFromCrash(): void {
-    this.crashed = false;
     this.endingScreen.hideCrash();
     this.revealCard.uncoverBoard();
     this.restart(this.moreToReach);
+    this.crashed = false;
   }
 
   private step(time: number, delta: number): void {
@@ -2582,12 +2591,12 @@ export class BoardScene extends Scene {
 
     this.memoryPanel.fadeTo(0.15, 700, settled * 0.4);
 
-    this.time.delayedCall(settled, () => {
+    this.time.delayedCall(settled, this.guarded(() => {
       if (this.runOver === null) {
         return;
       }
       this.endingScreen.showLost(closingLine(this.unfinishedBusiness()));
-    });
+    }));
   }
 
   private winTheRun(): void {
@@ -2625,13 +2634,13 @@ export class BoardScene extends Scene {
 
     const settled = Math.max(built.length * 60 + 520, FOUND_FLIGHT_END_MS + 400);
 
-    this.time.delayedCall(settled, () => {
+    this.time.delayedCall(settled, this.guarded(() => {
       if (this.runOver !== 'won') {
         return;
       }
 
       this.showVictory();
-    });
+    }));
   }
 
   private unfinishedBusiness(): UnfinishedBusiness {
