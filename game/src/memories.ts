@@ -167,7 +167,15 @@ export function collectionEntries(): MemoryNode[] {
   return CHAPTERS.flatMap((chapter) => chapter.nodes);
 }
 
-export const MEMORY_SIGNATURE = [
-  FRAGMENT_COUNT,
-  ...CHAPTERS.flatMap((chapter) => chapter.nodes.map((node) => node.title)),
-].join('|');
+export function signatureOf(chapters: readonly Chapter[]): string {
+  return chapters
+    .map((chapter) => chapter.nodes.map((node) => {
+      if (node.photo === undefined) {
+        throw new Error(`The memory "${node.title}" has no picture key, so saved progress cannot be matched to it`);
+      }
+      return node.photo;
+    }).join(','))
+    .join('|');
+}
+
+export const MEMORY_SIGNATURE = signatureOf(CHAPTERS);

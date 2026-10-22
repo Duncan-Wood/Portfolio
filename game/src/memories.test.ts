@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   CHAPTERS,
   FRAGMENT_COUNT,
+  MEMORY_SIGNATURE,
   collectableAt,
   collectionEntries,
   nodeAt,
+  signatureOf,
+  type Chapter,
 } from './memories';
 import { LOCKS } from './engine/locks';
 import { MEMORY_PICTURES } from './memory-pictures';
@@ -92,5 +95,50 @@ describe('the collection a player reads from the pause screen', () => {
 
   it('lists an entry for every index, so a row can be drawn from it', () => {
     expect(collectionEntries()).toHaveLength(FRAGMENT_COUNT);
+  });
+});
+
+describe('the signature that tells saved progress it belongs to these memories', () => {
+  const chapters = (...groups: { title: string; photo?: string }[][]): Chapter[] => groups.map((nodes, index) => ({
+    title: `Chapter ${index}`,
+    nodes: nodes.map((node) => ({ ...node, body: 'body' })),
+  }));
+
+  const door = { title: 'PDF Converter', photo: 'the-door' };
+  const hat = { title: 'The Hat', photo: 'the-hat' };
+  const build = { title: 'The Build', photo: 'the-build' };
+
+  it('stays the same when a title or a body is reworded, so a typo fix erases nobody\'s run', () => {
+    const before = chapters([door, hat], [build]);
+    const after = chapters([{ ...door, title: 'PDF Convertor' }, { ...hat, title: 'The hat' }], [build]);
+
+    expect(signatureOf(after)).toBe(signatureOf(before));
+  });
+
+  it('changes when two memories swap places, since progress is kept by position', () => {
+    expect(signatureOf(chapters([hat, door], [build]))).not.toBe(signatureOf(chapters([door, hat], [build])));
+  });
+
+  it('changes when a memory is added or removed', () => {
+    const base = signatureOf(chapters([door, hat]));
+
+    expect(signatureOf(chapters([door, hat, build]))).not.toBe(base);
+    expect(signatureOf(chapters([door]))).not.toBe(base);
+  });
+
+  it('changes when a memory moves from one chapter to another, since each chapter has its own lock', () => {
+    expect(signatureOf(chapters([door], [hat, build]))).not.toBe(signatureOf(chapters([door, hat], [build])));
+  });
+
+  it('changes when a memory is swapped for a different one, even at the same position', () => {
+    expect(signatureOf(chapters([door, hat]))).not.toBe(signatureOf(chapters([door, build])));
+  });
+
+  it('refuses a memory with no picture key, rather than tracking it as the word undefined', () => {
+    expect(() => signatureOf(chapters([door, { title: 'No Picture' }]))).toThrow('No Picture');
+  });
+
+  it('is the one the game really uses, built from every real memory', () => {
+    expect(MEMORY_SIGNATURE).toBe(signatureOf(CHAPTERS));
   });
 });
