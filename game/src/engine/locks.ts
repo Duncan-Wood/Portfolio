@@ -25,8 +25,6 @@ export interface Lock {
 
 export const SEED_ROWS = 3;
 
-// `tiles + shadows + neurons` must fit COLUMNS x SEED_ROWS; overflow is silent
-// and leaves the board unsolvable.
 export const LOCKS: readonly Lock[] = [
   {
     neurons: 2,
@@ -59,8 +57,12 @@ export const LOCKS: readonly Lock[] = [
 ];
 
 export function lockFor(chapterIndex: number): Lock {
-  const index = Math.max(0, Math.min(chapterIndex, LOCKS.length - 1));
-  return LOCKS[index];
+  const lock = LOCKS[chapterIndex];
+  if (lock === undefined) {
+    throw new RangeError(`No lock for chapter ${chapterIndex}; there are ${LOCKS.length}`);
+  }
+
+  return lock;
 }
 
 export function isSolved(_lock: Lock, board: Board): boolean {
@@ -81,6 +83,10 @@ export function seedLock(
   board.reset();
 
   const total = lock.tiles + lock.shadows + lock.neurons;
+  if (total > COLUMNS * SEED_ROWS) {
+    throw new RangeError(`A lock of ${total} pieces does not fit ${COLUMNS} columns of ${SEED_ROWS} rows`);
+  }
+
   const heights = new Array<number>(COLUMNS).fill(0);
 
   for (let placed = 0; placed < total; placed += 1) {
@@ -89,10 +95,6 @@ export function seedLock(
     for (let tried = 0; tried < COLUMNS && heights[column] >= SEED_ROWS; tried += 1) {
       column = (column + 1) % COLUMNS;
     }
-    if (heights[column] >= SEED_ROWS) {
-      break;
-    }
-
     const row = ROWS - 1 - heights[column];
     heights[column] += 1;
 

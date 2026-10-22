@@ -211,13 +211,9 @@ describe('lockFor picks the boards for the chapter being played', () => {
     }
   });
 
-  it('holds on the last lock rather than running off the end', () => {
-    expect(lockFor(LOCKS.length)).toBe(LOCKS[LOCKS.length - 1]);
-    expect(lockFor(LOCKS.length + 99)).toBe(LOCKS[LOCKS.length - 1]);
-  });
-
-  it('holds on the first lock if it is ever asked for a nonsense chapter', () => {
-    expect(lockFor(-1)).toBe(LOCKS[0]);
+  it('refuses a chapter that has no lock, instead of quietly playing another one', () => {
+    expect(() => lockFor(LOCKS.length)).toThrow(RangeError);
+    expect(() => lockFor(-1)).toThrow(RangeError);
   });
 });
 
@@ -259,5 +255,13 @@ describe('how full the memory picture is', () => {
 
   it('follows only the score on a board with no neurons, rather than dividing by zero', () => {
     expect(lockProgress(new Board(), 250, FILL_SCORE)).toBe(0.25);
+  });
+});
+
+describe('seeding a lock that does not fit', () => {
+  it('refuses, instead of leaving a board that cannot be solved', () => {
+    const tooBig = { neurons: 3, shadows: 1, tiles: COLUMNS * SEED_ROWS, fallInterval: 500, fillScore: 100 };
+
+    expect(() => seedLock(new Board(), tooBig, fixed([0.5]))).toThrow(RangeError);
   });
 });
