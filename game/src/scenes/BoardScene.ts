@@ -984,9 +984,7 @@ export class BoardScene extends Scene {
       }
     } else if (this.hitStopRemaining > 0) {
       this.hitStopRemaining -= delta;
-    } else if (this.runOver === 'won') {
-    } else if (this.lockSequence.handingOver && !this.simulation.resolving) {
-    } else {
+    } else if (!this.boardFrozen) {
       for (let step = this.timestep.stepsFor(delta); step > 0; step -= 1) {
         this.simulation.update(FIXED_STEP);
       }
@@ -1050,7 +1048,7 @@ export class BoardScene extends Scene {
     if (paused) {
       this.resetButton.show();
       this.tweens.pauseAll();
-      this.foundMemories.show(this.storyHolding ? [] : this.collected, select);
+      this.foundMemories.show(this.storyHolding ? [] : foundFragments(), select);
       this.startFocus();
     } else {
       this.stopReadingInPause();
@@ -1118,7 +1116,7 @@ export class BoardScene extends Scene {
   }
 
   private showVictory(): void {
-    this.victory.show(this.collected);
+    this.victory.show(foundFragments());
     this.startFocus();
   }
 
@@ -1373,7 +1371,7 @@ export class BoardScene extends Scene {
     }
   }
 
-  private restart(keepMemory = false, keepStory = false): void {
+  private restart(keepMemory = false): void {
     this.setPaused(false);
     this.simulation.restart();
 
@@ -1389,10 +1387,10 @@ export class BoardScene extends Scene {
       popup.setVisible(false);
     }
 
-    this.resetShownState(keepMemory, keepStory);
+    this.resetShownState(keepMemory);
   }
 
-  private resetShownState(keepMemory = false, keepStory = false): void {
+  private resetShownState(keepMemory = false): void {
     this.cellsBeingFilled.clear();
     this.threatenedIndex = null;
 
@@ -1417,9 +1415,7 @@ export class BoardScene extends Scene {
     this.endingScreen.reset();
     this.memoryHandover.reset();
     this.memoryPanel.reset();
-    if (!keepStory) {
-      this.tweens.killAll();
-    }
+    this.tweens.killAll();
     this.staticStrength = 0;
     this.staticOverlay.setVisible(false);
     this.cameras.main.filters.external.clear();
@@ -1429,19 +1425,15 @@ export class BoardScene extends Scene {
       slot.trace.setAlpha(1);
     }
 
-    if (!keepStory) {
-      this.revealCard.reset();
-    }
-    if (!keepStory) {
-      this.objectiveHeld = false;
-      this.tweens.killTweensOf([
-        this.objectiveText, ...this.runReadouts, ...this.previewTiles,
-      ]);
-      for (const part of [
-        this.objectiveText, ...this.runReadouts, ...this.previewTiles,
-      ]) {
-        part.setAlpha(1);
-      }
+    this.revealCard.reset();
+    this.objectiveHeld = false;
+    this.tweens.killTweensOf([
+      this.objectiveText, ...this.runReadouts, ...this.previewTiles,
+    ]);
+    for (const part of [
+      this.objectiveText, ...this.runReadouts, ...this.previewTiles,
+    ]) {
+      part.setAlpha(1);
     }
     this.tweens.killTweensOf(this.cellTiles);
     for (let index = 0; index < this.cellTiles.length; index += 1) {
@@ -1471,10 +1463,8 @@ export class BoardScene extends Scene {
     this.hitStopRemaining = 0;
     this.nextScorePopup = 0;
 
-    if (!keepStory) {
-      this.introCardShowing = null;
-      this.readingIndex = null;
-    }
+    this.introCardShowing = null;
+    this.readingIndex = null;
     this.refreshSheriffCount();
     this.memoryPanel.startOver(this.upcomingPhoto());
 
@@ -1615,6 +1605,10 @@ export class BoardScene extends Scene {
     return this.victory.active ? this.victoryCard : this.revealCard;
   }
 
+  private get boardFrozen(): boolean {
+    return this.runOver === 'won' || (this.lockSequence.handingOver && !this.simulation.resolving);
+  }
+
   private get betweenPlay(): boolean {
     return this.paused || this.card.holding || this.runOver !== null || this.crashed;
   }
@@ -1677,8 +1671,7 @@ export class BoardScene extends Scene {
   }
 
   private checkLock(): void {
-    const lock = lockFor(this.chapterIndex);
-    if (!this.lockSequence.checkSolved(this.sequenceWorld, () => isSolved(lock, this.simulation.board))) {
+    if (!this.lockSequence.checkSolved(this.sequenceWorld, () => isSolved(this.simulation.board))) {
       return;
     }
 
@@ -2236,10 +2229,6 @@ export class BoardScene extends Scene {
       ...popVoice(this.simulation.chainLength - 1),
       pan: poppedAt === null ? 0 : panForX(poppedAt),
     });
-  }
-
-  private get collected(): number[] {
-    return foundFragments();
   }
 
   private reachNeurons(lit: readonly NeuronSite[]): void {

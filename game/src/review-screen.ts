@@ -14,7 +14,6 @@ export const REVIEW_COLUMNS = 110;
 export const REVIEW_ROWS = 64;
 
 export const DECISIONS: readonly Decision[] = ['accept', 'reject', 'edit', 'accept', 'accept'];
-export const EDIT_ROW = DECISIONS.indexOf('edit');
 
 const BACKGROUND_MARK = '7';
 const HEADER_MARK = '3';

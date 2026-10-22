@@ -65,7 +65,7 @@ export function lockFor(chapterIndex: number): Lock {
   return lock;
 }
 
-export function isSolved(_lock: Lock, board: Board): boolean {
+export function isSolved(board: Board): boolean {
   return allLit(board);
 }
 

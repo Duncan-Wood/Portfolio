@@ -41,7 +41,7 @@ describe('a lock is a board with something to work out', () => {
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.05, 0.35, 0.65, 0.95, 0.15, 0.55]));
 
-    expect(isSolved(LOCKS[0], board)).toBe(false);
+    expect(isSolved(board)).toBe(false);
   });
 
   it('rests everything it seeds on the floor, with no floating tiles', () => {
@@ -85,12 +85,12 @@ describe('a lock is a board with something to work out', () => {
   it('is solved when the last neuron lights, and not before', () => {
     const board = new Board();
     seedLock(board, LOCKS[0], fixed([0.3, 0.7, 0.5]));
-    expect(isSolved(LOCKS[0], board)).toBe(false);
+    expect(isSolved(board)).toBe(false);
 
     const sites = neuronsOn(board);
     sites.forEach((site, index) => {
       lightAdjacent(board, [{ column: site.column, row: site.row - 1 }]);
-      expect(isSolved(LOCKS[0], board)).toBe(index === sites.length - 1);
+      expect(isSolved(board)).toBe(index === sites.length - 1);
     });
   });
 
@@ -104,7 +104,7 @@ describe('a lock is a board with something to work out', () => {
 
     expect(unlitCount(board)).toBe(0);
     expect(cellsOn(board).some((cell) => isShadow(cell.piece))).toBe(true);
-    expect(isSolved(WITH_SHADOWS, board)).toBe(true);
+    expect(isSolved(board)).toBe(true);
   });
 
   it('opens on a lock with nothing opposing the player', () => {
@@ -199,7 +199,7 @@ describe('the run escalates across the memory it is unlocking', () => {
 
       expect(cells.filter((cell) => isNeuron(cell.piece))).toHaveLength(lock.neurons);
       expect(cells.filter((cell) => isShadow(cell.piece))).toHaveLength(lock.shadows);
-      expect(isSolved(lock, board)).toBe(false);
+      expect(isSolved(board)).toBe(false);
     }
   });
 });

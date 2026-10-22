@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   DECISIONS,
-  EDIT_ROW,
   REVIEW_COLUMNS,
   REVIEW_LOOP,
   REVIEW_ROWS,
@@ -82,7 +81,7 @@ describe('the reviewer working down the rows', () => {
   it('keeps the machine’s guess beside the correction on the edited row', () => {
     const grid = drawReview(REVIEW_COLUMNS, REVIEW_ROWS, STILL_MOMENT).rows;
     const base = drawReviewBase(REVIEW_COLUMNS, REVIEW_ROWS).rows;
-    const top = 14 + EDIT_ROW * 9;
+    const top = 14 + DECISIONS.indexOf('edit') * 9;
     const cell = (rows: readonly string[]) => rows.slice(top, top + 8).map((row) => row.slice(50, 90)).join('');
 
     expect(cell(base)).toContain('6');
