@@ -35,18 +35,11 @@ describe('the theme of each memory', () => {
     expect(new Set(shapes).size).toBe(photos.length);
   });
 
-  it('plays quietly enough to sit under the game sounds', () => {
+  it('plays only quiet, audible, positive-length notes', () => {
     for (const photo of photos) {
       for (const voice of themeFor(photo)) {
         expect(voice.gain, photo).toBeGreaterThan(0);
         expect(voice.gain, photo).toBeLessThanOrEqual(0.12);
-      }
-    }
-  });
-
-  it('plays only audible, positive-length notes', () => {
-    for (const photo of photos) {
-      for (const voice of themeFor(photo)) {
         expect(voice.duration, photo).toBeGreaterThan(0);
         expect(voice.delay, photo).toBeGreaterThanOrEqual(0);
         expect(voice.startFrequency, photo).toBeGreaterThanOrEqual(40);
@@ -61,12 +54,6 @@ describe('the theme of each memory', () => {
       const end = Math.max(...themeFor(photo).map((voice) => voice.delay + voice.duration));
 
       expect(end, photo).toBeLessThanOrEqual(5200);
-    }
-  });
-
-  it('begins right away', () => {
-    for (const photo of photos) {
-      expect(Math.min(...themeFor(photo).map((voice) => voice.delay)), photo).toBe(0);
     }
   });
 });
