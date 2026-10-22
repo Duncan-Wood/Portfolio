@@ -7,6 +7,7 @@ import {
   WALK_SPEED,
   advanceSparks,
   ambientPulseAt,
+  driftingStars,
   seededRandom,
   sparkSample,
   spawnSparks,
@@ -246,5 +247,44 @@ describe('the cowboy walking the trunk', () => {
     const stepped = walkAfter(standingAt(10), 50, 100, lit);
 
     expect(stepped.at).toBeCloseTo(10 + 100 * WALK_SPEED, 5);
+  });
+});
+
+describe('the stars drifting behind the tree', () => {
+  it('is a handful, not a crowd', () => {
+    expect(driftingStars(0).length).toBeGreaterThanOrEqual(8);
+    expect(driftingStars(0).length).toBeLessThanOrEqual(20);
+  });
+
+  it('stays on the screen as it drifts', () => {
+    for (const time of [0, 5000, 61000, 987654]) {
+      for (const star of driftingStars(time)) {
+        expect(star.x).toBeGreaterThanOrEqual(0);
+        expect(star.x).toBeLessThanOrEqual(SKY_WIDTH);
+        expect(star.y).toBeGreaterThanOrEqual(0);
+        expect(star.y).toBeLessThanOrEqual(SKY_HEIGHT);
+      }
+    }
+  });
+
+  it('drifts slowly, under a dozen pixels in a second', () => {
+    const before = driftingStars(10000);
+    const after = driftingStars(11000);
+
+    before.forEach((star, index) => {
+      const moved = Math.hypot(after[index].x - star.x, after[index].y - star.y);
+      expect(moved).toBeLessThan(12);
+    });
+  });
+
+  it('twinkles within a visible range, never fully dark or fully lit', () => {
+    for (const star of driftingStars(4321)) {
+      expect(star.alpha).toBeGreaterThan(0.05);
+      expect(star.alpha).toBeLessThan(0.9);
+    }
+  });
+
+  it('is the same sky at the same moment', () => {
+    expect(driftingStars(777)).toEqual(driftingStars(777));
   });
 });

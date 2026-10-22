@@ -190,3 +190,34 @@ export function walkAfter(walker: Walker, target: number, elapsed: number, isLit
 
   return { at, facing: direction, walking: at !== target };
 }
+
+const DRIFTING_STAR_COUNT = 14;
+const DRIFT_SEED = 4093;
+const DRIFT_PER_MS = 0.004;
+const TWINKLE_PER_MS = 0.0011;
+
+interface DriftingStar {
+  x: number;
+  y: number;
+  alpha: number;
+}
+
+const drifters = (() => {
+  const next = seededRandom(DRIFT_SEED);
+
+  return Array.from({ length: DRIFTING_STAR_COUNT }, () => ({
+    x: next() * SKY_WIDTH,
+    y: next() * SKY_HEIGHT,
+    sway: next() * Math.PI * 2,
+    phase: next() * Math.PI * 2,
+    speed: 0.6 + next() * 0.8,
+  }));
+})();
+
+export function driftingStars(time: number): DriftingStar[] {
+  return drifters.map(({ x, y, sway, phase, speed }) => ({
+    x: x + Math.sin(time * 0.0003 + sway) * 14,
+    y: ((y - time * DRIFT_PER_MS * speed) % SKY_HEIGHT + SKY_HEIGHT) % SKY_HEIGHT,
+    alpha: 0.35 + 0.25 * Math.sin(time * TWINKLE_PER_MS * speed + phase),
+  }));
+}

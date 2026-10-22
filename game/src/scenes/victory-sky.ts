@@ -21,6 +21,7 @@ import {
   SPARK_REACH,
   advanceSparks,
   ambientPulseAt,
+  driftingStars,
   seededRandom,
   sparkSample,
   spawnSparks,
@@ -60,6 +61,11 @@ const PLACE_COLORS: Readonly<Record<string, string>> = {
 };
 
 const DUST_COUNT = 110;
+const HALO_RINGS = 9;
+const HALO_COLOR = 0x4a2a7a;
+const HALO_ALPHA = 0.045;
+const HALO_RADIUS = 360;
+const HALO_CENTER = { x: 330, y: 500 };
 const DUST_SEED = 1987;
 const AMBIENT_LIGHTS = 3;
 
@@ -299,6 +305,12 @@ export class VictorySky {
   private scatterDust(width: number): void {
     const next = seededRandom(DUST_SEED);
 
+    for (let ring = 0; ring < HALO_RINGS; ring += 1) {
+      const reach = 1 - ring / HALO_RINGS;
+      this.dust.fillStyle(HALO_COLOR, HALO_ALPHA);
+      this.dust.fillCircle(HALO_CENTER.x, HALO_CENTER.y, HALO_RADIUS * reach);
+    }
+
     for (let drawn = 0; drawn < DUST_COUNT; drawn += 1) {
       const x = next() * width;
       const y = next() * SKY_HEIGHT;
@@ -415,6 +427,11 @@ export class VictorySky {
     }
 
     this.drawTendrils(time);
+
+    for (const star of driftingStars(time)) {
+      this.live.fillStyle(0xd9c8ff, star.alpha);
+      this.live.fillRect(star.x, star.y, 2, 2);
+    }
 
     for (let light = 0; light < AMBIENT_LIGHTS; light += 1) {
       const sample = SKY_TRUNK[ambientPulseAt(time, light, AMBIENT_LIGHTS)];
