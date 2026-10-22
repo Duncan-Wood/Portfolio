@@ -130,6 +130,9 @@ export const TOUCH_PRIMARY = typeof matchMedia === 'function'
 const REDUCED_MOTION = typeof matchMedia === 'function'
   && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// Must match the media query that shows #turn-upright in `index.html`.
+const TURN_UPRIGHT_QUERY = '(pointer: coarse) and (orientation: landscape) and (max-height: 599px)';
+
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
 const CONTACT_URL = '/#contact';
 const soundLabel = (muted: boolean) => (muted ? 'sound off' : 'sound on');
@@ -431,6 +434,7 @@ export class BoardScene extends Scene {
   private memoryHandover: MemoryHandover;
 
   private crashed = false;
+  private turnedAway = false;
 
   private sideCommands: Phaser.GameObjects.Text[] = [];
   private soundCommand: Phaser.GameObjects.Text;
@@ -678,6 +682,12 @@ export class BoardScene extends Scene {
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
+    if (typeof matchMedia === 'function') {
+      matchMedia(TURN_UPRIGHT_QUERY).addEventListener('change', (event) => {
+        this.turnedAway = event.matches;
+      });
+    }
+
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         this.soundBoard.resumeIfStopped();
@@ -912,6 +922,13 @@ export class BoardScene extends Scene {
   }
 
   private step(time: number, delta: number): void {
+    if (this.turnedAway) {
+      this.turnedAway = false;
+      if (this.readingIndex === null && !this.victory.active && this.runOver !== 'won') {
+        this.setPaused(true);
+      }
+    }
+
     if (Input.Keyboard.JustDown(this.pauseKey) || this.touch.takePause()) {
       if (this.readingIndex !== null) {
         this.closeReading();
