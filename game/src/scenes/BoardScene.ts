@@ -127,6 +127,7 @@ export const TOUCH_PRIMARY = typeof matchMedia === 'function'
   && matchMedia('(pointer: coarse)').matches;
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
+const CONTACT_URL = '/#contact';
 const soundLabel = (muted: boolean) => (muted ? 'sound off' : 'sound on');
 const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
@@ -235,6 +236,10 @@ function centerOfColumn(column: number): number {
 
 function centerOfRow(row: number): number {
   return ORIGIN_Y + (row - FIRST_VISIBLE_ROW) * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+}
+
+function centerOfSite(site: NeuronSite): { x: number; y: number } {
+  return { x: centerOfColumn(site.column), y: centerOfRow(site.row) };
 }
 
 // Not a mask: Phaser 4's `setMask` compiles, runs, and leaves the tile drawn in full.
@@ -759,9 +764,7 @@ export class BoardScene extends Scene {
         });
       }
     });
-    this.onPress(this.victory.contactButton, () => {
-      window.location.href = '/#contact';
-    });
+    this.onPress(this.victory.contactButton, () => this.openContact());
     this.onPress(this.victory.playAgainButton, () => {
       this.playAgainPressed = true;
     });
@@ -1293,7 +1296,7 @@ export class BoardScene extends Scene {
     }
 
     if (button === this.victory.contactButton) {
-      window.location.href = '/#contact';
+      this.openContact();
     } else if (button === this.victory.playAgainButton) {
       this.playAgain();
     } else if (button === this.victory.resetButton.text) {
@@ -1554,6 +1557,10 @@ export class BoardScene extends Scene {
     );
   }
 
+  private openContact(): void {
+    window.location.href = CONTACT_URL;
+  }
+
   private toggleSound(): void {
     const muted = this.soundBoard.toggleMute();
     rememberSoundMuted(muted);
@@ -1668,22 +1675,17 @@ export class BoardScene extends Scene {
       }
     }
 
-    const centre = (site: NeuronSite) => ({
-      x: centerOfColumn(site.column),
-      y: centerOfRow(site.row),
-    });
-
     if (this.litNeurons.length > 1) {
       this.neuronThread.lineStyle(3, TRACK_LIT_COLOR, 0.85);
       this.neuronThread.beginPath();
-      const first = centre(this.litNeurons[0]);
+      const first = centerOfSite(this.litNeurons[0]);
       this.neuronThread.moveTo(first.x, first.y);
       for (const site of this.litNeurons.slice(1)) {
-        const at = centre(site);
+        const at = centerOfSite(site);
         this.neuronThread.lineTo(at.x, at.y);
       }
       this.neuronThread.strokePath();
-      this.drawSurge(this.litNeurons.map(centre));
+      this.drawSurge(this.litNeurons.map(centerOfSite));
     }
 
     if (this.litNeurons.length === 0) {
@@ -1696,8 +1698,8 @@ export class BoardScene extends Scene {
       return;
     }
 
-    const from = centre(this.litNeurons[this.litNeurons.length - 1]);
-    const to = centre(dark);
+    const from = centerOfSite(this.litNeurons[this.litNeurons.length - 1]);
+    const to = centerOfSite(dark);
     const span = Math.hypot(to.x - from.x, to.y - from.y);
     const steps = Math.max(Math.floor(span / 14), 1);
 
