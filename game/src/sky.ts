@@ -86,15 +86,15 @@ function buildTrunk(): TrunkSample[] {
     const [before, from, to, after] = [padded[at - 1], padded[at], padded[at + 1], padded[at + 2]];
 
     for (let step = 0; step < SAMPLES_PER_SEGMENT; step += 1) {
-      const t = step / SAMPLES_PER_SEGMENT;
+      const fraction = step / SAMPLES_PER_SEGMENT;
       const blend = (axis: 'x' | 'y'): number => 0.5 * (
         2 * from[axis]
-        + (-before[axis] + to[axis]) * t
-        + (2 * before[axis] - 5 * from[axis] + 4 * to[axis] - after[axis]) * t * t
-        + (-before[axis] + 3 * from[axis] - 3 * to[axis] + after[axis]) * t * t * t
+        + (-before[axis] + to[axis]) * fraction
+        + (2 * before[axis] - 5 * from[axis] + 4 * to[axis] - after[axis]) * fraction * fraction
+        + (-before[axis] + 3 * from[axis] - 3 * to[axis] + after[axis]) * fraction * fraction * fraction
       );
 
-      samples.push({ x: blend('x'), y: blend('y'), along: from.along + (to.along - from.along) * t });
+      samples.push({ x: blend('x'), y: blend('y'), along: from.along + (to.along - from.along) * fraction });
     }
   }
 
@@ -126,10 +126,10 @@ export function nearestTrunkSample(point: SkyPoint, reach: number): number {
   return nearest;
 }
 
-const meets = (a: Rect, b: Rect): boolean => a.left < b.right + LABEL_CLEARANCE
-  && a.right > b.left - LABEL_CLEARANCE
-  && a.top < b.bottom + LABEL_CLEARANCE
-  && a.bottom > b.top - LABEL_CLEARANCE;
+const meets = (rect: Rect, other: Rect): boolean => rect.left < other.right + LABEL_CLEARANCE
+  && rect.right > other.left - LABEL_CLEARANCE
+  && rect.top < other.bottom + LABEL_CLEARANCE
+  && rect.bottom > other.top - LABEL_CLEARANCE;
 
 export function labelSpot(index: number, width: number): { left: number; top: number } {
   const { x, y } = SKY_CELLS[index];

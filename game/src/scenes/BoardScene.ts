@@ -1720,13 +1720,13 @@ export class BoardScene extends Scene {
 
     this.neuronThread.lineStyle(2, TRACK_LIT_COLOR, 0.22);
     for (let step = 0; step < steps; step += 2) {
-      const a = step / steps;
-      const b = Math.min((step + 1) / steps, 1);
+      const dashStart = step / steps;
+      const dashEnd = Math.min((step + 1) / steps, 1);
       this.neuronThread.lineBetween(
-        from.x + (to.x - from.x) * a,
-        from.y + (to.y - from.y) * a,
-        from.x + (to.x - from.x) * b,
-        from.y + (to.y - from.y) * b,
+        from.x + (to.x - from.x) * dashStart,
+        from.y + (to.y - from.y) * dashStart,
+        from.x + (to.x - from.x) * dashEnd,
+        from.y + (to.y - from.y) * dashEnd,
       );
     }
   }

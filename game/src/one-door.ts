@@ -117,20 +117,22 @@ function place(design: Design, column: number, side: Shape['side'], from: number
 
 export function doorwayScene(elapsed: number): Shape[] {
   const shapes: Shape[] = [];
-  const kindOf = (n: number): Design => FILE_KINDS[((n % FILE_KINDS.length) + FILE_KINDS.length) % FILE_KINDS.length];
+  const kindOf = (fileNumber: number): Design => FILE_KINDS[
+    ((fileNumber % FILE_KINDS.length) + FILE_KINDS.length) % FILE_KINDS.length
+  ];
 
   const firstFile = Math.ceil((elapsed - FILE_TRAVEL) / FILE_EVERY);
-  for (let n = firstFile; n * FILE_EVERY <= elapsed; n += 1) {
-    const design = kindOf(n);
-    const progress = (elapsed - n * FILE_EVERY) / FILE_TRAVEL;
+  for (let fileNumber = firstFile; fileNumber * FILE_EVERY <= elapsed; fileNumber += 1) {
+    const design = kindOf(fileNumber);
+    const progress = (elapsed - fileNumber * FILE_EVERY) / FILE_TRAVEL;
     const column = Math.round(-design.width + (DOOR_LEFT + design.width) * progress);
     shapes.push(...place(design, column, 'file', 0, DOOR_LEFT));
   }
 
   const pageDelay = FILE_TRAVEL + DOOR_TIME;
   const firstPage = Math.ceil((elapsed - pageDelay - PAGE_TRAVEL) / FILE_EVERY);
-  for (let n = firstPage; n * FILE_EVERY + pageDelay <= elapsed; n += 1) {
-    const progress = (elapsed - n * FILE_EVERY - pageDelay) / PAGE_TRAVEL;
+  for (let pageNumber = firstPage; pageNumber * FILE_EVERY + pageDelay <= elapsed; pageNumber += 1) {
+    const progress = (elapsed - pageNumber * FILE_EVERY - pageDelay) / PAGE_TRAVEL;
     const start = DOOR_RIGHT - PAGE.width;
     const column = Math.round(start + (DOOR_COLUMNS - start) * progress);
     shapes.push(...place(PAGE, column, 'page', DOOR_RIGHT, DOOR_COLUMNS));

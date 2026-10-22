@@ -101,13 +101,21 @@ export function seedLock(
 
   const reachable = (column: number, row: number): number => {
     let count = 0;
-    for (const step of [{ c: 1, r: 0 }, { c: -1, r: 0 }, { c: 0, r: 1 }, { c: 0, r: -1 }]) {
-      const c = column + step.c;
-      const r = row + step.r;
-      if (c < 0 || c >= COLUMNS || r < FIRST_VISIBLE_ROW || r >= ROWS) {
+    for (const step of [
+      { columnStep: 1, rowStep: 0 },
+      { columnStep: -1, rowStep: 0 },
+      { columnStep: 0, rowStep: 1 },
+      { columnStep: 0, rowStep: -1 },
+    ]) {
+      const neighbourColumn = column + step.columnStep;
+      const neighbourRow = row + step.rowStep;
+      if (
+        neighbourColumn < 0 || neighbourColumn >= COLUMNS
+        || neighbourRow < FIRST_VISIBLE_ROW || neighbourRow >= ROWS
+      ) {
         continue;
       }
-      const piece = board.pieceAt(c, r);
+      const piece = board.pieceAt(neighbourColumn, neighbourRow);
       if (isNeuron(piece) || isShadow(piece)) {
         continue;
       }
@@ -135,7 +143,7 @@ export function seedLock(
         const openAbove = row === FIRST_VISIBLE_ROW || board.isEmpty(column, row - 1);
         const spread = neurons.length === 0
           ? 0
-          : Math.min(...neurons.map((n) => Math.abs(n.column - column) * 2 + Math.abs(n.row - row)));
+          : Math.min(...neurons.map((neuron) => Math.abs(neuron.column - column) * 2 + Math.abs(neuron.row - row)));
         const score = (openAbove ? 24 : 0) + spread * 3 + room;
         if (score > bestScore) {
           bestScore = score;
