@@ -19,6 +19,19 @@
     <meta property="og:image:alt" content="Connected — the part a resume leaves out" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://duncanwoodpro.netlify.app/og-game.png" />
+    <noscript>
+      <style>
+        #loading,
+        #game-container {
+          display: none !important;
+        }
+
+        body > noscript {
+          display: flex;
+          flex: 1;
+        }
+      </style>
+    </noscript>
     <style>
       /* `background` must match GROUND_COLOR in `src/palette.ts`. */
       html,
@@ -84,7 +97,23 @@
         color: #c98cff;
       }
 
-      #no-webgl {
+      #loading {
+        position: fixed;
+        inset: 0;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        font-family: monospace;
+        font-size: 14px;
+        color: #9481aa;
+      }
+
+      #loading:not([hidden]) {
+        display: flex;
+      }
+
+      #no-webgl,
+      #needs-javascript {
         flex: 1;
         flex-direction: column;
         align-items: center;
@@ -99,6 +128,10 @@
       }
 
       #no-webgl:not([hidden]) {
+        display: flex;
+      }
+
+      #needs-javascript {
         display: flex;
       }
 
@@ -126,6 +159,13 @@
   </head>
   <body>
     <div id="game-container"></div>
+    <div id="loading">loading…</div>
+    <noscript>
+      <div id="needs-javascript">
+        <div>This game needs JavaScript.</div>
+        <div>Use the link to the standard version of the site.</div>
+      </div>
+    </noscript>
     <div id="no-webgl" hidden>
       <div>This game needs WebGL, and this browser is not offering it.</div>
       <div>Try another browser, or use the link to the standard version of the site.</div>

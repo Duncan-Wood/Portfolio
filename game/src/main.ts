@@ -41,6 +41,7 @@ if (webglSupported()) {
   const game = new Game(config);
 
   game.events.once('ready', () => {
+    document.getElementById('loading')!.hidden = true;
     game.canvas.setAttribute('role', 'img');
     game.canvas.setAttribute(
       'aria-label',
@@ -50,6 +51,7 @@ if (webglSupported()) {
     );
   });
 } else {
+  document.getElementById('loading')!.hidden = true;
   document.getElementById('game-container')!.hidden = true;
   document.getElementById('no-webgl')!.hidden = false;
 }
