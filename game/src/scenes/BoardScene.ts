@@ -2636,7 +2636,7 @@ export class BoardScene extends Scene {
   private unfinishedBusiness(): UnfinishedBusiness {
     const at = nodeAt(this.nodesRevealed);
     if (at === null) {
-      return { reaching: null, connectionsShort: 0 };
+      throw new Error('The board was lost with no memory left to reach');
     }
 
     return {

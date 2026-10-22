@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { collectionEntries } from './memories';
 import {
   ARRIVALS_BETWEEN_LINES,
   CONNECTION_LOST,
   REACH_OUT_LINE,
-  SHADOW_CLOSING_LINE,
   SHADOW_OPENING_LINE,
   SHADOW_LINES,
   closingLine,
@@ -80,7 +80,9 @@ describe('the writing itself', () => {
     }
 
     expect(CONNECTION_LOST.length).toBeLessThanOrEqual(24);
-    expect(SHADOW_CLOSING_LINE.length).toBeLessThanOrEqual(56);
+    for (const { title } of collectionEntries()) {
+      expect(closingLine({ reaching: title, connectionsShort: 99 }).length, title).toBeLessThanOrEqual(56);
+    }
     expect(SHADOW_OPENING_LINE.length).toBeLessThanOrEqual(48);
     expect(RECOVERED_LINE.length).toBeLessThanOrEqual(150);
     expect(REACH_OUT_LINE.length).toBeLessThanOrEqual(32);
@@ -88,21 +90,22 @@ describe('the writing itself', () => {
 });
 
 describe('what a lost run says it lost', () => {
-  it('names the fragment the run was reaching for, and how close it got', () => {
-    const line = closingLine({ reaching: 'The Hat', connectionsShort: 3 });
-
-    expect(line).toContain('The Hat');
-    expect(line).toContain('3');
+  it('names the fragment the run was reaching for and how close it got, and says nothing else', () => {
+    expect(closingLine({ reaching: 'The Hat', connectionsShort: 3 })).toBe('3 connections short of The Hat.');
   });
 
-  it('says something different when the run was one connection away', () => {
-    expect(closingLine({ reaching: 'My Voice', connectionsShort: 1 }))
-      .not.toContain('1 connections');
+  it('says one connection, not 1 connections', () => {
+    expect(closingLine({ reaching: 'My Voice', connectionsShort: 1 })).toBe('One connection short of My Voice.');
   });
 
-  it('falls back to the thesis when there was nothing left to reach for', () => {
-    expect(closingLine({ reaching: null, connectionsShort: 0 }))
-      .toBe(SHADOW_CLOSING_LINE);
+  it('is never the same line for two different runs', () => {
+    const lines = [
+      closingLine({ reaching: 'The Hat', connectionsShort: 3 }),
+      closingLine({ reaching: 'The Hat', connectionsShort: 4 }),
+      closingLine({ reaching: 'The Build', connectionsShort: 3 }),
+    ];
+
+    expect(new Set(lines).size).toBe(lines.length);
   });
 });
 

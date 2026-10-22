@@ -31,8 +31,6 @@ export const OVERTHINKING_LINE = 'You’re overthinking it.';
 
 export const CONNECTION_LOST = 'CONNECTION LOST';
 
-export const SHADOW_CLOSING_LINE = 'That is usually where it stops.';
-
 export const SHADOW_OPENING_LINE = 'You stopped here before.';
 
 export const STILL_CONNECTED = 'STILL CONNECTED';
@@ -44,20 +42,16 @@ export const RECOVERED_LINE = 'Everything I’ve built started with a connection
 export const REACH_OUT_LINE = 'reach out to me';
 
 export interface UnfinishedBusiness {
-  reaching: string | null;
+  reaching: string;
   connectionsShort: number;
 }
 
 export function closingLine({ reaching, connectionsShort }: UnfinishedBusiness): string {
-  if (reaching === null) {
-    return SHADOW_CLOSING_LINE;
-  }
-
   const distance = connectionsShort <= 1
     ? 'One connection'
     : `${connectionsShort} connections`;
 
-  return `${distance} short of ${reaching}. That is usually where it stops.`;
+  return `${distance} short of ${reaching}.`;
 }
 
 const TIER_THRESHOLDS = [0, 5, 12];
