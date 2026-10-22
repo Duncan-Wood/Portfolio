@@ -29,6 +29,9 @@ function fakeParam() {
   return {
     value: 0,
     setValueAtTime() {},
+    setTargetAtTime(this: { value: number }, target: number) {
+      this.value = target;
+    },
     linearRampToValueAtTime() {},
     exponentialRampToValueAtTime() {},
   };
@@ -62,9 +65,9 @@ const plain: Voice = {
   waveform: 'sine', startFrequency: 440, endFrequency: 440, duration: 100, gain: 0.1, delay: 0,
 };
 
-function unlockedBoard() {
+function unlockedBoard(muted = false) {
   const context = new FakeContext();
-  const board = new SoundBoard(() => context as unknown as AudioContext);
+  const board = new SoundBoard({ createContext: () => context as unknown as AudioContext, muted });
   board.unlock();
   return { board, context };
 }
@@ -117,7 +120,7 @@ describe('the sound board routing', () => {
   it('plays nothing until the context is running', () => {
     const context = new FakeContext();
     context.state = 'suspended';
-    const board = new SoundBoard(() => context as unknown as AudioContext);
+    const board = new SoundBoard({ createContext: () => context as unknown as AudioContext });
     board.unlock();
 
     board.play(plain);
@@ -164,9 +167,11 @@ describe('the sound board coming back after the browser stops the audio', () => 
 
   it('does not build a context before the first gesture, which the browser would start suspended', () => {
     let built = 0;
-    const board = new SoundBoard(() => {
-      built++;
-      return new FakeContext() as unknown as AudioContext;
+    const board = new SoundBoard({
+      createContext: () => {
+        built++;
+        return new FakeContext() as unknown as AudioContext;
+      },
     });
 
     board.resumeIfStopped();
@@ -181,5 +186,79 @@ describe('the sound board coming back after the browser stops the audio', () => 
     board.resumeIfStopped();
 
     expect(context.resumeCalls).toBe(0);
+  });
+});
+
+function masterGain(context: FakeContext): number {
+  const master = context.nodes.find((node) => node.outputs.some((output) => output.kind === 'compressor'));
+  return master!.gain.value;
+}
+
+describe('muting the sound board', () => {
+  it('starts unmuted', () => {
+    expect(unlockedBoard().board.muted).toBe(false);
+  });
+
+  it('starts muted when the player chose that last time', () => {
+    const { board, context } = unlockedBoard(true);
+
+    expect(board.muted).toBe(true);
+    expect(masterGain(context)).toBe(0);
+  });
+
+  it('says whether it is now muted when toggled', () => {
+    const { board } = unlockedBoard();
+
+    expect(board.toggleMute()).toBe(true);
+    expect(board.toggleMute()).toBe(false);
+  });
+
+  it('silences notes already ringing, music and effects alike', () => {
+    const { board, context } = unlockedBoard();
+    board.play(plain);
+    const before = masterGain(context);
+
+    board.toggleMute();
+
+    expect(before).toBeGreaterThan(0);
+    expect(masterGain(context)).toBe(0);
+  });
+
+  it('brings the volume back to where it was when unmuted', () => {
+    const { board, context } = unlockedBoard();
+    const before = masterGain(context);
+
+    board.toggleMute();
+    board.toggleMute();
+
+    expect(masterGain(context)).toBe(before);
+  });
+
+  it('builds no voices while muted', () => {
+    const { board, context } = unlockedBoard(true);
+
+    board.play(plain);
+    board.playAll([plain, plain]);
+
+    expect(context.nodes.filter((node) => node.kind === 'oscillator')).toHaveLength(0);
+  });
+
+  it('plays again once unmuted', () => {
+    const { board, context } = unlockedBoard(true);
+    board.toggleMute();
+
+    board.play(plain);
+
+    expect(context.nodes.filter((node) => node.kind === 'oscillator')).toHaveLength(1);
+  });
+
+  it('remembers a mute chosen before the first gesture, when no context exists yet', () => {
+    const context = new FakeContext();
+    const board = new SoundBoard({ createContext: () => context as unknown as AudioContext });
+
+    board.toggleMute();
+    board.unlock();
+
+    expect(masterGain(context)).toBe(0);
   });
 });

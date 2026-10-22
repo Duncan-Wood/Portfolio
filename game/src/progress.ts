@@ -10,6 +10,7 @@ const LOG_KEY = 'connected.log';
 const RESUME_KEY = 'connected.resume';
 const INTRO_SEEN_KEY = 'connected.introSeen';
 const COMPLETIONS_KEY = 'connected.completions';
+const SOUND_MUTED_KEY = 'connected.soundMuted';
 
 export function playedBefore(): boolean {
   return readStored(PLAYED_KEY) === 'true';
@@ -25,6 +26,14 @@ export function introSeen(): boolean {
 
 export function rememberIntroSeen(): void {
   writeStored(INTRO_SEEN_KEY, 'true');
+}
+
+export function soundMuted(): boolean {
+  return readStored(SOUND_MUTED_KEY) === 'true';
+}
+
+export function rememberSoundMuted(muted: boolean): void {
+  writeStored(SOUND_MUTED_KEY, String(muted));
 }
 
 export interface SurfacedFragment {

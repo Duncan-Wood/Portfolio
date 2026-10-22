@@ -14,7 +14,9 @@ import {
   resumePoint,
   runFinished,
   playedBefore,
+  rememberSoundMuted,
   setFoundMemories,
+  soundMuted,
 } from './progress';
 
 describe('resumePoint', () => {
@@ -286,6 +288,51 @@ describe('a player starting over', () => {
     ]) {
       expect(held.has(key)).toBe(false);
     }
+  });
+});
+
+describe('whether a player muted the sound', () => {
+  const held = new Map<string, string>();
+
+  beforeEach(() => {
+    held.clear();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => held.get(key) ?? null,
+        setItem: (key: string, value: string) => held.set(key, value),
+        removeItem: (key: string) => held.delete(key),
+      },
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('plays sound on a first visit', () => {
+    expect(soundMuted()).toBe(false);
+  });
+
+  it('stays muted on the next visit', () => {
+    rememberSoundMuted(true);
+
+    expect(soundMuted()).toBe(true);
+  });
+
+  it('plays sound again once unmuted', () => {
+    rememberSoundMuted(true);
+    rememberSoundMuted(false);
+
+    expect(soundMuted()).toBe(false);
+  });
+
+  it('stays muted when a player erases their progress, since that is a setting and not progress', () => {
+    rememberSoundMuted(true);
+
+    forgetAllProgress();
+
+    expect(soundMuted()).toBe(true);
   });
 });
 

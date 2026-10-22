@@ -83,8 +83,10 @@ import {
   rememberIntroSeen,
   rememberPlayed,
   rememberResume,
+  rememberSoundMuted,
   resumeAt,
   runFinished,
+  soundMuted,
 } from '../progress';
 import { type IntroControls, introCards } from '../intro';
 import { neighbourOf } from '../sky';
@@ -132,6 +134,7 @@ export const TOUCH_PRIMARY = typeof matchMedia === 'function'
   && matchMedia('(pointer: coarse)').matches;
 
 const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
+const soundLabel = (muted: boolean) => (muted ? 'sound off' : 'sound on');
 const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
@@ -175,12 +178,14 @@ const MEMORY_BOX = {
   height: 300,
 };
 
-const SHERIFF_COUNT_Y = MEMORY_BOX.top + MEMORY_BOX.height + 12;
+const SOUND_ROW_HEIGHT = TOUCH_PRIMARY ? 46 : 0;
+const SHERIFF_COUNT_Y = MEMORY_BOX.top + MEMORY_BOX.height + 12 - SOUND_ROW_HEIGHT;
 
 const SIDE_COMMAND_WIDTH = (MEMORY_BOX.width - SIDE_COMMAND_GAP) / 2;
 const SIDE_COMMAND_Y = ORIGIN_Y + BOARD_HEIGHT - 34;
 const CHARACTER_X = MEMORY_BOX.left + MEMORY_BOX.width / 2;
-const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42;
+const SOUND_COMMAND_Y = SIDE_COMMAND_Y - 61;
+const CHARACTER_BOTTOM = SIDE_COMMAND_Y - 42 - SOUND_ROW_HEIGHT;
 const ABOVE_PAUSE_SCRIM = 10;
 const THOUGHT_OFFSET_X = 52;
 const THOUGHT_OFFSET_Y = 176;
@@ -428,6 +433,7 @@ export class BoardScene extends Scene {
   private crashed = false;
 
   private sideCommands: Phaser.GameObjects.Text[] = [];
+  private soundCommand: Phaser.GameObjects.Text;
 
   private nodesRevealed = 0;
 
@@ -448,7 +454,7 @@ export class BoardScene extends Scene {
 
   private shownBeats = 0;
 
-  private readonly soundBoard = new SoundBoard();
+  private readonly soundBoard = new SoundBoard({ muted: soundMuted() });
   private ambient = STILL_AMBIENT;
   private shownToppedOut = false;
 
@@ -605,29 +611,42 @@ export class BoardScene extends Scene {
       );
     }
 
+    const commandX = (index: number) =>
+      MEMORY_BOX.left + SIDE_COMMAND_WIDTH / 2 + index * (SIDE_COMMAND_WIDTH + SIDE_COMMAND_GAP);
+    const commandStyle = {
+      fontFamily: 'monospace',
+      fontSize: '16px',
+      color: '#9d86b8',
+      backgroundColor: '#2b1644',
+      align: 'center',
+      fixedWidth: SIDE_COMMAND_WIDTH,
+      padding: { y: 24 },
+    };
+
     if (TOUCH_PRIMARY) {
       this.sideCommands = (['pause', 'restart'] as const).map((action, index) => {
         const command = this.add
-          .text(
-            MEMORY_BOX.left + SIDE_COMMAND_WIDTH / 2 + index * (SIDE_COMMAND_WIDTH + SIDE_COMMAND_GAP),
-            SIDE_COMMAND_Y,
-            action,
-            {
-              fontFamily: 'monospace',
-              fontSize: '16px',
-              color: '#9d86b8',
-              backgroundColor: '#2b1644',
-              align: 'center',
-              fixedWidth: SIDE_COMMAND_WIDTH,
-              padding: { y: 24 },
-            },
-          )
+          .text(commandX(index), SIDE_COMMAND_Y, action, commandStyle)
           .setOrigin(0.5, 0.5)
           .setInteractive({ useHandCursor: true });
 
         return this.onPress(command, () => this.touch.press(action));
       });
     }
+
+    this.soundCommand = this.add
+      .text(
+        CHARACTER_X,
+        TOUCH_PRIMARY ? SOUND_COMMAND_Y : SIDE_COMMAND_Y,
+        soundLabel(this.soundBoard.muted),
+        TOUCH_PRIMARY
+          ? { ...commandStyle, fontSize: '14px', fixedWidth: MEMORY_BOX.width, padding: { y: 10 } }
+          : { fontFamily: 'monospace', fontSize: '14px', color: '#9d86b8', padding: { x: 10, y: 8 } },
+      )
+      .setOrigin(0.5, 0.5)
+      .setInteractive({ useHandCursor: true });
+    this.onPress(this.soundCommand, () => this.toggleSound());
+    this.sideCommands.push(this.soundCommand);
 
     this.character = this.add.image(CHARACTER_X, CHARACTER_BOTTOM, characterTexture('idle', 0))
       .setOrigin(0.5, 1);
@@ -654,7 +673,7 @@ export class BoardScene extends Scene {
     this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
     this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
     this.enterKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ENTER);
-    this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.M).on('down', () => this.soundBoard.toggleMusic());
+    this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.M).on('down', () => this.toggleSound());
     this.resetKeys = [Input.Keyboard.KeyCodes.BACKSPACE, Input.Keyboard.KeyCodes.DELETE]
       .map((code) => this.input.keyboard!.addKey(code));
 
@@ -1062,7 +1081,7 @@ export class BoardScene extends Scene {
     this.soundBoard.play(nodeVoice(Math.max(found - 1, 0), FRAGMENT_COUNT));
     const photo = collectableAt(found - 1)?.photo;
     if (photo !== undefined) {
-      this.soundBoard.playMusic(themeFor(photo).map((voice) => ({ ...voice, delay: voice.delay + THEME_AFTER_CHIME_MS })));
+      this.soundBoard.playAll(themeFor(photo).map((voice) => ({ ...voice, delay: voice.delay + THEME_AFTER_CHIME_MS })));
     }
     this.refreshSheriffCount();
   }
@@ -1302,7 +1321,7 @@ export class BoardScene extends Scene {
     this.readingIndex = index;
     this.focusFrame.setVisible(false);
     if (node.photo !== undefined) {
-      this.soundBoard.playMusic(themeFor(node.photo));
+      this.soundBoard.playAll(themeFor(node.photo));
     }
 
     if (!this.victory.active) {
@@ -1543,6 +1562,12 @@ export class BoardScene extends Scene {
         return this.shift(direction);
       },
     );
+  }
+
+  private toggleSound(): void {
+    const muted = this.soundBoard.toggleMute();
+    rememberSoundMuted(muted);
+    this.soundCommand.setText(soundLabel(muted));
   }
 
   private pressedDirection(): HorizontalDirection | null {
@@ -2127,7 +2152,7 @@ export class BoardScene extends Scene {
   private advanceAmbient(delta: number): void {
     const { clock, voices } = ambientAfter(this.ambient, delta, foundFragments().length);
     this.ambient = clock;
-    this.soundBoard.playMusic(voices);
+    this.soundBoard.playAll(voices);
   }
 
   private advanceCharacter(delta: number): void {
