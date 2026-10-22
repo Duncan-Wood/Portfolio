@@ -47,6 +47,7 @@ import {
 import { PURSE_CENTER } from '../character-purse';
 import { STILL_AMBIENT, ambientAfter } from '../audio/ambient';
 import { themeFor } from '../audio/memory-themes';
+import { LockSequence, type SequenceWorld } from '../lock-sequence';
 import { revealNextNode } from '../reveal';
 import { RevealCard } from './reveal-card';
 import { FOUND_FLIGHT_END_MS, MemoryPanel, type FlightHooks } from './memory-panel';
@@ -56,9 +57,7 @@ import { MemoryReader } from './memory-reader';
 import { VictorySky } from './victory-sky';
 import { MemoryHandover } from './memory-handover';
 import {
-  advanceHandover,
   stageLength,
-  stagesBegun,
   type HandoverStage,
 } from '../handover';
 import { PressTwiceButton } from './press-twice-button';
@@ -315,9 +314,7 @@ export class BoardScene extends Scene {
   private showFps = false;
   private objectiveText: Phaser.GameObjects.Text;
 
-  private lockSolved = false;
 
-  private handoverElapsed: number | null = null;
 
   private litNeurons: NeuronSite[] = [];
 
@@ -439,9 +436,7 @@ export class BoardScene extends Scene {
 
   private sheriffCount: Phaser.GameObjects.Text;
 
-  private revealPending = false;
 
-  private lastRevealPiece = -1;
 
   private revealCard: RevealCard;
   private victoryCard: RevealCard;
@@ -452,6 +447,7 @@ export class BoardScene extends Scene {
 
   private shownBeats = 0;
 
+  private readonly lockSequence = new LockSequence();
   private readonly soundBoard = new SoundBoard({ muted: soundMuted() });
   private ambient = STILL_AMBIENT;
   private shownToppedOut = false;
@@ -969,7 +965,7 @@ export class BoardScene extends Scene {
     } else if (this.hitStopRemaining > 0) {
       this.hitStopRemaining -= delta;
     } else if (this.runOver === 'won') {
-    } else if (this.handoverElapsed !== null && !this.simulation.resolving) {
+    } else if (this.lockSequence.handingOver && !this.simulation.resolving) {
     } else {
       for (let step = this.timestep.stepsFor(delta); step > 0; step -= 1) {
         this.simulation.update(FIXED_STEP);
@@ -1383,6 +1379,7 @@ export class BoardScene extends Scene {
       this.nodesRevealed = resumeAt(FRAGMENT_COUNT);
     }
 
+    this.lockSequence.reset();
     this.startLock();
     this.simulation.shadowHeld = this.nodesRevealed === 0;
 
@@ -1454,11 +1451,9 @@ export class BoardScene extends Scene {
     this.nextScorePopup = 0;
 
     if (!keepStory) {
-      this.revealPending = false;
       this.introCardShowing = null;
       this.readingIndex = null;
     }
-    this.lastRevealPiece = -1;
     this.refreshSheriffCount();
     this.memoryPanel.startOver(this.upcomingPhoto());
 
@@ -1649,8 +1644,6 @@ export class BoardScene extends Scene {
 
   private startLock(): void {
     const lock = lockFor(this.chapterIndex);
-    this.lockSolved = false;
-    this.handoverElapsed = null;
     this.tuning.fallInterval = lock.fallInterval;
     seedLock(this.simulation.board, lock, Math.random);
     this.litNeurons = [];
@@ -1668,22 +1661,19 @@ export class BoardScene extends Scene {
     return `${CHAPTERS[this.chapterIndex].title}  \u00b7  ${objective}`;
   }
 
+  private get sequenceWorld(): SequenceWorld {
+    return { resolving: this.simulation.resolving, storyHolding: this.storyHolding };
+  }
+
   private checkLock(): void {
-    if (this.lockSolved || this.simulation.resolving || this.storyHolding) {
-      return;
-    }
-
     const lock = lockFor(this.chapterIndex);
-    if (!isSolved(lock, this.simulation.board)) {
+    if (!this.lockSequence.checkSolved(this.sequenceWorld, () => isSolved(lock, this.simulation.board))) {
       return;
     }
 
-    this.lockSolved = true;
     this.threadSurge = { whole: true, progress: 0, duration: stageLength('settle') };
     this.objectiveText.setText(this.whereYouAre('open'));
     this.tweens.add({ targets: this.objectiveText, alpha: 0.45, duration: 400 });
-
-    this.revealPending = true;
   }
 
   private drawNeuronThread(delta: number): void {
@@ -1747,18 +1737,7 @@ export class BoardScene extends Scene {
       return;
     }
 
-    if (!this.lockSolved || this.storyHolding) {
-      return;
-    }
-
-    const settled = !this.simulation.resolving && !this.revealPending;
-    const before = this.handoverElapsed ?? -1;
-    const elapsed = this.handoverElapsed === null
-      ? 0
-      : advanceHandover(this.handoverElapsed, delta, settled);
-    this.handoverElapsed = elapsed;
-
-    for (const stage of stagesBegun(before, elapsed)) {
+    for (const stage of this.lockSequence.advance(delta, this.sequenceWorld)) {
       this.beginHandoverStage(stage);
     }
   }
@@ -2101,18 +2080,9 @@ export class BoardScene extends Scene {
   }
 
   private surfaceBankedFragment(): void {
-    if (
-      !this.revealPending
-      || this.simulation.resolving
-      || this.storyHolding
-      || this.simulation.piecesLocked <= this.lastRevealPiece
-    ) {
-      return;
+    if (this.lockSequence.takeReveal(this.sequenceWorld)) {
+      this.surfaceNextNode();
     }
-
-    this.revealPending = false;
-    this.lastRevealPiece = this.simulation.piecesLocked;
-    this.surfaceNextNode();
   }
 
   private surfaceNextNode(): void {
