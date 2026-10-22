@@ -18,8 +18,6 @@ export interface Lock {
   shadows: number;
   tiles: number;
   fallInterval: number;
-
-  /** Score that fills the memory picture. Solving fills it regardless. */
   fillScore: number;
 }
 

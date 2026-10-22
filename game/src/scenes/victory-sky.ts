@@ -139,7 +139,6 @@ export class VictorySky {
         useHandCursor: true,
       }));
 
-    // The scrim sits above the stars for input, so hovering has to be worked out here.
     scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.wasTouch || pointer.isDown) {
         this.aim(pointer);

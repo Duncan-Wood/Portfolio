@@ -27,7 +27,6 @@ export class Board {
     return !this.isInside(column, row) || !this.isEmpty(column, row);
   }
 
-  // Throws rather than ignoring a bad write; callers ask first via `fits`.
   place(column: number, row: number, pieceType: number): void {
     if (!this.isInside(column, row)) {
       throw new RangeError(`Cannot place a piece outside the board at ${column},${row}`);

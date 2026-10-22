@@ -50,8 +50,7 @@ export const DEFAULT_TUNING: Tuning = {
   shakeRollDegrees: 0.22,
 };
 
-// Canvas units, not screen pixels: Phaser reports pointers in the 620x900 space
-// however the display scales it, so one column here stays one column everywhere.
+// Canvas units, not screen pixels: Phaser reports pointers in the 620x900 space whatever the display scale.
 export const SWIPE_TUNING: SwipeTuning = {
   columnDistance: 68,
   tapMaxDistance: 14,
