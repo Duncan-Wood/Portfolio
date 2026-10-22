@@ -1109,7 +1109,7 @@ export class BoardScene extends Scene {
         : 0;
 
     if (direction !== 0) {
-      const next = neighbourOf(foundFragments(), reading, direction);
+      const next = neighbourOf(foundFragments(), reading, direction === 1 ? -1 : 1);
       if (next !== reading) {
         this.openFound(next);
       }

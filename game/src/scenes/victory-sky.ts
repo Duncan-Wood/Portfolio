@@ -283,7 +283,7 @@ export class VictorySky {
       return;
     }
 
-    this.selectedAt = Math.max(0, Math.min(this.shown.length - 1, this.selectedAt + direction));
+    this.selectedAt = Math.max(0, Math.min(this.shown.length - 1, this.selectedAt - direction));
     this.highlight();
   }
 
