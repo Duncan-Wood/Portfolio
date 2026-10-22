@@ -102,6 +102,78 @@ describe('a clear beside a shadow', () => {
   });
 });
 
+describe('a chain reaching further into the shadow with every link', () => {
+  const bottom = ROWS - 1;
+
+  const redRowWithShadowAt = (column: number, row: number) => {
+    const board = new Board();
+    for (let at = 0; at < 4; at += 1) {
+      board.place(at, bottom, RED);
+    }
+    board.place(column, row, shadowCell(BLUE));
+    return board;
+  };
+
+  const wasPurified = (board: Board, column: number, row: number) => !isShadow(board.pieceAt(column, row));
+
+  it('takes only the shadow beside a clear on the first link', () => {
+    const diagonal = redRowWithShadowAt(4, bottom - 1);
+    clearStep(diagonal, 0);
+
+    expect(wasPurified(diagonal, 4, bottom - 1)).toBe(false);
+  });
+
+  it('takes the shadow touching a clear at a corner from the second link', () => {
+    const board = redRowWithShadowAt(4, bottom - 1);
+    clearStep(board, 1);
+
+    expect(wasPurified(board, 4, bottom - 1)).toBe(true);
+  });
+
+  it('leaves a shadow two cells away alone on the second link', () => {
+    const board = redRowWithShadowAt(5, bottom);
+    clearStep(board, 1);
+
+    expect(wasPurified(board, 5, bottom)).toBe(false);
+  });
+
+  it('takes a shadow two cells away from the third link', () => {
+    const board = redRowWithShadowAt(5, bottom);
+    clearStep(board, 2);
+
+    expect(wasPurified(board, 5, bottom)).toBe(true);
+  });
+
+  it('takes a shadow two cells away on a diagonal too, from the third link', () => {
+    const board = redRowWithShadowAt(5, bottom - 2);
+    clearStep(board, 2);
+
+    expect(wasPurified(board, 5, bottom - 2)).toBe(true);
+  });
+
+  it('never reaches three cells, however long the chain', () => {
+    const board = redRowWithShadowAt(0, bottom - 3);
+    clearStep(board, 9);
+
+    expect(wasPurified(board, 0, bottom - 3)).toBe(false);
+  });
+
+  it('reports every shadow cell it took, with the colour it gave back', () => {
+    const board = redRowWithShadowAt(4, bottom - 1);
+
+    const link = clearStep(board, 1);
+
+    expect(link?.shadowPurified).toEqual([{ column: 4, row: bottom - 1, turnedTo: BLUE }]);
+  });
+
+  it('behaves as the first link when no link number is given', () => {
+    const board = redRowWithShadowAt(4, bottom - 1);
+    clearStep(board);
+
+    expect(wasPurified(board, 4, bottom - 1)).toBe(false);
+  });
+});
+
 describe('what the shadow is reaching for', () => {
   const simulation = () => new Simulation(() => [RED, BLUE], DEFAULT_TUNING);
 

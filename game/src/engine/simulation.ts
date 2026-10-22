@@ -204,7 +204,7 @@ export class Simulation {
       return;
     }
 
-    const link = clearStep(this.board);
+    const link = clearStep(this.board, this.chainLength);
     if (link === null) {
       this.resolving = false;
       this.spawnOrTopOut();

@@ -61,7 +61,7 @@ export function findGroups(board: Board): Group[] {
   return groups;
 }
 
-export function clearStep(board: Board): ChainLink | null {
+export function clearStep(board: Board, linkIndex = 0): ChainLink | null {
   const groups = findGroups(board);
   if (groups.length === 0) {
     return null;
@@ -75,7 +75,7 @@ export function clearStep(board: Board): ChainLink | null {
     }
   }
 
-  const purified = purifyShadow(board, groups);
+  const purified = purifyShadow(board, groups, linkIndex);
 
   const cleared = groups.flatMap((group) => group.cells);
   const neuronsLit = lightAdjacent(board, cleared);
@@ -83,12 +83,31 @@ export function clearStep(board: Board): ChainLink | null {
   return { groups, cellsCleared, shadowPurified: purified, neuronsLit };
 }
 
-function purifyShadow(board: Board, groups: Group[]): ShadowHit[] {
+function shadowReach(linkIndex: number): { column: number; row: number }[] {
+  if (linkIndex === 0) {
+    return NEIGHBOURS;
+  }
+
+  const distance = linkIndex === 1 ? 1 : 2;
+  const offsets: { column: number; row: number }[] = [];
+  for (let column = -distance; column <= distance; column += 1) {
+    for (let row = -distance; row <= distance; row += 1) {
+      if (column !== 0 || row !== 0) {
+        offsets.push({ column, row });
+      }
+    }
+  }
+
+  return offsets;
+}
+
+function purifyShadow(board: Board, groups: Group[], linkIndex: number): ShadowHit[] {
   const touched = new Map<number, GroupCell>();
+  const reach = shadowReach(linkIndex);
 
   for (const group of groups) {
     for (const cell of group.cells) {
-      for (const step of NEIGHBOURS) {
+      for (const step of reach) {
         const column = cell.column + step.column;
         const row = cell.row + step.row;
         const key = row * COLUMNS + column;
