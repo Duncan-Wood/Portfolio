@@ -1,4 +1,4 @@
-type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
+export type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 export interface Voice {
   waveform: Waveform;
@@ -32,11 +32,11 @@ export function popVoice(linkIndex: number): Voice {
 
 export function landVoice(): Voice {
   return {
-    waveform: 'sine',
-    startFrequency: 180,
-    endFrequency: 120,
-    duration: 60,
-    gain: 0.12,
+    waveform: 'sawtooth',
+    startFrequency: 190,
+    endFrequency: 70,
+    duration: 90,
+    gain: 0.14,
     delay: 0,
   };
 }

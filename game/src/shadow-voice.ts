@@ -27,33 +27,31 @@ export const SHADOW_LINES: readonly (readonly string[])[] = [
   ],
 ];
 
-export const CONNECTION_LOST = 'CONNECTION LOST';
+export const OVERTHINKING_LINE = 'You’re overthinking it.';
 
-export const SHADOW_CLOSING_LINE = 'That is usually where it stops.';
+export const CONNECTION_LOST = 'CONNECTION LOST';
 
 export const SHADOW_OPENING_LINE = 'You stopped here before.';
 
 export const STILL_CONNECTED = 'STILL CONNECTED';
 
-export const RECOVERED_LINE = 'Nothing in a mind connects itself.';
+export const RECOVERED_LINE = 'Everything I’ve built started with a connection to '
+  + 'someone. I don’t know where my life goes next, but I’d like to hear what '
+  + 'you’re working on.';
 
 export const REACH_OUT_LINE = 'reach out to me';
 
 export interface UnfinishedBusiness {
-  reaching: string | null;
+  reaching: string;
   connectionsShort: number;
 }
 
 export function closingLine({ reaching, connectionsShort }: UnfinishedBusiness): string {
-  if (reaching === null) {
-    return SHADOW_CLOSING_LINE;
-  }
-
   const distance = connectionsShort <= 1
     ? 'One connection'
     : `${connectionsShort} connections`;
 
-  return `${distance} short of ${reaching}. That is usually where it stops.`;
+  return `${distance} short of ${reaching}.`;
 }
 
 const TIER_THRESHOLDS = [0, 5, 12];
@@ -64,7 +62,12 @@ export function shadowLine(
   cellsHeld: number,
   arrivalsSinceSpoken: number,
   spoken: readonly string[],
+  overthinking = false,
 ): string | null {
+  if (overthinking && !spoken.includes(OVERTHINKING_LINE)) {
+    return OVERTHINKING_LINE;
+  }
+
   if (arrivalsSinceSpoken < ARRIVALS_BETWEEN_LINES) {
     return null;
   }

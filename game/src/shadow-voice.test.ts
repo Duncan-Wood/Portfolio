@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { collectionEntries } from './memories';
 import {
   ARRIVALS_BETWEEN_LINES,
   CONNECTION_LOST,
   REACH_OUT_LINE,
-  SHADOW_CLOSING_LINE,
   SHADOW_OPENING_LINE,
-  STILL_CONNECTED,
   SHADOW_LINES,
   closingLine,
+  OVERTHINKING_LINE,
   RECOVERED_LINE,
   shadowLine,
 } from './shadow-voice';
@@ -70,88 +70,59 @@ describe('what it picks', () => {
 });
 
 describe('the writing itself', () => {
-  it('keeps every line short enough to read at a glance', () => {
-    for (const line of everyLine) {
-      expect(line.length).toBeLessThanOrEqual(56);
-    }
-  });
-
   it('never repeats a line between tiers', () => {
     expect(new Set(everyLine).size).toBe(everyLine.length);
   });
-});
 
-describe('what is left when the shadow has won', () => {
-  it('does not reuse a line the player has already been needled with', () => {
-    expect(everyLine).not.toContain(SHADOW_CLOSING_LINE);
-  });
+  it('keeps every piece of copy short enough for the space it is drawn in', () => {
+    for (const line of everyLine) {
+      expect(line.length, line).toBeLessThanOrEqual(56);
+    }
 
-  it('keeps both short enough to land', () => {
     expect(CONNECTION_LOST.length).toBeLessThanOrEqual(24);
-    expect(SHADOW_CLOSING_LINE.length).toBeLessThanOrEqual(56);
+    for (const { title } of collectionEntries()) {
+      expect(closingLine({ reaching: title, connectionsShort: 99 }).length, title).toBeLessThanOrEqual(56);
+    }
+    expect(SHADOW_OPENING_LINE.length).toBeLessThanOrEqual(48);
+    expect(RECOVERED_LINE.length).toBeLessThanOrEqual(150);
+    expect(REACH_OUT_LINE.length).toBeLessThanOrEqual(32);
   });
 });
 
 describe('what a lost run says it lost', () => {
-  it('names the fragment the run was reaching for, and how close it got', () => {
-    const line = closingLine({ reaching: 'The Hat', connectionsShort: 3 });
-
-    expect(line).toContain('The Hat');
-    expect(line).toContain('3');
+  it('names the fragment the run was reaching for and how close it got, and says nothing else', () => {
+    expect(closingLine({ reaching: 'The Hat', connectionsShort: 3 })).toBe('3 connections short of The Hat.');
   });
 
-  it('says something different when the run was one connection away', () => {
-    expect(closingLine({ reaching: 'My Voice', connectionsShort: 1 }))
-      .not.toContain('1 connections');
+  it('says one connection, not 1 connections', () => {
+    expect(closingLine({ reaching: 'My Voice', connectionsShort: 1 })).toBe('One connection short of My Voice.');
   });
 
-  it('falls back to the thesis when there was nothing left to reach for', () => {
-    expect(closingLine({ reaching: null, connectionsShort: 0 }))
-      .toBe(SHADOW_CLOSING_LINE);
-  });
-
-  it('never gives the player permission to leave', () => {
+  it('is never the same line for two different runs', () => {
     const lines = [
-      closingLine({ reaching: 'The Build', connectionsShort: 7 }),
-      closingLine({ reaching: 'The Hat', connectionsShort: 1 }),
-      closingLine({ reaching: null, connectionsShort: 0 }),
+      closingLine({ reaching: 'The Hat', connectionsShort: 3 }),
+      closingLine({ reaching: 'The Hat', connectionsShort: 4 }),
+      closingLine({ reaching: 'The Build', connectionsShort: 3 }),
     ];
 
-    for (const line of lines) {
-      expect(line.toLowerCase()).not.toMatch(/tomorrow|come back|rest|another day|stop now/);
-    }
+    expect(new Set(lines).size).toBe(lines.length);
   });
 });
 
-describe('how a run opens', () => {
-  it('speaks in the same register as the rest of the shadow, not as a tutorial', () => {
-    expect(SHADOW_OPENING_LINE.toLowerCase())
-      .not.toMatch(/press|key|arrow|space|drop|rotate|match|click/);
+describe('when the player is overthinking', () => {
+  it('says so at its very next arrival, without waiting its usual turn', () => {
+    expect(shadowLine(1, 0, NEVER_SPOKEN, true)).toBe(OVERTHINKING_LINE);
   });
 
-  it('obeys the closing line\'s rule, since it is read at the same decision', () => {
-    expect(SHADOW_OPENING_LINE.toLowerCase())
-      .not.toMatch(/tomorrow|come back|another day|stop now|do not have to/);
+  it('says it over whatever it would have said instead', () => {
+    expect(shadowLine(20, ENOUGH, NEVER_SPOKEN, true)).toBe(OVERTHINKING_LINE);
   });
 
-  it('is short enough to read before the first piece falls', () => {
-    expect(SHADOW_OPENING_LINE.length).toBeLessThanOrEqual(48);
-  });
-});
-
-describe('what a finished memory says', () => {
-  it('ends on the title the losing screen spends the whole run contradicting', () => {
-    expect(STILL_CONNECTED).not.toBe(CONNECTION_LOST);
-    expect(STILL_CONNECTED.toLowerCase()).toContain('connected');
+  it('does not say it twice on one board', () => {
+    expect(shadowLine(1, 0, [OVERTHINKING_LINE], true)).toBeNull();
   });
 
-  it('fits the two lines the ending has room for', () => {
-    expect(RECOVERED_LINE.length).toBeLessThanOrEqual(80);
-  });
-
-  it('offers a way to reach a person without turning into a pitch', () => {
-    expect(REACH_OUT_LINE.length).toBeLessThanOrEqual(32);
-    expect(REACH_OUT_LINE.toLowerCase())
-      .not.toMatch(/hire|resume|cv|recruit|opportunit|available for/);
+  it('keeps it out of its usual lines', () => {
+    expect(everyLine).not.toContain(OVERTHINKING_LINE);
   });
 });

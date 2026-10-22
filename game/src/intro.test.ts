@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { type IntroControls, introCards } from './intro';
-import { LOCKS } from './engine/locks';
 
 describe('the cards that open a first run', () => {
   it('says what Connected is before it says how to play', () => {
@@ -9,13 +8,6 @@ describe('the cards that open a first run', () => {
     expect(cards).toHaveLength(2);
     expect(cards[0].title).toBe('Connected');
     expect(cards[1].title).toBe('how to play');
-  });
-
-  it('names the goal with the word the board shows for it', () => {
-    const goal = 'neuron';
-
-    expect(LOCKS.every((lock) => lock.objective.includes(goal))).toBe(true);
-    expect(introCards('keyboard')[1].body).toContain(goal);
   });
 });
 

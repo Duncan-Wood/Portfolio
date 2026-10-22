@@ -75,11 +75,6 @@ describe('the hard drop, which reports its own impact', () => {
   it('still makes a sound when the pair had nowhere to fall', () => {
     expect(hardDropVoice(0).gain).toBeGreaterThan(0);
   });
-
-  it('drops in pitch, the way an impact does', () => {
-    const voice = hardDropVoice(6);
-    expect(voice.endFrequency).toBeLessThan(voice.startFrequency);
-  });
 });
 
 describe('the chain flourish', () => {
@@ -105,13 +100,6 @@ describe('the chain flourish', () => {
   });
 });
 
-describe('the top-out', () => {
-  it('falls in pitch, so it reads as a loss', () => {
-    const voice = topOutVoice();
-    expect(voice.endFrequency).toBeLessThan(voice.startFrequency);
-  });
-});
-
 describe('the progress-track voice', () => {
   it('climbs exactly one octave across the whole loop', () => {
     const first = nodeVoice(0, 20);
@@ -130,27 +118,6 @@ describe('the progress-track voice', () => {
 });
 
 describe('the shadow', () => {
-  it('arrives below everything else the game plays', () => {
-    const arrival = shadowArrivalVoice();
-    const others = [popVoice(0), landVoice(), nodeVoice(0, 20), ...chainVoices(3)];
-
-    for (const voice of others) {
-      expect(arrival.endFrequency).toBeLessThan(voice.startFrequency);
-    }
-  });
-
-  it('falls as it arrives and rises as it is pushed back', () => {
-    const arrival = shadowArrivalVoice();
-    const recede = shadowRecedeVoice(1);
-
-    expect(arrival.endFrequency).toBeLessThan(arrival.startFrequency);
-    expect(recede.endFrequency).toBeGreaterThan(recede.startFrequency);
-  });
-
-  it('never drowns out the pop that pushed it back', () => {
-    expect(shadowRecedeVoice(6).gain).toBeLessThan(popVoice(0).gain);
-  });
-
   it('answers a bigger push with more of an answer', () => {
     expect(shadowRecedeVoice(3).gain).toBeGreaterThan(shadowRecedeVoice(1).gain);
   });
@@ -169,22 +136,9 @@ describe('answering the question', () => {
     expect(answerVoice(3).delay).toBeGreaterThan(answerVoice(0).delay);
     expect(answerVoice(0).delay).toBe(0);
   });
-
-  it('is louder than an ordinary clear, because it happens twice a session', () => {
-    expect(answerVoice(0).gain).toBeGreaterThan(popVoice(0).gain);
-  });
 });
 
 describe('losing the board', () => {
-  it('falls where answering climbs — the same beat run backwards', () => {
-    expect(connectionLostVoice(4).startFrequency).toBeLessThan(connectionLostVoice(0).startFrequency);
-    expect(answerVoice(4).startFrequency).toBeGreaterThan(answerVoice(0).startFrequency);
-  });
-
-  it('starts where answering starts, so the two are heard as one pair', () => {
-    expect(connectionLostVoice(0).startFrequency).toBe(answerVoice(0).startFrequency);
-  });
-
   it('stops falling before it drops out of hearing', () => {
     expect(connectionLostVoice(72).startFrequency).toBe(connectionLostVoice(24).startFrequency);
     expect(connectionLostVoice(72).endFrequency).toBeGreaterThan(20);

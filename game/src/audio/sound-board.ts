@@ -1,24 +1,95 @@
 import { type Voice } from './voices';
 
+const MASTER_GAIN = 0.45;
+const COMPRESSOR_THRESHOLD_DB = -18;
+const COMPRESSOR_KNEE_DB = 10;
+const COMPRESSOR_RATIO = 8;
+const COMPRESSOR_ATTACK_SECONDS = 0.005;
+const COMPRESSOR_RELEASE_SECONDS = 0.2;
+const MUTE_FADE_SECONDS = 0.02;
+const THEME_FADE_SECONDS = 0.05;
+
 export class SoundBoard {
   private context: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private themeBus: GainNode | null = null;
+  private isMuted: boolean;
+  private readonly createContext: () => AudioContext;
+
+  constructor(options: { createContext?: () => AudioContext; muted?: boolean } = {}) {
+    this.createContext = options.createContext ?? (() => new AudioContext());
+    this.isMuted = options.muted ?? false;
+  }
 
   // Must be called from a keypress, not scene creation: a context built before
   // the user interacts is born `suspended`.
   unlock(): void {
     if (this.context === null) {
-      this.context = new AudioContext();
+      this.context = this.createContext();
+      this.buildOutput(this.context);
       return;
     }
 
-    if (this.context.state === 'suspended') {
-      void this.context.resume();
+    this.resumeIfStopped();
+  }
+
+  resumeIfStopped(): void {
+    const context = this.context;
+    if (context === null || context.state === 'running' || context.state === 'closed') {
+      return;
     }
+
+    void context.resume();
+  }
+
+  private buildOutput(context: AudioContext): void {
+    const master = context.createGain();
+    master.gain.value = this.isMuted ? 0 : MASTER_GAIN;
+    this.master = master;
+
+    const compressor = context.createDynamicsCompressor();
+    compressor.threshold.value = COMPRESSOR_THRESHOLD_DB;
+    compressor.knee.value = COMPRESSOR_KNEE_DB;
+    compressor.ratio.value = COMPRESSOR_RATIO;
+    compressor.attack.value = COMPRESSOR_ATTACK_SECONDS;
+    compressor.release.value = COMPRESSOR_RELEASE_SECONDS;
+
+    master.connect(compressor);
+    compressor.connect(context.destination);
   }
 
   play(voice: Voice): void {
+    if (this.master !== null) {
+      this.schedule(voice, this.master);
+    }
+  }
+
+  playTheme(voices: Voice[]): void {
     const context = this.context;
-    if (context === null || context.state !== 'running') {
+    const master = this.master;
+    if (!this.canSound() || context === null || master === null) {
+      return;
+    }
+
+    this.themeBus?.gain.setTargetAtTime(0, context.currentTime, THEME_FADE_SECONDS);
+
+    const bus = context.createGain();
+    bus.gain.value = 1;
+    bus.connect(master);
+    this.themeBus = bus;
+
+    for (const voice of voices) {
+      this.schedule(voice, bus);
+    }
+  }
+
+  private canSound(): boolean {
+    return !this.isMuted && this.context !== null && this.context.state === 'running';
+  }
+
+  private schedule(voice: Voice, destination: AudioNode): void {
+    const context = this.context;
+    if (!this.canSound() || context === null) {
       return;
     }
 
@@ -43,13 +114,29 @@ export class SoundBoard {
       const panner = context.createStereoPanner();
       panner.pan.setValueAtTime(Math.max(-1, Math.min(1, voice.pan)), startAt);
       envelope.connect(panner);
-      panner.connect(context.destination);
+      panner.connect(destination);
     } else {
-      envelope.connect(context.destination);
+      envelope.connect(destination);
     }
 
     oscillator.start(startAt);
     oscillator.stop(endAt);
+  }
+
+  get muted(): boolean {
+    return this.isMuted;
+  }
+
+  toggleMute(): boolean {
+    this.isMuted = !this.isMuted;
+    if (this.master !== null && this.context !== null) {
+      this.master.gain.setTargetAtTime(
+        this.isMuted ? 0 : MASTER_GAIN,
+        this.context.currentTime,
+        MUTE_FADE_SECONDS,
+      );
+    }
+    return this.isMuted;
   }
 
   playAll(voices: Voice[]): void {
