@@ -35,8 +35,9 @@ function fakeParam() {
 }
 
 class FakeContext {
-  state: AudioContextState = 'running';
+  state: string = 'running';
   currentTime = 0;
+  resumeCalls = 0;
   readonly destination = new FakeNode('destination');
   readonly nodes: FakeNode[] = [];
 
@@ -51,6 +52,7 @@ class FakeContext {
   createStereoPanner() { return this.make('panner'); }
   createDynamicsCompressor() { return this.make('compressor'); }
   resume(): Promise<void> {
+    this.resumeCalls++;
     this.state = 'running';
     return Promise.resolve();
   }
@@ -121,5 +123,63 @@ describe('the sound board routing', () => {
     board.play(plain);
 
     expect(context.nodes.filter((node) => node.kind === 'oscillator')).toHaveLength(0);
+  });
+});
+
+describe('the sound board coming back after the browser stops the audio', () => {
+  it('resumes a context the browser left interrupted, as iOS does after a call or a lock screen', () => {
+    const { board, context } = unlockedBoard();
+    context.state = 'interrupted';
+
+    board.unlock();
+
+    expect(context.resumeCalls).toBe(1);
+  });
+
+  it('resumes a suspended context on the next gesture', () => {
+    const { board, context } = unlockedBoard();
+    context.state = 'suspended';
+
+    board.unlock();
+
+    expect(context.resumeCalls).toBe(1);
+  });
+
+  it('leaves a running context alone', () => {
+    const { board, context } = unlockedBoard();
+
+    board.unlock();
+
+    expect(context.resumeCalls).toBe(0);
+  });
+
+  it('resumes when the tab becomes visible again', () => {
+    const { board, context } = unlockedBoard();
+    context.state = 'interrupted';
+
+    board.resumeIfStopped();
+
+    expect(context.resumeCalls).toBe(1);
+  });
+
+  it('does not build a context before the first gesture, which the browser would start suspended', () => {
+    let built = 0;
+    const board = new SoundBoard(() => {
+      built++;
+      return new FakeContext() as unknown as AudioContext;
+    });
+
+    board.resumeIfStopped();
+
+    expect(built).toBe(0);
+  });
+
+  it('leaves a closed context alone', () => {
+    const { board, context } = unlockedBoard();
+    context.state = 'closed';
+
+    board.resumeIfStopped();
+
+    expect(context.resumeCalls).toBe(0);
   });
 });

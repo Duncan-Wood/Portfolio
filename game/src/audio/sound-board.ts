@@ -23,9 +23,16 @@ export class SoundBoard {
       return;
     }
 
-    if (this.context.state === 'suspended') {
-      void this.context.resume();
+    this.resumeIfStopped();
+  }
+
+  resumeIfStopped(): void {
+    const context = this.context;
+    if (context === null || context.state === 'running' || context.state === 'closed') {
+      return;
     }
+
+    void context.resume();
   }
 
   private buildOutput(context: AudioContext): AudioNode {

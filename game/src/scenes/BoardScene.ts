@@ -660,6 +660,12 @@ export class BoardScene extends Scene {
 
     this.input.keyboard!.on(Input.Keyboard.Events.ANY_KEY_DOWN, () => this.soundBoard.unlock());
 
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.soundBoard.resumeIfStopped();
+      }
+    });
+
     this.input.on(
       Input.Events.POINTER_UP,
       (_pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
