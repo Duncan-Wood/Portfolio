@@ -11,7 +11,7 @@ import {
 } from './grid';
 import { Board } from './board';
 import { findGroups } from './matching';
-import { allLit } from './neurons';
+import { allLit, litCount, neuronsOn } from './neurons';
 
 export interface Lock {
   neurons: number;
@@ -65,6 +65,12 @@ export function lockFor(chapterIndex: number): Lock {
 
 export function isSolved(_lock: Lock, board: Board): boolean {
   return allLit(board);
+}
+
+export function lockProgress(board: Board, score: number, fillScore: number): number {
+  const total = neuronsOn(board).length;
+  const fromNeurons = total === 0 ? 0 : litCount(board) / total;
+  return Math.max(fromNeurons, Math.min(score / fillScore, 1));
 }
 
 export function seedLock(

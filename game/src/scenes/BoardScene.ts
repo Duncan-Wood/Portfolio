@@ -63,8 +63,8 @@ import {
 } from '../handover';
 import { PressTwiceButton } from './press-twice-button';
 import { VictoryScreen } from './victory-screen';
-import { isSolved, lockFor, seedLock } from '../engine/locks';
-import { neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
+import { isSolved, lockFor, lockProgress, seedLock } from '../engine/locks';
+import { litCount, neuronsOn, unlitCount, type NeuronSite } from '../engine/neurons';
 import {
   CHAPTERS,
   FRAGMENT_COUNT,
@@ -1649,9 +1649,8 @@ export class BoardScene extends Scene {
 
   private refreshObjective(): void {
     const total = neuronsOn(this.simulation.board).length;
-    const lit = total - unlitCount(this.simulation.board);
 
-    this.objectiveText.setText(this.whereYouAre(`${lit} of ${total}`));
+    this.objectiveText.setText(this.whereYouAre(`${litCount(this.simulation.board)} of ${total}`));
   }
 
   private whereYouAre(objective: string): string {
@@ -2055,15 +2054,11 @@ export class BoardScene extends Scene {
       return;
     }
 
-    const neurons = neuronsOn(this.simulation.board);
-    const total = neurons.length;
-    const lit = neurons
-      .filter(({ column, row }) => isNeuronLit(this.simulation.board.pieceAt(column, row) as number))
-      .length;
-
-    const fromNeurons = total === 0 ? 0 : lit / total;
-    const fillScore = lockFor(this.chapterIndex).fillScore;
-    const progress = Math.max(fromNeurons, Math.min(this.simulation.score / fillScore, 1));
+    const progress = lockProgress(
+      this.simulation.board,
+      this.simulation.score,
+      lockFor(this.chapterIndex).fillScore,
+    );
 
     this.memoryPanel.showProgress(this.upcomingPhoto(), progress);
   }

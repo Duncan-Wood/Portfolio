@@ -56,6 +56,10 @@ export function unlitCount(board: Board): number {
     .length;
 }
 
+export function litCount(board: Board): number {
+  return neuronsOn(board).length - unlitCount(board);
+}
+
 export function allLit(board: Board): boolean {
   const neurons = neuronsOn(board);
   return neurons.length > 0

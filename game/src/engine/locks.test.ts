@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isColour, isNeuron, isShadow } from './grid';
+import { COLUMNS, FIRST_VISIBLE_ROW, ROWS, isColour, isNeuron, isShadow, neuronCell } from './grid';
 import { lightAdjacent, neuronsOn, unlitCount } from './neurons';
 import { Board } from './board';
-import { LOCKS, SEED_ROWS, isSolved, lockFor, seedLock } from './locks';
+import { LOCKS, SEED_ROWS, isSolved, lockFor, lockProgress, seedLock } from './locks';
 
 const fixed = (values: number[]) => {
   let index = 0;
@@ -218,5 +218,46 @@ describe('lockFor picks the boards for the chapter being played', () => {
 
   it('holds on the first lock if it is ever asked for a nonsense chapter', () => {
     expect(lockFor(-1)).toBe(LOCKS[0]);
+  });
+});
+
+describe('how full the memory picture is', () => {
+  const FILL_SCORE = 1000;
+
+  const withNeurons = (lit: number, unlit: number): Board => {
+    const board = new Board();
+    for (let index = 0; index < lit + unlit; index += 1) {
+      board.place(index, ROWS - 1, neuronCell(index < lit));
+    }
+    return board;
+  };
+
+  it('is empty before anything has happened', () => {
+    expect(lockProgress(withNeurons(0, 3), 0, FILL_SCORE)).toBe(0);
+  });
+
+  it('follows the neurons when they are ahead of the score', () => {
+    expect(lockProgress(withNeurons(1, 3), 0, FILL_SCORE)).toBe(0.25);
+  });
+
+  it('follows the score when it is ahead of the neurons', () => {
+    expect(lockProgress(withNeurons(0, 4), 600, FILL_SCORE)).toBe(0.6);
+  });
+
+  it('takes whichever is further along', () => {
+    expect(lockProgress(withNeurons(3, 1), 200, FILL_SCORE)).toBe(0.75);
+    expect(lockProgress(withNeurons(1, 3), 500, FILL_SCORE)).toBe(0.5);
+  });
+
+  it('never goes past full however high the score climbs', () => {
+    expect(lockProgress(withNeurons(0, 3), FILL_SCORE * 5, FILL_SCORE)).toBe(1);
+  });
+
+  it('is full when every neuron is lit', () => {
+    expect(lockProgress(withNeurons(3, 0), 0, FILL_SCORE)).toBe(1);
+  });
+
+  it('follows only the score on a board with no neurons, rather than dividing by zero', () => {
+    expect(lockProgress(new Board(), 250, FILL_SCORE)).toBe(0.25);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ROWS, isNeuronLit, neuronCell } from './grid';
 import { Board } from './board';
-import { allLit, lightAdjacent, neuronsOn, unlitCount } from './neurons';
+import { allLit, lightAdjacent, litCount, neuronsOn, unlitCount } from './neurons';
 
 const BOTTOM = ROWS - 1;
 
@@ -98,5 +98,29 @@ describe('reading the neurons on a board', () => {
 
   it('never calls a board with no neurons on it solved', () => {
     expect(allLit(new Board())).toBe(false);
+  });
+});
+
+describe('counting lit neurons', () => {
+  it('counts none on an empty board', () => {
+    expect(litCount(new Board())).toBe(0);
+  });
+
+  it('counts only the lit ones', () => {
+    const board = new Board();
+    board.place(0, BOTTOM, neuronCell(true));
+    board.place(1, BOTTOM, neuronCell(false));
+    board.place(2, BOTTOM, neuronCell(true));
+
+    expect(litCount(board)).toBe(2);
+  });
+
+  it('adds up with the unlit ones to every neuron on the board', () => {
+    const board = new Board();
+    board.place(0, BOTTOM, neuronCell(true));
+    board.place(1, BOTTOM, neuronCell(false));
+    board.place(2, BOTTOM, neuronCell(false));
+
+    expect(litCount(board) + unlitCount(board)).toBe(neuronsOn(board).length);
   });
 });
