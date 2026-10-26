@@ -55,7 +55,8 @@ export const CHAPTERS: Chapter[] = [
         body:
           'When I moved to DC I knew nobody. Someone invited me to Sunday '
           + 'kickball. Stonewall.\n\n'
-          + 'I was not good at it. Nobody was. That turned out to be the point.'
+          + 'I was not good at it. Nobody was. That turned out to be the point.\n\n'
+          + 'Now I captain a team, and our kickball grandma told me she was proud of me.'
       },
       {
         title: 'The Laptop',
