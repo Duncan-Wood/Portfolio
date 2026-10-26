@@ -14,7 +14,7 @@ export function introCards(controls: IntroControls): readonly IntroCard[] {
   return [
     {
       title: 'Connected',
-      body: 'Nothing I’ve built happened without other people.\n\nLight the neurons to unlock the memories behind it.',
+      body: 'Light the neurons to unlock the memories behind it.\n\nPause any time to read them.',
     },
     {
       title: 'how to play',

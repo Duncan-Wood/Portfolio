@@ -11,6 +11,15 @@ describe('the cards that open a first run', () => {
   });
 });
 
+describe('telling a player the memories can be read', () => {
+  it('says so on the first card, without naming a key', () => {
+    const body = introCards('keyboard')[0].body;
+
+    expect(body).toContain('read');
+    expect(body).not.toMatch(/\b(esc|escape)\b/i);
+  });
+});
+
 describe('the controls a player is told about', () => {
   const rules = (controls: IntroControls): string => introCards(controls)[1].body.split('\n\n')[0];
 
