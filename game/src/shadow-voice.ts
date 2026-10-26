@@ -27,7 +27,7 @@ export const SHADOW_LINES: readonly (readonly string[])[] = [
   ],
 ];
 
-export const OVERTHINKING_LINE = 'You’re overthinking it.';
+export const OVERTHINKING_LINE = 'You are overthinking it.';
 
 export const CONNECTION_LOST = 'CONNECTION LOST';
 

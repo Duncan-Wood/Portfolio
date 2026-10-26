@@ -31,8 +31,8 @@ export const CHAPTERS: Chapter[] = [
           'Anything an AI proposes has to pass a person before anyone should trust '
           + 'it. I built the screen where that happens, at my first software '
           + 'engineering job, in a framework I had never used.\n\n'
-          + 'Almost everything about it was new, and the responsibility was big. '
-          + 'I got it live in ten weeks, and the data team started using it.'
+          + 'The responsibility was big. I got it live in ten weeks, and the data '
+          + 'team started using it.'
       },
       {
         title: 'Theta',
@@ -66,7 +66,7 @@ export const CHAPTERS: Chapter[] = [
           + 'through a bootcamp.\n\n'
           + 'It is where I learned to actually build software, one error message at '
           + 'a time.\n\n'
-          + 'I don’t open it much anymore. I still learn things from the ground up, '
+          + 'I do not open it much anymore. I still learn things from the ground up, '
           + 'just not on it.'
       },
     ],
@@ -116,7 +116,7 @@ export const CHAPTERS: Chapter[] = [
           'Bought in Corpus Christi on a family vacation.\n\n'
           + 'I wore it to an audition for the sheriff in The Laramie Project, a lead I '
           + 'did not expect to get, and got.\n\n'
-          + 'I don’t have it anymore. Later, as Lurch in The Addams Family, I '
+          + 'I do not have it anymore. Later, as Lurch in The Addams Family, I '
           + 'improvised a swig from a wine bottle and a full theatre laughed. I had '
           + 'never felt anything like it.'
       },
