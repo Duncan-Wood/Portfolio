@@ -59,6 +59,7 @@ import { MemoryReader } from './memory-reader';
 import { VictorySky } from './victory-sky';
 import { MemoryHandover } from './memory-handover';
 import {
+  PURSE_FLASH_MS,
   stageLength,
   type HandoverStage,
 } from '../handover';
@@ -200,7 +201,6 @@ const MEMORY_LANDS_AT = {
 };
 const PURSE_AT_SCREEN = MEMORY_LANDS_AT.purse;
 const PURSE_FLASH_COLOR = 0xf2b705;
-const PURSE_FLASH_MS = 380;
 const THEME_AFTER_CHIME_MS = 220;
 const WIN_CONNECTION_STAGGER_MS = 60;
 const LOSS_CONNECTION_STAGGER_MS = 45;
@@ -418,6 +418,7 @@ export class BoardScene extends Scene {
   private runOver: 'topped-out' | 'won' | null = null;
 
   private character: Phaser.GameObjects.Image;
+  private purseFlash: Phaser.GameObjects.Arc;
   private thought: Phaser.GameObjects.Image;
 
   private characterState = RESTING;
@@ -655,6 +656,8 @@ export class BoardScene extends Scene {
 
     this.character = this.add.image(CHARACTER_X, CHARACTER_BOTTOM, characterTexture('idle', 0))
       .setOrigin(0.5, 1);
+    this.purseFlash = this.add.circle(PURSE_AT_SCREEN.x, PURSE_AT_SCREEN.y, 10, PURSE_FLASH_COLOR)
+      .setVisible(false);
     this.thought = this.add.image(CHARACTER_X + THOUGHT_OFFSET_X, CHARACTER_BOTTOM - THOUGHT_OFFSET_Y, thoughtTexture(0))
       .setOrigin(0.5, 1)
       .setVisible(false);
@@ -1102,14 +1105,15 @@ export class BoardScene extends Scene {
   }
 
   private flashPurse(): void {
-    const flash = this.add.circle(PURSE_AT_SCREEN.x, PURSE_AT_SCREEN.y, 10, PURSE_FLASH_COLOR, 0.9);
+    this.tweens.killTweensOf(this.purseFlash);
+    this.purseFlash.setVisible(true).setScale(1).setAlpha(0.9);
     this.tweens.add({
-      targets: flash,
+      targets: this.purseFlash,
       scale: 2.4,
       alpha: 0,
       duration: PURSE_FLASH_MS,
       ease: 'Sine.easeOut',
-      onComplete: () => flash.destroy(),
+      onComplete: () => this.purseFlash.setVisible(false),
     });
   }
 
@@ -1418,6 +1422,7 @@ export class BoardScene extends Scene {
     this.memoryHandover.reset();
     this.memoryPanel.reset();
     this.tweens.killAll();
+    this.purseFlash.setVisible(false);
     this.staticStrength = 0;
     this.staticOverlay.setVisible(false);
     this.cameras.main.filters.external.clear();

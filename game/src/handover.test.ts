@@ -4,6 +4,7 @@ import {
   FOUND_DROP_MS,
   FOUND_LAND_FADE_MS,
   HANDOVER_TIMELINE,
+  PURSE_FLASH_MS,
   advanceHandover,
   stageLength,
   stageStart,
@@ -39,6 +40,12 @@ describe('the handover after a solved board', () => {
   it('keeps the return from starting until the memory has landed and faded', () => {
     expect(stageLength('land')).toBeGreaterThanOrEqual(
       FOUND_CAUGHT_HOLD_MS + FOUND_DROP_MS + FOUND_LAND_FADE_MS,
+    );
+  });
+
+  it('keeps the return from starting until the purse flash that follows the landing is over', () => {
+    expect(stageLength('land')).toBeGreaterThanOrEqual(
+      FOUND_CAUGHT_HOLD_MS + FOUND_DROP_MS + PURSE_FLASH_MS,
     );
   });
 
