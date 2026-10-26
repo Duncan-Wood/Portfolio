@@ -142,7 +142,7 @@ describe('handing the solved board over', () => {
 
     const begun = runHandover(sequence, 400);
 
-    expect(begun).toEqual(['settle', 'fade', 'bloom', 'flight', 'return']);
+    expect(begun).toEqual(['settle', 'fade', 'bloom', 'flight', 'land', 'return']);
   });
 
   it('does not advance while a story card is up', () => {
@@ -194,6 +194,6 @@ describe('starting a board over', () => {
     sequence.checkSolved(calm, solved);
     sequence.takeReveal(calm);
 
-    expect(runHandover(sequence, 400)).toEqual(['settle', 'fade', 'bloom', 'flight', 'return']);
+    expect(runHandover(sequence, 400)).toEqual(['settle', 'fade', 'bloom', 'flight', 'land', 'return']);
   });
 });

@@ -1,11 +1,9 @@
 import { GROUND_COLOR } from '../palette';
 import { memoryArtTexture } from './tile-textures';
+import { FOUND_CAUGHT_HOLD_MS, FOUND_DROP_MS, FOUND_LAND_FADE_MS } from '../handover';
 import {
-  FOUND_CAUGHT_HOLD_MS,
   FOUND_CAUGHT_WIDTH,
-  FOUND_DROP_MS,
   FOUND_LANDED_WIDTH,
-  FOUND_LAND_FADE_MS,
   type FlightHooks,
   type LandingPlace,
 } from './memory-panel';

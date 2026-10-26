@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FOUND_CAUGHT_HOLD_MS,
+  FOUND_DROP_MS,
+  FOUND_LAND_FADE_MS,
   HANDOVER_TIMELINE,
   advanceHandover,
   stageLength,
@@ -25,12 +28,18 @@ function playThrough(frameMs: number): HandoverStage[] {
 describe('the handover after a solved board', () => {
   it('runs from the settle through to the return, in order', () => {
     expect(HANDOVER_TIMELINE.map(({ stage }) => stage)).toEqual(
-      ['settle', 'fade', 'bloom', 'flight', 'return'],
+      ['settle', 'fade', 'bloom', 'flight', 'land', 'return'],
     );
   });
 
   it('begins every stage exactly once at a smooth frame rate', () => {
-    expect(playThrough(16)).toEqual(['settle', 'fade', 'bloom', 'flight', 'return']);
+    expect(playThrough(16)).toEqual(['settle', 'fade', 'bloom', 'flight', 'land', 'return']);
+  });
+
+  it('keeps the return from starting until the memory has landed and faded', () => {
+    expect(stageLength('land')).toBeGreaterThanOrEqual(
+      FOUND_CAUGHT_HOLD_MS + FOUND_DROP_MS + FOUND_LAND_FADE_MS,
+    );
   });
 
   it('still begins every stage when one slow frame jumps past several', () => {

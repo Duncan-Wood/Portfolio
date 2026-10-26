@@ -4,6 +4,7 @@ import { type MemoryGrid } from '../memory-art';
 import { MEMORY_PICTURES } from '../memory-pictures';
 import { revealOrder } from '../memory-reveal';
 import { PIECE_COLORS, mix } from '../palette';
+import { FOUND_CAUGHT_HOLD_MS, FOUND_DROP_MS, FOUND_LAND_FADE_MS } from '../handover';
 
 const MEMORY_PICTURE_DARKEN = 0.88;
 const MEMORY_PICTURE_FILL_MS = 620;
@@ -13,10 +14,7 @@ const FOUND_CROSSFADE_MS = 140;
 const FOUND_LIFT_MS = 300;
 const FOUND_LIFT_RISE = 18;
 const FOUND_FLIGHT_MS = 900;
-export const FOUND_CAUGHT_HOLD_MS = 200;
-export const FOUND_DROP_MS = 400;
 const FOUND_HELD_MS = FOUND_CAUGHT_HOLD_MS + FOUND_DROP_MS;
-export const FOUND_LAND_FADE_MS = 120;
 export const FOUND_CAUGHT_WIDTH = 26;
 export const FOUND_LANDED_WIDTH = 14;
 

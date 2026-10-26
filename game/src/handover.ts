@@ -1,10 +1,15 @@
-export type HandoverStage = 'settle' | 'fade' | 'bloom' | 'flight' | 'return';
+export type HandoverStage = 'settle' | 'fade' | 'bloom' | 'flight' | 'land' | 'return';
+
+export const FOUND_CAUGHT_HOLD_MS = 200;
+export const FOUND_DROP_MS = 400;
+export const FOUND_LAND_FADE_MS = 120;
 
 export const HANDOVER_TIMELINE: readonly { stage: HandoverStage; lasts: number }[] = [
   { stage: 'settle', lasts: 700 },
   { stage: 'fade', lasts: 520 },
   { stage: 'bloom', lasts: 720 },
   { stage: 'flight', lasts: 560 },
+  { stage: 'land', lasts: FOUND_CAUGHT_HOLD_MS + FOUND_DROP_MS + FOUND_LAND_FADE_MS },
   { stage: 'return', lasts: 520 },
 ];
 
