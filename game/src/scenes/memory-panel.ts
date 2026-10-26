@@ -24,7 +24,6 @@ export const FOUND_FLIGHT_END_MS = FOUND_FLIGHT_DELAY + FOUND_CROSSFADE_MS + FOU
 const FOUND_HOLD_MS = 3200;
 const FOUND_FADE_MS = 500;
 const FOUND_TITLE_ABOVE_BOTTOM = 34;
-const FOUND_HINT_GAP = 22;
 
 export interface PanelBox {
   left: number;
@@ -56,7 +55,6 @@ export class MemoryPanel {
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly flier: Phaser.GameObjects.Image;
   private readonly foundTitle: Phaser.GameObjects.Text;
-  private readonly foundHint: Phaser.GameObjects.Text;
 
   private rank: number[] = [];
   private art: MemoryGrid | null = null;
@@ -81,11 +79,6 @@ export class MemoryPanel {
       align: 'center',
       wordWrap: { width: box.width },
     }).setOrigin(0.5, 0).setVisible(false);
-    this.foundHint = scene.add.text(centerX, 0, '', {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#9481aa',
-    }).setOrigin(0.5, 0).setVisible(false);
   }
 
   showProgress(photo: string | undefined, progress: number): void {
@@ -104,7 +97,7 @@ export class MemoryPanel {
 
   fadeTo(alpha: number, duration: number, delay = 0): void {
     if (this.showingFound) {
-      this.scene.tweens.killTweensOf([this.graphics, this.foundTitle, this.foundHint]);
+      this.scene.tweens.killTweensOf([this.graphics, this.foundTitle]);
       this.stopShowingFound();
       this.graphics.setAlpha(1);
     }
@@ -112,23 +105,18 @@ export class MemoryPanel {
     this.scene.tweens.add({ targets: this.graphics, alpha, duration, delay });
   }
 
-  showFound(photo: string | undefined, title: string, hint: string | null): void {
-    this.present(photo, title, hint);
+  showFound(photo: string | undefined, title: string): void {
+    this.present(photo, title);
   }
 
-  showFoundFlying(
-    photo: string | undefined,
-    title: string,
-    hint: string | null,
-    hooks: FlightHooks,
-  ): void {
-    const art = this.present(photo, title, hint);
+  showFoundFlying(photo: string | undefined, title: string, hooks: FlightHooks): void {
+    const art = this.present(photo, title);
     if (art !== null && photo !== undefined) {
       this.flyToTarget(art, photo, hooks);
     }
   }
 
-  private present(photo: string | undefined, title: string, hint: string | null): MemoryGrid | null {
+  private present(photo: string | undefined, title: string): MemoryGrid | null {
     this.fill?.remove();
     this.fill = null;
 
@@ -143,9 +131,6 @@ export class MemoryPanel {
 
     const below = this.box.top + this.box.height - FOUND_TITLE_ABOVE_BOTTOM;
     const shown = [this.foundTitle.setText(title).setY(below)];
-    if (hint !== null) {
-      shown.push(this.foundHint.setText(hint).setY(below + FOUND_HINT_GAP));
-    }
     for (const text of shown) {
       text.setVisible(true).setAlpha(0);
     }
@@ -166,7 +151,7 @@ export class MemoryPanel {
   }
 
   reset(): void {
-    this.scene.tweens.killTweensOf([this.graphics, this.foundTitle, this.foundHint, this.flier]);
+    this.scene.tweens.killTweensOf([this.graphics, this.foundTitle, this.flier]);
     this.stopShowingFound();
     this.graphics.setAlpha(1);
     this.photo = null;
@@ -257,7 +242,6 @@ export class MemoryPanel {
     this.scene.tweens.killTweensOf(this.flier);
     this.flier.setVisible(false);
     this.foundTitle.setVisible(false);
-    this.foundHint.setVisible(false);
     this.shownProgress = -1;
     this.graphics.clear();
   }

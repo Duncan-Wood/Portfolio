@@ -14,11 +14,12 @@ describe('the cards that open a first run', () => {
 describe('the controls a player is told about', () => {
   const rules = (controls: IntroControls): string => introCards(controls)[1].body.split('\n\n')[0];
 
-  it('gives a keyboard player the keys', () => {
+  it('gives a keyboard player the rules and no key list', () => {
     const body = introCards('keyboard')[1].body;
 
-    expect(body).toContain('←');
-    expect(body).toContain('space');
+    expect(body).toContain('Match four');
+    expect(body).not.toContain('←');
+    expect(body).not.toContain('space');
   });
 
   it('tells a swipe player what to do with a finger, not which keys to press', () => {

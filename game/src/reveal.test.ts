@@ -60,14 +60,6 @@ describe('revealing the next memory', () => {
     expect(resumeAt(FRAGMENT_COUNT)).toBe(4);
   });
 
-  it('says it is the first find only when nothing had been found before', () => {
-    const first = revealNextNode(0);
-    const second = revealNextNode(1);
-
-    expect(first.kind === 'found' && first.firstFind).toBe(true);
-    expect(second.kind === 'found' && second.firstFind).toBe(false);
-  });
-
   it('does not count a completion for an ordinary find', () => {
     revealNextNode(0);
 

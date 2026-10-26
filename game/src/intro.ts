@@ -6,8 +6,8 @@ export interface IntroCard {
 }
 
 const CONTROLS: Record<IntroControls, string> = {
-  keyboard: '←  →  move\n↑  rotate\n↓  faster\nspace  drop',
-  swipe: 'drag sideways to move\ntap to rotate\nflick down to drop',
+  keyboard: '',
+  swipe: '\n\ndrag sideways to move\ntap to rotate\nflick down to drop',
 };
 
 export function introCards(controls: IntroControls): readonly IntroCard[] {
@@ -18,7 +18,7 @@ export function introCards(controls: IntroControls): readonly IntroCard[] {
     },
     {
       title: 'how to play',
-      body: `Match four of a color to clear them. Clear beside a dark neuron to light it.\n\n${CONTROLS[controls]}`,
+      body: `Match four of a color to clear them. Clear beside a dark neuron to light it.${CONTROLS[controls]}`,
     },
   ];
 }

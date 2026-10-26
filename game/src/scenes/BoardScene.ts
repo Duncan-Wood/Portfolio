@@ -58,6 +58,8 @@ import { FoundMemories } from './found-memories';
 import { MemoryReader } from './memory-reader';
 import { VictorySky } from './victory-sky';
 import { MemoryHandover } from './memory-handover';
+import { KeySet } from './key-set';
+import { KEY_BINDINGS, type KeyAction } from '../input/key-bindings';
 import {
   PURSE_FLASH_MS,
   stageLength,
@@ -134,10 +136,8 @@ const REDUCED_MOTION = typeof matchMedia === 'function'
 // Must match the media query that shows #turn-upright in `index.html`.
 const TURN_UPRIGHT_QUERY = '(pointer: coarse) and (orientation: landscape) and (max-height: 599px)';
 
-const SKIP_PROMPT = TOUCH_PRIMARY ? 'tap  \u00b7  continue' : 'space  \u00b7  continue';
 const CONTACT_URL = '/#contact';
 const soundLabel = (muted: boolean) => (muted ? 'sound off' : 'sound on');
-const FOUND_HINT = TOUCH_PRIMARY ? 'pause  \u00b7  read' : 'esc  \u00b7  read';
 const RESTART_PROMPT = TOUCH_PRIMARY ? 'tap to restart' : 'restart';
 const RESET_PROMPT = 'reset progress';
 const RESET_ARMED_PROMPT = TOUCH_PRIMARY ? 'tap again to erase it all' : 'click again to erase it all';
@@ -319,7 +319,7 @@ export class BoardScene extends Scene {
   private simulation: Simulation;
   private cellTiles: Phaser.GameObjects.Image[];
   private pairTiles: Phaser.GameObjects.Image[];
-  private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+  private keys: Record<KeyAction, KeySet>;
   private fpsText: Phaser.GameObjects.Text;
   private showFps = false;
   private objectiveText: Phaser.GameObjects.Text;
@@ -358,8 +358,6 @@ export class BoardScene extends Scene {
 
   private lastPiecesSpawned = 0;
   private restartKey: Phaser.Input.Keyboard.Key;
-  private hardDropKey: Phaser.Input.Keyboard.Key;
-  private pauseKey: Phaser.Input.Keyboard.Key;
 
   private paused = false;
 
@@ -444,7 +442,7 @@ export class BoardScene extends Scene {
 
   private nodesRevealed = 0;
 
-  private foundBeat: { photo?: string; title: string; hint: string | null } | null = null;
+  private foundBeat: { photo?: string; title: string } | null = null;
 
   private sheriffCount: Phaser.GameObjects.Text;
 
@@ -676,10 +674,10 @@ export class BoardScene extends Scene {
       tile.setScale(PREVIEW_CELL / CELL_SIZE);
     }
 
-    this.cursors = this.input.keyboard!.createCursorKeys();
+    this.keys = Object.fromEntries(
+      Object.entries(KEY_BINDINGS).map(([action, codes]) => [action, new KeySet(this.input.keyboard!, codes)]),
+    ) as Record<KeyAction, KeySet>;
     this.restartKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.R);
-    this.hardDropKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
-    this.pauseKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
     this.enterKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ENTER);
     this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.M).on('down', () => this.toggleSound());
     this.resetKeys = [Input.Keyboard.KeyCodes.BACKSPACE, Input.Keyboard.KeyCodes.DELETE]
@@ -797,7 +795,7 @@ export class BoardScene extends Scene {
       coverWidth: BOARD_WIDTH + BOARD_FRAME_MARGIN * 2,
       coverHeight: BOARD_HEIGHT + BOARD_FRAME_MARGIN * 2,
       textWidth: BOARD_WIDTH,
-    }, SKIP_PROMPT);
+    });
 
     this.victoryCard = new RevealCard(this, {
       centerX: CANVAS_WIDTH / 2,
@@ -807,7 +805,7 @@ export class BoardScene extends Scene {
       textWidth: CANVAS_WIDTH - 60,
       coverColor: VICTORY_CARD_COLOR,
       pictureFrameHeight: VICTORY_PICTURE_FRAME,
-    }, SKIP_PROMPT);
+    });
 
     this.staticOverlay = this.add.tileSprite(
       ORIGIN_X + BOARD_WIDTH / 2,
@@ -934,7 +932,7 @@ export class BoardScene extends Scene {
       }
     }
 
-    if (Input.Keyboard.JustDown(this.pauseKey) || this.touch.takePause()) {
+    if (this.keys.pause.justDown() || this.touch.takePause()) {
       if (this.readingIndex !== null) {
         this.closeReading();
       } else if (!this.victory.active && this.runOver !== 'won') {
@@ -983,7 +981,7 @@ export class BoardScene extends Scene {
     if (this.card.holding) {
       if (this.card.waitForSkip(
         delta,
-        () => Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop(),
+        () => this.keys.confirm.justDown() || this.touch.takeDrop(),
       )) {
         this.advanceReveal();
       }
@@ -1129,8 +1127,7 @@ export class BoardScene extends Scene {
   private readFromVictory(): void {
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
-    const picked = Input.Keyboard.JustDown(this.hardDropKey)
-      || Input.Keyboard.JustDown(this.enterKey);
+    const picked = this.keys.confirm.justDown();
     const playAgainPressed = this.playAgainPressed;
     this.playAgainPressed = false;
     const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
@@ -1157,8 +1154,8 @@ export class BoardScene extends Scene {
   }
 
   private readWhileReadingVictory(reading: number): void {
-    const direction = Input.Keyboard.JustDown(this.cursors.left) ? -1
-      : Input.Keyboard.JustDown(this.cursors.right) ? 1
+    const direction = this.keys.moveLeft.justDown() ? -1
+      : this.keys.moveRight.justDown() ? 1
         : 0;
 
     if (direction !== 0) {
@@ -1166,7 +1163,7 @@ export class BoardScene extends Scene {
       if (next !== reading) {
         this.openFound(next);
       }
-    } else if (Input.Keyboard.JustDown(this.enterKey)) {
+    } else if (this.keys.confirm.justDown()) {
       this.closeReading();
     }
   }
@@ -1186,7 +1183,7 @@ export class BoardScene extends Scene {
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
     const picked = Input.Keyboard.JustDown(this.enterKey);
-    const resumed = Input.Keyboard.JustDown(this.hardDropKey);
+    const resumed = this.keys.hardDrop.justDown();
     const tappedAway = this.touch.takeDrop();
     const resetPressed = this.resetKeys.some((key) => Input.Keyboard.JustDown(key))
       || this.resetPressed;
@@ -1223,14 +1220,12 @@ export class BoardScene extends Scene {
 
     const tapped = this.tappedMemory;
     this.tappedMemory = null;
-    const done = Input.Keyboard.JustDown(this.hardDropKey)
-      || Input.Keyboard.JustDown(this.enterKey)
-      || this.touch.takeDrop();
+    const done = this.keys.confirm.justDown() || this.touch.takeDrop();
 
-    if (Input.Keyboard.JustDown(this.cursors.left)) {
+    if (this.keys.moveLeft.justDown()) {
       this.foundMemories.move(-1);
     }
-    if (Input.Keyboard.JustDown(this.cursors.right)) {
+    if (this.keys.moveRight.justDown()) {
       this.foundMemories.move(1);
     }
     if (tapped !== null) {
@@ -1263,16 +1258,16 @@ export class BoardScene extends Scene {
   }
 
   private steerFocus(memories: FoundMemories | VictorySky): void {
-    if (Input.Keyboard.JustDown(this.cursors.up)) {
+    if (this.keys.rotate.justDown()) {
       this.moveFocus(-1);
     }
-    if (Input.Keyboard.JustDown(this.cursors.down)) {
+    if (this.keys.softDrop.justDown()) {
       this.moveFocus(1);
     }
-    if (Input.Keyboard.JustDown(this.cursors.left)) {
+    if (this.keys.moveLeft.justDown()) {
       memories.move(-1);
     }
-    if (Input.Keyboard.JustDown(this.cursors.right)) {
+    if (this.keys.moveRight.justDown()) {
       memories.move(1);
     }
   }
@@ -1476,7 +1471,7 @@ export class BoardScene extends Scene {
     this.memoryPanel.startOver(this.upcomingPhoto());
 
     if (this.foundBeat !== null) {
-      this.memoryPanel.showFound(this.foundBeat.photo, this.foundBeat.title, this.foundBeat.hint);
+      this.memoryPanel.showFound(this.foundBeat.photo, this.foundBeat.title);
       this.foundBeat = null;
     }
 
@@ -1548,12 +1543,12 @@ export class BoardScene extends Scene {
   private readInput(delta: number): void {
     this.readSwipe();
 
-    if (Input.Keyboard.JustDown(this.cursors.up)) {
+    if (this.keys.rotate.justDown()) {
       this.overthinking.decided();
       this.simulation.rotate();
     }
 
-    if (Input.Keyboard.JustDown(this.hardDropKey) || this.touch.takeDrop()) {
+    if (this.keys.hardDrop.justDown() || this.touch.takeDrop()) {
       this.dropTheHardWay();
     }
 
@@ -1562,8 +1557,8 @@ export class BoardScene extends Scene {
 
     this.simulation.softDropping = this.inputTranslator.update(
       {
-        direction: pressedDirection(this.cursors.left, this.cursors.right),
-        softDropHeld: this.cursors.down.isDown,
+        direction: pressedDirection(this.keys.moveLeft, this.keys.moveRight),
+        softDropHeld: this.keys.softDrop.isDown,
         newPiece,
         delta,
       },
@@ -2101,15 +2096,14 @@ export class BoardScene extends Scene {
     this.simulation.shadowHeld = false;
 
     const { node } = reveal;
-    const hint = reveal.firstFind ? FOUND_HINT : null;
 
     if (reveal.kind === 'won') {
       this.winTheRun();
-      this.memoryPanel.showFoundFlying(node.photo, node.title, hint, this.flightHooks());
+      this.memoryPanel.showFoundFlying(node.photo, node.title, this.flightHooks());
       return;
     }
 
-    this.foundBeat = { photo: node.photo, title: node.title, hint };
+    this.foundBeat = { photo: node.photo, title: node.title };
   }
 
   private holdFor(text: string, floor: number): number {

@@ -25,23 +25,20 @@ export class RevealCard {
   private readonly scene: Phaser.Scene;
   private readonly centerX: number;
   private readonly centerY: number;
-  private readonly skipPrompt: string;
   private readonly pictureFrameHeight: number | undefined;
 
   private readonly scrim: Phaser.GameObjects.Rectangle;
   private readonly picture: MemoryPicture;
   private readonly title: Phaser.GameObjects.Text;
   private readonly body: Phaser.GameObjects.Text;
-  private readonly hint: Phaser.GameObjects.Text;
 
   private isHolding = false;
   private skippableIn = 0;
 
-  constructor(scene: Phaser.Scene, area: RevealArea, skipPrompt: string) {
+  constructor(scene: Phaser.Scene, area: RevealArea) {
     this.scene = scene;
     this.centerX = area.centerX;
     this.centerY = area.centerY;
-    this.skipPrompt = skipPrompt;
     this.pictureFrameHeight = area.pictureFrameHeight;
 
     this.scrim = scene.add.rectangle(
@@ -70,12 +67,6 @@ export class RevealCard {
       wordWrap: { width: area.textWidth - 56 },
       lineSpacing: 7,
     }).setOrigin(0.5, 0.5).setVisible(false);
-
-    this.hint = scene.add.text(area.centerX, area.centerY + 96, skipPrompt, {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: '#9481aa',
-    }).setOrigin(0.5, 0.5).setVisible(false);
   }
 
   get holding(): boolean {
@@ -86,7 +77,6 @@ export class RevealCard {
     this.body.setColor(REVEAL_BODY_COLOR);
     this.isHolding = true;
     this.skippableIn = REVEAL_SKIP_GRACE;
-    this.hint.setText(this.skipPrompt).setVisible(false);
 
     this.scene.tweens.killTweensOf([this.scrim, this.title, this.body, ...this.picture.parts]);
 
@@ -120,10 +110,6 @@ export class RevealCard {
   waitForSkip(delta: number, skipPressed: () => boolean): boolean {
     if (this.skippableIn > 0) {
       this.skippableIn -= delta;
-      if (this.skippableIn <= 0) {
-        this.hint.setVisible(true).setAlpha(0);
-        this.scene.tweens.add({ targets: this.hint, alpha: 1, duration: 260 });
-      }
       return false;
     }
 
@@ -136,7 +122,7 @@ export class RevealCard {
   }
 
   hide(): void {
-    const parts = [this.scrim, this.title, this.body, this.hint, ...this.picture.parts];
+    const parts = [this.scrim, this.title, this.body, ...this.picture.parts];
     this.scene.tweens.killTweensOf(parts);
     this.scene.tweens.add({
       targets: parts,
@@ -161,7 +147,7 @@ export class RevealCard {
   }
 
   reset(): void {
-    const parts = [this.scrim, this.title, this.body, this.hint, ...this.picture.parts];
+    const parts = [this.scrim, this.title, this.body, ...this.picture.parts];
     this.scene.tweens.killTweensOf(parts);
     for (const part of parts) {
       part.setVisible(false).setAlpha(1);
@@ -177,15 +163,12 @@ export class RevealCard {
       frameHeight,
       gap: REVEAL_GAP,
       titleHeight: this.title.height,
-      bodyHeight: this.body.height,
       tallestBody: textHeight(READER_MAX_LINES),
-      hintHeight: this.hint.height,
     });
 
     this.picture.placeAt(this.centerX, layout.pictureY);
     this.title.setPosition(this.centerX, layout.titleY);
     this.body.setPosition(this.centerX, layout.bodyTop + this.body.height / 2);
-    this.hint.setPosition(this.centerX, layout.hintY);
   }
 
   private layOut(): void {
@@ -197,13 +180,11 @@ export class RevealCard {
     const photoHeight = this.picture.height;
     const titleHeight = this.title.visible ? this.title.height : 0;
     const bodyHeight = this.body.height;
-    const hintHeight = this.hint.height;
 
     const parts: { place: (y: number) => void; height: number }[] = [];
     if (photoHeight > 0) parts.push({ place: (y) => this.picture.placeAt(this.centerX, y), height: photoHeight });
     if (titleHeight > 0) parts.push({ place: (y) => this.title.setPosition(this.centerX, y), height: titleHeight });
     parts.push({ place: (y) => this.body.setPosition(this.centerX, y), height: bodyHeight });
-    parts.push({ place: (y) => this.hint.setPosition(this.centerX, y), height: hintHeight });
 
     const total = parts.reduce((sum, part) => sum + part.height, 0)
       + REVEAL_GAP * (parts.length - 1);
