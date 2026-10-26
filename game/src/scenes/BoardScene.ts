@@ -106,7 +106,7 @@ import {
   connectionLostVoice,
   nodeVoice,
   popVoice,
-  shadowArrivalVoice,
+  shadowArrivalVoices,
   shadowRecedeVoice,
   topOutVoice,
 } from '../audio/voices';
@@ -1914,7 +1914,7 @@ export class BoardScene extends Scene {
     }
 
     this.shownShadowTaken = shadowTaken;
-    this.soundBoard.play(shadowArrivalVoice());
+    this.soundBoard.playAll(shadowArrivalVoices());
     this.characterState = characterOn(this.characterState, 'shadow');
     this.speakForShadow();
 
@@ -2231,10 +2231,12 @@ export class BoardScene extends Scene {
 
     this.reachNeurons(lastBeat.link.neuronsLit);
 
-    this.soundBoard.play({
-      ...popVoice(this.simulation.chainLength - 1),
-      pan: poppedAt === null ? 0 : panForX(poppedAt),
-    });
+    for (const group of lastBeat.link.groups) {
+      this.soundBoard.play({
+        ...popVoice(this.simulation.chainLength - 1, group.pieceType),
+        pan: poppedAt === null ? 0 : panForX(poppedAt),
+      });
+    }
   }
 
   private reachNeurons(lit: readonly NeuronSite[]): void {

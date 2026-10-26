@@ -39,7 +39,7 @@ describe('the theme of each memory', () => {
     for (const photo of photos) {
       for (const voice of themeFor(photo)) {
         expect(voice.gain, photo).toBeGreaterThan(0);
-        expect(voice.gain, photo).toBeLessThanOrEqual(0.12);
+        expect(voice.gain, photo).toBeLessThanOrEqual(0.2);
         expect(voice.duration, photo).toBeGreaterThan(0);
         expect(voice.delay, photo).toBeGreaterThanOrEqual(0);
         expect(voice.startFrequency, photo).toBeGreaterThanOrEqual(40);

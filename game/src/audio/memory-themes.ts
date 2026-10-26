@@ -33,13 +33,15 @@ interface Line {
   notes: Note[];
 }
 
+const THEME_LOUDNESS = 1.8;
+
 function theme(lines: Line[]): Voice[] {
   return lines.flatMap(({ waveform, gain, pan, notes }) => notes.map((note) => ({
     waveform,
     startFrequency: hertz(note.pitch),
     endFrequency: hertz(note.slideTo ?? note.pitch),
     duration: note.length,
-    gain: note.gain ?? gain,
+    gain: (note.gain ?? gain) * THEME_LOUDNESS,
     delay: note.at,
     ...(pan === undefined ? {} : { pan }),
   })));

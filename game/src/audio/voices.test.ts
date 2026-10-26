@@ -9,19 +9,19 @@ import {
   landVoice,
   nodeVoice,
   popVoice,
-  shadowArrivalVoice,
+  shadowArrivalVoices,
   shadowRecedeVoice,
   topOutVoice,
 } from './voices';
 
 const everyVoice = [
-  popVoice(0),
-  popVoice(4),
+  popVoice(0, 0),
+  popVoice(4, 3),
   landVoice(),
   hardDropVoice(0),
   hardDropVoice(11),
   topOutVoice(),
-  shadowArrivalVoice(),
+  ...shadowArrivalVoices(),
   shadowRecedeVoice(1),
   shadowRecedeVoice(6),
   answerVoice(0),
@@ -50,12 +50,22 @@ describe('every voice', () => {
 });
 
 describe('the pop, which carries the chain escalation', () => {
-  it('starts at the base pitch on the first link', () => {
-    expect(popVoice(0).startFrequency).toBe(BASE_POP_FREQUENCY);
+  it('starts at the base pitch on the first link of the first colour', () => {
+    expect(popVoice(0, 0).startFrequency).toBe(BASE_POP_FREQUENCY);
+  });
+
+  it('gives every colour its own pitch', () => {
+    const pitches = new Set([0, 1, 2, 3].map((colour) => popVoice(0, colour).startFrequency));
+
+    expect(pitches.size).toBe(4);
+  });
+
+  it('refuses a piece type that is not a colour, rather than popping at no pitch', () => {
+    expect(() => popVoice(0, 4)).toThrow(RangeError);
   });
 
   it('rises with every further link', () => {
-    const pitches = [0, 1, 2, 3, 4].map((link) => popVoice(link).startFrequency);
+    const pitches = [0, 1, 2, 3, 4].map((link) => popVoice(link, 0).startFrequency);
 
     for (let index = 1; index < pitches.length; index += 1) {
       expect(pitches[index]).toBeGreaterThan(pitches[index - 1]);
@@ -63,7 +73,7 @@ describe('the pop, which carries the chain escalation', () => {
   });
 
   it('stops climbing before it leaves the hearing range', () => {
-    expect(popVoice(200).startFrequency).toBe(MAX_POP_FREQUENCY);
+    expect(popVoice(200, 3).startFrequency).toBe(MAX_POP_FREQUENCY);
   });
 });
 
@@ -101,11 +111,15 @@ describe('the chain flourish', () => {
 });
 
 describe('the progress-track voice', () => {
-  it('climbs exactly one octave across the whole loop', () => {
+  it('lands the last pad exactly one octave above the first, so finishing resolves', () => {
     const first = nodeVoice(0, 20);
-    const last = nodeVoice(20, 20);
+    const last = nodeVoice(19, 20);
 
     expect(last.startFrequency).toBeCloseTo(first.startFrequency * 2);
+  });
+
+  it('does not divide by zero when there is only one pad', () => {
+    expect(nodeVoice(0, 1).startFrequency).toBeGreaterThan(0);
   });
 
   it('rises with every pad, so pitch alone reports progress', () => {
@@ -118,6 +132,14 @@ describe('the progress-track voice', () => {
 });
 
 describe('the shadow', () => {
+  it('arrives as two notes, the second after the first', () => {
+    const [first, second] = shadowArrivalVoices();
+
+    expect(shadowArrivalVoices()).toHaveLength(2);
+    expect(first.delay).toBe(0);
+    expect(second.delay).toBeGreaterThan(0);
+  });
+
   it('answers a bigger push with more of an answer', () => {
     expect(shadowRecedeVoice(3).gain).toBeGreaterThan(shadowRecedeVoice(1).gain);
   });

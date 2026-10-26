@@ -1,6 +1,6 @@
 import { type Voice } from './voices';
 
-const MASTER_GAIN = 0.45;
+const MASTER_GAIN = 0.8;
 const COMPRESSOR_THRESHOLD_DB = -18;
 const COMPRESSOR_KNEE_DB = 10;
 const COMPRESSOR_RATIO = 8;
