@@ -13,8 +13,7 @@
     "react-scroll": "^1.8.9"
   },
   "scripts": {
-    "start": "concurrently -n web,game -c blue,magenta \"vite\" \"npm --prefix game run dev\"",
-    "start:web": "vite",
+    "start": "vite",
     "build": "vite build && vite build --ssr src/entry-server.jsx --outDir .ssr && node prerender.mjs && npm --prefix game run build && cp -r game/dist build/game",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -33,7 +32,6 @@
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/react": "^13.4.0",
     "@vitejs/plugin-react": "^6.1.0",
-    "concurrently": "^10.0.5",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",

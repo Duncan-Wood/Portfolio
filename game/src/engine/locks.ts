@@ -11,79 +11,80 @@ import {
 } from './grid';
 import { Board } from './board';
 import { findGroups } from './matching';
-import { allLit } from './neurons';
+import { allLit, litCount, neuronsOn } from './neurons';
 
 export interface Lock {
-  objective: string;
   neurons: number;
   shadows: number;
   tiles: number;
-  pieces: number;
-
-  /** Score that fills the memory picture. Solving fills it regardless. */
+  fallInterval: number;
   fillScore: number;
 }
 
 export const SEED_ROWS = 3;
 
-// `tiles + shadows + neurons` must fit COLUMNS x SEED_ROWS; overflow is silent
-// and leaves the board unsolvable.
 export const LOCKS: readonly Lock[] = [
   {
-    objective: 'light every neuron',
-    neurons: 1,
+    neurons: 2,
     shadows: 0,
-    tiles: 13,
-    pieces: 14,
-    fillScore: 80,
+    tiles: 12,
+    fallInterval: 750,
+    fillScore: 100,
   },
   {
-    objective: 'light every neuron',
     neurons: 3,
     shadows: 1,
     tiles: 11,
-    pieces: 12,
+    fallInterval: 650,
     fillScore: 180,
   },
   {
-    objective: 'light every neuron',
-    neurons: 3,
-    shadows: 2,
-    tiles: 11,
-    pieces: 11,
-    fillScore: 180,
-  },
-  {
-    objective: 'light every neuron',
     neurons: 4,
     shadows: 2,
     tiles: 10,
-    pieces: 11,
+    fallInterval: 560,
     fillScore: 220,
   },
   {
-    objective: 'light every neuron',
     neurons: 5,
     shadows: 3,
     tiles: 9,
-    pieces: 10,
+    fallInterval: 480,
     fillScore: 280,
   },
 ];
 
-export function lockFor(fragmentsEarned: number): Lock {
-  const index = Math.max(0, Math.min(fragmentsEarned, LOCKS.length - 1));
-  return LOCKS[index];
+export function lockFor(chapterIndex: number): Lock {
+  const lock = LOCKS[chapterIndex];
+  if (lock === undefined) {
+    throw new RangeError(`No lock for chapter ${chapterIndex}; there are ${LOCKS.length}`);
+  }
+
+  return lock;
 }
 
-export function isSolved(_lock: Lock, board: Board): boolean {
+export function isSolved(board: Board): boolean {
   return allLit(board);
 }
 
-export function seedLock(board: Board, lock: Lock, random: () => number): void {
+export function lockProgress(board: Board, score: number, fillScore: number): number {
+  const total = neuronsOn(board).length;
+  const fromNeurons = total === 0 ? 0 : litCount(board) / total;
+  return Math.max(fromNeurons, Math.min(score / fillScore, 1));
+}
+
+export function seedLock(
+  board: Board,
+  lock: Lock,
+  random: () => number,
+): void {
   board.reset();
 
   const total = lock.tiles + lock.shadows + lock.neurons;
+  if (total > COLUMNS * SEED_ROWS) {
+    throw new RangeError(`A lock of ${total} pieces does not fit ${COLUMNS} columns of ${SEED_ROWS} rows`);
+  }
+
   const heights = new Array<number>(COLUMNS).fill(0);
 
   for (let placed = 0; placed < total; placed += 1) {
@@ -92,10 +93,6 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
     for (let tried = 0; tried < COLUMNS && heights[column] >= SEED_ROWS; tried += 1) {
       column = (column + 1) % COLUMNS;
     }
-    if (heights[column] >= SEED_ROWS) {
-      break;
-    }
-
     const row = ROWS - 1 - heights[column];
     heights[column] += 1;
 
@@ -104,13 +101,21 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
 
   const reachable = (column: number, row: number): number => {
     let count = 0;
-    for (const step of [{ c: 1, r: 0 }, { c: -1, r: 0 }, { c: 0, r: 1 }, { c: 0, r: -1 }]) {
-      const c = column + step.c;
-      const r = row + step.r;
-      if (c < 0 || c >= COLUMNS || r < FIRST_VISIBLE_ROW || r >= ROWS) {
+    for (const step of [
+      { columnStep: 1, rowStep: 0 },
+      { columnStep: -1, rowStep: 0 },
+      { columnStep: 0, rowStep: 1 },
+      { columnStep: 0, rowStep: -1 },
+    ]) {
+      const neighbourColumn = column + step.columnStep;
+      const neighbourRow = row + step.rowStep;
+      if (
+        neighbourColumn < 0 || neighbourColumn >= COLUMNS
+        || neighbourRow < FIRST_VISIBLE_ROW || neighbourRow >= ROWS
+      ) {
         continue;
       }
-      const piece = board.pieceAt(c, r);
+      const piece = board.pieceAt(neighbourColumn, neighbourRow);
       if (isNeuron(piece) || isShadow(piece)) {
         continue;
       }
@@ -138,7 +143,7 @@ export function seedLock(board: Board, lock: Lock, random: () => number): void {
         const openAbove = row === FIRST_VISIBLE_ROW || board.isEmpty(column, row - 1);
         const spread = neurons.length === 0
           ? 0
-          : Math.min(...neurons.map((n) => Math.abs(n.column - column) * 2 + Math.abs(n.row - row)));
+          : Math.min(...neurons.map((neuron) => Math.abs(neuron.column - column) * 2 + Math.abs(neuron.row - row)));
         const score = (openAbove ? 24 : 0) + spread * 3 + room;
         if (score > bestScore) {
           bestScore = score;

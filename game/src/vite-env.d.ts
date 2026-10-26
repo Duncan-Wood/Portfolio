@@ -8,7 +8,6 @@ declare global {
   const __BUILD_ID__: string;
 
   interface ImportMetaEnv {
-    readonly VITE_GAME_CODE?: string;
     readonly VITE_SENTRY_DSN?: string;
   }
 
@@ -16,5 +15,6 @@ declare global {
     tuning?: Tuning;
     simulation?: Simulation;
     boardScene?: BoardScene;
+    setMemories?: (count: number) => void;
   }
 }

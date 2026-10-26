@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { type IntroControls, introCards } from './intro';
-import { LOCKS } from './engine/locks';
 
 describe('the cards that open a first run', () => {
   it('says what Connected is before it says how to play', () => {
@@ -10,23 +9,26 @@ describe('the cards that open a first run', () => {
     expect(cards[0].title).toBe('Connected');
     expect(cards[1].title).toBe('how to play');
   });
+});
 
-  it('names the goal with the word the board shows for it', () => {
-    const goal = 'neuron';
+describe('telling a player the memories can be read', () => {
+  it('says so on the first card, without naming a key', () => {
+    const body = introCards('keyboard')[0].body;
 
-    expect(LOCKS.every((lock) => lock.objective.includes(goal))).toBe(true);
-    expect(introCards('keyboard')[1].body).toContain(goal);
+    expect(body).toContain('read');
+    expect(body).not.toMatch(/\b(esc|escape)\b/i);
   });
 });
 
 describe('the controls a player is told about', () => {
   const rules = (controls: IntroControls): string => introCards(controls)[1].body.split('\n\n')[0];
 
-  it('gives a keyboard player the keys', () => {
+  it('gives a keyboard player the rules and no key list', () => {
     const body = introCards('keyboard')[1].body;
 
-    expect(body).toContain('←');
-    expect(body).toContain('space');
+    expect(body).toContain('Match four');
+    expect(body).not.toContain('←');
+    expect(body).not.toContain('space');
   });
 
   it('tells a swipe player what to do with a finger, not which keys to press', () => {

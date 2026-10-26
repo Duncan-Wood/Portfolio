@@ -1,5 +1,23 @@
 export type HorizontalDirection = -1 | 1;
 
+export interface HeldKey {
+  isDown: boolean;
+  timeDown: number;
+}
+
+export function pressedDirection(left: HeldKey, right: HeldKey): HorizontalDirection | null {
+  if (left.isDown && right.isDown) {
+    return left.timeDown > right.timeDown ? -1 : 1;
+  }
+  if (left.isDown) {
+    return -1;
+  }
+  if (right.isDown) {
+    return 1;
+  }
+  return null;
+}
+
 interface InputTuning {
   autoShiftDelay: number;
   autoRepeatInterval: number;
@@ -12,7 +30,7 @@ export interface InputFrame {
   delta: number;
 }
 
-type ShiftAttempt = (direction: HorizontalDirection) => boolean;
+type ShiftAttempt = (direction: HorizontalDirection, fresh: boolean) => boolean;
 
 export class InputTranslator {
   private heldDirection: HorizontalDirection | null = null;
@@ -56,14 +74,14 @@ export class InputTranslator {
     if (direction !== this.heldDirection) {
       this.heldDirection = direction;
       this.autoRepeatTimer = this.tuning.autoShiftDelay;
-      attemptShift(direction);
+      attemptShift(direction, true);
       return;
     }
 
     this.autoRepeatTimer -= frame.delta;
 
     while (this.autoRepeatTimer <= 0) {
-      if (!attemptShift(direction)) {
+      if (!attemptShift(direction, false)) {
         this.autoRepeatTimer = 0;
         return;
       }

@@ -77,6 +77,27 @@ describe('gravity', () => {
   });
 });
 
+describe('resting on the floor', () => {
+  it('is not resting while the pair is still falling', () => {
+    expect(simulation().resting).toBe(false);
+  });
+
+  it('is resting the moment the pair touches down, before it locks', () => {
+    const game = simulation();
+    dropToFloor(game);
+
+    expect(game.resting).toBe(true);
+  });
+
+  it('stops resting once the pair locks and the next one starts to fall', () => {
+    const game = simulation();
+    dropToFloor(game);
+    game.update(lockDelay);
+
+    expect(game.resting).toBe(false);
+  });
+});
+
 describe('lock delay', () => {
   it('does not lock the instant the pair lands', () => {
     const game = simulation();
@@ -910,177 +931,6 @@ describe('reporting where a pair came to rest', () => {
   });
 });
 
-describe('the piece budget', () => {
-  const budgeted = (pieces: number) => {
-    const simulation = new Simulation(() => [0, 1]);
-    simulation.pieceBudget = pieces;
-    simulation.restart();
-    return simulation;
-  };
-
-  it('is unlimited when no budget is set, so nothing else has to know about it', () => {
-    const simulation = new Simulation(() => [0, 1]);
-    expect(simulation.outOfPieces).toBe(false);
-    expect(simulation.piecesRemaining).toBe(Infinity);
-  });
-
-  it('counts down as pieces are committed', () => {
-    const simulation = budgeted(3);
-    expect(simulation.piecesRemaining).toBe(3);
-
-    simulation.hardDrop();
-    expect(simulation.piecesRemaining).toBe(2);
-
-    simulation.hardDrop();
-    expect(simulation.piecesRemaining).toBe(1);
-  });
-
-  it('runs out when the last piece is spent, and refuses input after', () => {
-    const simulation = budgeted(2);
-
-    simulation.hardDrop();
-    expect(simulation.outOfPieces).toBe(false);
-
-    simulation.hardDrop();
-    expect(simulation.outOfPieces).toBe(true);
-    expect(simulation.piecesRemaining).toBe(0);
-    expect(simulation.moveLeft()).toBe(false);
-    expect(simulation.rotate()).toBe(false);
-  });
-
-  it('never reports a negative count', () => {
-    const simulation = budgeted(1);
-    simulation.hardDrop();
-    simulation.hardDrop();
-
-    expect(simulation.piecesRemaining).toBe(0);
-  });
-
-  it('gives the budget back on a restart', () => {
-    const simulation = budgeted(2);
-    simulation.hardDrop();
-    simulation.hardDrop();
-    expect(simulation.outOfPieces).toBe(true);
-
-    simulation.restart();
-
-    expect(simulation.outOfPieces).toBe(false);
-    expect(simulation.piecesRemaining).toBe(2);
-  });
-});
-
-describe('the deepest chain of a run', () => {
-  it('is nothing before anything has cleared', () => {
-    const simulation = new Simulation(() => [0, 1]);
-    simulation.restart();
-
-    expect(simulation.deepestChain).toBe(0);
-  });
-
-  it('keeps the deepest cascade after the chain counter has reset for the next one', () => {
-    const simulation = new Simulation(() => [0, 0]);
-    simulation.restart();
-
-    simulation.chainLength = 4;
-    simulation.rememberChain();
-    simulation.chainLength = 0;
-
-    expect(simulation.deepestChain).toBe(4);
-  });
-
-  it('does not lower it when a later cascade is shallower', () => {
-    const simulation = new Simulation(() => [0, 0]);
-    simulation.restart();
-
-    simulation.chainLength = 5;
-    simulation.rememberChain();
-    simulation.chainLength = 2;
-    simulation.rememberChain();
-
-    expect(simulation.deepestChain).toBe(5);
-  });
-
-  it('starts over with the run, so a new run reports its own best', () => {
-    const simulation = new Simulation(() => [0, 0]);
-    simulation.restart();
-
-    simulation.chainLength = 6;
-    simulation.rememberChain();
-    simulation.restart();
-
-    expect(simulation.deepestChain).toBe(0);
-  });
-});
-
-describe('the piece after this one', () => {
-  const budgeted = (pieces: number) => {
-    const simulation = new Simulation(() => [0, 1]);
-    simulation.pieceBudget = pieces;
-    simulation.restart();
-    return simulation;
-  };
-
-  it('is promised while the run still has pieces to hand out', () => {
-    expect(budgeted(3).hasNextPiece).toBe(true);
-  });
-
-  it('is not promised on the last piece, so the preview cannot show one that never arrives', () => {
-    const simulation = budgeted(2);
-    simulation.hardDrop();
-
-    expect(simulation.piecesRemaining).toBe(1);
-    expect(simulation.hasNextPiece).toBe(false);
-  });
-
-  it('stays unpromised once the budget is spent', () => {
-    const simulation = budgeted(1);
-    simulation.hardDrop();
-
-    expect(simulation.hasNextPiece).toBe(false);
-  });
-
-  it('is always promised when nothing limits the run', () => {
-    const simulation = new Simulation(() => [0, 1]);
-    simulation.restart();
-
-    expect(simulation.hasNextPiece).toBe(true);
-  });
-});
-
-describe('a board that has run out of pieces', () => {
-  it('still lets the last piece\'s cascade play out', () => {
-    const simulation = new Simulation(() => [0, 0]);
-    simulation.pieceBudget = 2;
-    simulation.restart();
-
-    simulation.hardDrop();
-    simulation.hardDrop();
-
-    expect(simulation.outOfPieces).toBe(true);
-    expect(simulation.resolving).toBe(true);
-
-    for (let step = 0; step < 40; step += 1) {
-      simulation.update(50);
-    }
-
-    expect(simulation.resolving).toBe(false);
-    expect(simulation.score).toBeGreaterThan(0);
-  });
-
-  it('stops feeding the shadow once nothing can be done about it', () => {
-    const simulation = new Simulation(() => [0, 1]);
-    simulation.pieceBudget = 1;
-    simulation.restart();
-    simulation.hardDrop();
-
-    for (let step = 0; step < 200; step += 1) {
-      simulation.update(50);
-    }
-
-    expect(simulation.shadowTaken).toBe(0);
-  });
-});
-
 const THINKING = { ...DEFAULT_TUNING, fallInterval: 100_000 };
 
 describe('the shadow waits for the player to start', () => {
@@ -1095,7 +945,7 @@ describe('the shadow waits for the player to start', () => {
     expect(simulation.shadowTaken).toBe(0);
   });
 
-  it('starts the clock once a piece is down, and keeps it running after', () => {
+  it('counts pieces placed, never time spent thinking', () => {
     const simulation = new Simulation(() => [0, 1], THINKING);
     simulation.restart();
     simulation.hardDrop();
@@ -1103,6 +953,52 @@ describe('the shadow waits for the player to start', () => {
     for (let step = 0; step < 400; step += 1) {
       simulation.update(50);
     }
+    expect(simulation.shadowTaken).toBe(0);
+
+    for (let piece = 1; piece < DEFAULT_TUNING.piecesPerShadow; piece += 1) {
+      simulation.hardDrop();
+    }
+    expect(simulation.shadowTaken).toBe(1);
+  });
+});
+
+describe('holding the shadow back while a first memory is still unearned', () => {
+  const placeWhileHeld = (simulation: Simulation) => {
+    for (let piece = 0; piece < DEFAULT_TUNING.piecesPerShadow; piece += 1) {
+      simulation.hardDrop();
+    }
+  };
+
+  const stalledWithHold = (held: boolean): Simulation => {
+    const simulation = new Simulation(() => [0, 1], THINKING);
+    simulation.restart();
+    simulation.shadowHeld = held;
+    placeWhileHeld(simulation);
+
+    return simulation;
+  };
+
+  it('leaves every board free by default, so only the scene decides to hold', () => {
+    expect(new Simulation(() => [0, 1], THINKING).shadowHeld).toBe(false);
+  });
+
+  it('takes nothing while the hold is on, however long the player stalls', () => {
+    expect(stalledWithHold(true).shadowTaken).toBe(0);
+  });
+
+  it('builds no threat while the hold is on, so nothing looms on the board', () => {
+    expect(stalledWithHold(true).stallProgress).toBe(0);
+  });
+
+  it('still takes ground once the hold is off', () => {
+    expect(stalledWithHold(false).shadowTaken).toBeGreaterThan(0);
+  });
+
+  it('lets the shadow back in once the hold is lifted', () => {
+    const simulation = stalledWithHold(true);
+    simulation.shadowHeld = false;
+
+    placeWhileHeld(simulation);
 
     expect(simulation.shadowTaken).toBeGreaterThan(0);
   });

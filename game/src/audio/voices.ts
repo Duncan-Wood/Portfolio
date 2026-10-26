@@ -1,4 +1,4 @@
-type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
+export type Waveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 export interface Voice {
   waveform: Waveform;
@@ -16,8 +16,15 @@ const POP_RATIO = 1.06;
 
 export const MAX_POP_FREQUENCY = BASE_POP_FREQUENCY * 4;
 
-export function popVoice(linkIndex: number): Voice {
-  const climbed = BASE_POP_FREQUENCY * POP_RATIO ** linkIndex;
+const COLOUR_SEMITONES = [0, 3, 5, 7];
+
+export function popVoice(linkIndex: number, pieceType: number): Voice {
+  const semitones = COLOUR_SEMITONES[pieceType];
+  if (semitones === undefined) {
+    throw new RangeError(`Piece type ${pieceType} is not a colour, so it has no pop pitch`);
+  }
+
+  const climbed = BASE_POP_FREQUENCY * 2 ** (semitones / 12) * POP_RATIO ** linkIndex;
   const frequency = Math.min(climbed, MAX_POP_FREQUENCY);
 
   return {
@@ -32,11 +39,11 @@ export function popVoice(linkIndex: number): Voice {
 
 export function landVoice(): Voice {
   return {
-    waveform: 'sine',
-    startFrequency: 180,
-    endFrequency: 120,
-    duration: 60,
-    gain: 0.12,
+    waveform: 'sawtooth',
+    startFrequency: 190,
+    endFrequency: 90,
+    duration: 90,
+    gain: 0.09,
     delay: 0,
   };
 }
@@ -47,9 +54,9 @@ export function hardDropVoice(distance: number): Voice {
   return {
     waveform: 'sawtooth',
     startFrequency: 200 - 60 * weight,
-    endFrequency: 50,
+    endFrequency: 80,
     duration: 80 + 40 * weight,
-    gain: 0.1 + 0.14 * weight,
+    gain: 0.07 + 0.08 * weight,
     delay: 0,
   };
 }
@@ -60,33 +67,43 @@ export function topOutVoice(): Voice {
     startFrequency: 200,
     endFrequency: 50,
     duration: 400,
-    gain: 0.2,
+    gain: 0.28,
     delay: 0,
   };
 }
 
 export function nodeVoice(padIndex: number, padCount: number): Voice {
-  const frequency = 330 * 2 ** (padIndex / padCount);
+  const frequency = 330 * 2 ** (padIndex / Math.max(padCount - 1, 1));
 
   return {
     waveform: 'triangle',
     startFrequency: frequency,
     endFrequency: frequency * 1.5,
     duration: 110,
-    gain: 0.1,
+    gain: 0.14,
     delay: 0,
   };
 }
 
-export function shadowArrivalVoice(): Voice {
-  return {
-    waveform: 'sawtooth',
-    startFrequency: 150,
-    endFrequency: 62,
-    duration: 320,
-    gain: 0.12,
-    delay: 0,
-  };
+export function shadowArrivalVoices(): Voice[] {
+  return [
+    {
+      waveform: 'sawtooth',
+      startFrequency: 233,
+      endFrequency: 233,
+      duration: 160,
+      gain: 0.16,
+      delay: 0,
+    },
+    {
+      waveform: 'sawtooth',
+      startFrequency: 165,
+      endFrequency: 80,
+      duration: 450,
+      gain: 0.22,
+      delay: 150,
+    },
+  ];
 }
 
 export function shadowRecedeVoice(cellsPushed: number): Voice {
@@ -97,7 +114,7 @@ export function shadowRecedeVoice(cellsPushed: number): Voice {
     startFrequency: 880,
     endFrequency: 1320 + 220 * weight,
     duration: 90,
-    gain: 0.05 + 0.05 * weight,
+    gain: 0.09 + 0.07 * weight,
     delay: 0,
   };
 }

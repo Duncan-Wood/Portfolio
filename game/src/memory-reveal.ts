@@ -1,5 +1,3 @@
-// A memory surfaces from the middle outward, not in bands: cells are ordered by
-// their distance from the centre, jittered so the advancing edge stays ragged.
 const JITTER = 2.4;
 
 function scatter(column: number, row: number): number {
