@@ -73,9 +73,6 @@ const Home = () => {
             <span className="text-lg font-semibold">
               Or play Connected
             </span>
-            <span className="mt-1 text-sm opacity-80">
-              the part the resume leaves out
-            </span>
           </a>
         </div>
       </div>
