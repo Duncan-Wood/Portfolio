@@ -41,6 +41,7 @@ class FakeContext {
   state: string = 'running';
   currentTime = 0;
   resumeCalls = 0;
+  private readonly stateListeners: Array<() => void> = [];
   readonly destination = new FakeNode('destination');
   readonly nodes: FakeNode[] = [];
 
@@ -58,6 +59,19 @@ class FakeContext {
     this.resumeCalls++;
     this.state = 'running';
     return Promise.resolve();
+  }
+
+  addEventListener(type: string, listener: () => void): void {
+    if (type === 'statechange') {
+      this.stateListeners.push(listener);
+    }
+  }
+
+  changeState(state: string): void {
+    this.state = state;
+    for (const listener of this.stateListeners) {
+      listener();
+    }
   }
 }
 
@@ -340,5 +354,31 @@ describe('memory themes on the sound board', () => {
 
     expect(context.nodes.filter((node) => node.kind === 'oscillator')).toHaveLength(0);
     expect(context.nodes.filter((node) => node.kind === 'gain')).toHaveLength(1);
+  });
+});
+
+describe('the sound board when the browser stops the audio mid-play', () => {
+  it('tries to resume the moment the context stops, without waiting for a tap', () => {
+    const { context } = unlockedBoard();
+
+    context.changeState('interrupted');
+
+    expect(context.resumeCalls).toBe(1);
+  });
+
+  it('does not resume when the context starts running', () => {
+    const { context } = unlockedBoard();
+
+    context.changeState('running');
+
+    expect(context.resumeCalls).toBe(0);
+  });
+
+  it('does not resume a context that was closed', () => {
+    const { context } = unlockedBoard();
+
+    context.changeState('closed');
+
+    expect(context.resumeCalls).toBe(0);
   });
 });

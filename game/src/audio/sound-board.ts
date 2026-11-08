@@ -43,6 +43,10 @@ export class SoundBoard {
   }
 
   private buildOutput(context: AudioContext): void {
+    context.addEventListener('statechange', () => {
+      this.resumeIfStopped();
+    });
+
     const master = context.createGain();
     master.gain.value = this.isMuted ? 0 : MASTER_GAIN;
     this.master = master;
