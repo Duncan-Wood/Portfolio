@@ -52,7 +52,7 @@ const NavLinks = ({ variant, onNavigate }) => {
         Resume
       </a>
       <a href="/game/" onClick={onNavigate} className={className()}>
-        Play
+        Game
       </a>
     </>
   );

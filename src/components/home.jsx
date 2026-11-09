@@ -71,7 +71,10 @@ const Home = () => {
             className="mt-2 inline-flex flex-col items-center rounded-lg border border-purple-400 px-6 py-3 text-center transition-colors hover:bg-brand-hover focus:outline-hidden focus:ring-2 focus:ring-purple-400"
           >
             <span className="text-lg font-semibold">
-              Or play Connected
+              Play Connected
+            </span>
+            <span className="mt-1 text-sm opacity-80">
+              a game I made
             </span>
           </a>
         </div>
